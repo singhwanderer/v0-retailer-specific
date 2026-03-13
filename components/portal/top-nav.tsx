@@ -11,7 +11,6 @@ const navLinks = [
   { id: "dashboard", label: "Dashboard" },
   { id: "attribute-profiles", label: "Attribute Profiles" },
   { id: "vendor-exceptions", label: "Vendor Exceptions" },
-  { id: "reports", label: "Reports" },
 ]
 
 export function TopNav({ activeScreen, onNavigate }: TopNavProps) {

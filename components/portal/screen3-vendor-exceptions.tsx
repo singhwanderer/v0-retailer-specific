@@ -65,7 +65,7 @@ interface ExceptionRow {
 
 const exceptions: ExceptionRow[] = [
   {
-    vendor: "J.Renée by Remac",
+    vendor: "J.Renée",
     profile: "Footwear — Core Compliance",
     exceptionType: "Attribute Waiver",
     attributes: ["Heel Height", "Platform Height"],

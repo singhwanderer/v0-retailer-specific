@@ -336,8 +336,7 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               </button>
             </div>
             <p className="text-xs" style={{ color: "#6B7280" }}>
-              Category: Footwear · 34 attributes required · Last edited Mar 8, 2026 by{" "}
-              <span className="text-[#0168B3]">Anita.Rogers@dillards.com</span>
+              Category: Footwear · 34 attributes required
             </p>
           </div>
 

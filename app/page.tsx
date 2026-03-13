@@ -11,7 +11,6 @@ type Screen =
   | "dashboard"
   | "attribute-profiles"
   | "vendor-exceptions"
-  | "reports"
   | "profile-detail"
 
 function DashboardPlaceholder() {
@@ -19,15 +18,6 @@ function DashboardPlaceholder() {
     <div className="p-8 flex flex-col gap-4">
       <h1 className="text-2xl font-semibold text-[#111827]">Dashboard</h1>
       <p className="text-sm text-[#6B7280]">Dashboard content is out of scope for this prototype.</p>
-    </div>
-  )
-}
-
-function ReportsPlaceholder() {
-  return (
-    <div className="p-8 flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-[#111827]">Reports</h1>
-      <p className="text-sm text-[#6B7280]">Reports content is out of scope for this prototype.</p>
     </div>
   )
 }
@@ -40,8 +30,7 @@ export default function RetailerPortal() {
     if (
       id === "dashboard" ||
       id === "attribute-profiles" ||
-      id === "vendor-exceptions" ||
-      id === "reports"
+      id === "vendor-exceptions"
     ) {
       setScreen(id as Screen)
     }
@@ -52,7 +41,30 @@ export default function RetailerPortal() {
     screen === "profile-detail" ? "attribute-profiles" : screen
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: "#F4F6F8" }}>
+    <div className="flex flex-col h-screen overflow-hidden relative" style={{ backgroundColor: "#F4F6F8" }}>
+      {/* Watermark overlay */}
+      <div
+        className="fixed inset-0 pointer-events-none flex items-center justify-center z-10"
+        style={{
+          opacity: 0.2,
+        }}
+      >
+        <div className="text-center">
+          <p
+            className="text-4xl font-bold tracking-widest"
+            style={{ color: "#9CA3AF" }}
+          >
+            MOCK DATA FOR ILLUSTRATION ONLY
+          </p>
+          <p
+            className="text-xl mt-3"
+            style={{ color: "#D1D5DB" }}
+          >
+            This is a prototype
+          </p>
+        </div>
+      </div>
+
       {/* Top navigation bar */}
       <TopNav activeScreen={activeScreen} onNavigate={handleNavigate} />
 
@@ -73,8 +85,6 @@ export default function RetailerPortal() {
           )}
 
           {screen === "vendor-exceptions" && <Screen3VendorExceptions />}
-
-          {screen === "reports" && <ReportsPlaceholder />}
         </main>
       </div>
     </div>
