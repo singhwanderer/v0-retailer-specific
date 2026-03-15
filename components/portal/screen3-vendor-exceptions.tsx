@@ -412,7 +412,6 @@ export function Screen3VendorExceptions() {
               <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F4F6F8" }}>
                 <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Vendor Name</th>
                 <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Affected Profile</th>
-                <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Exception Type</th>
                 <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Attributes Affected</th>
                 <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Valid Until</th>
                 <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Status</th>
@@ -434,9 +433,6 @@ export function Screen3VendorExceptions() {
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-[#374151] text-xs">{row.profile}</td>
-                  <td className="px-4 py-3.5">
-                    <ExceptionTypePill type={row.exceptionType} />
-                  </td>
                   <td className="px-4 py-3.5">
                     <div className="flex flex-wrap gap-1">
                       {row.attributes.map((attr) => (
@@ -474,7 +470,7 @@ export function Screen3VendorExceptions() {
 
         {/* Footer note */}
         <p className="text-xs" style={{ color: "#9CA3AF" }}>
-          5 exceptions active · 1 expired · Exceptions are audited quarterly.
+          2 exceptions active · 1 draft
         </p>
       </div>
 
