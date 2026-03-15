@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Search, X, Info, ChevronDown } from "lucide-react"
+import { Plus, Search, X, ChevronDown } from "lucide-react"
 
 // ── Pill components ───────────────────────────────────────────────────────────
 type ExceptionType = "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"
@@ -114,8 +114,6 @@ const exceptions: ExceptionRow[] = [
 // ── Add Exception Modal ────────────────────────────────────────────────────────
 function AddExceptionModal({ onClose }: { onClose: () => void }) {
   const [permanent, setPermanent] = useState(false)
-  const [suppressWarning, setSuppressWarning] = useState(false)
-  const [exceptionType, setExceptionType] = useState<ExceptionType | "">("")
 
   return (
     /* Backdrop */
@@ -180,54 +178,6 @@ function AddExceptionModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            {/* Exception Type — radio group */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-[#374151]">
-                Exception Type <span className="text-[#DC2626]">*</span>
-              </label>
-              <div
-                className="flex flex-col gap-0 rounded-md border overflow-hidden"
-                style={{ borderColor: "#E0E4E8" }}
-              >
-                {[
-                  {
-                    value: "Attribute Waiver" as ExceptionType,
-                    description: "Permanently exempt from specific attributes",
-                  },
-                  {
-                    value: "Extended Deadline" as ExceptionType,
-                    description: "More time to comply",
-                  },
-                  {
-                    value: "Reduced Scope" as ExceptionType,
-                    description: "Lower completeness threshold for this vendor",
-                  },
-                ].map(({ value, description }, idx, arr) => (
-                  <label
-                    key={value}
-                    className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-[#F9FAFB] transition-colors"
-                    style={{
-                      borderBottom: idx < arr.length - 1 ? "1px solid #F3F4F6" : undefined,
-                      backgroundColor: exceptionType === value ? "#EFF6FF" : undefined,
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="exceptionType"
-                      value={value}
-                      checked={exceptionType === value}
-                      onChange={() => setExceptionType(value)}
-                      className="mt-0.5 cursor-pointer accent-[#0168B3]"
-                    />
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-[#111827]">{value}</span>
-                      <span className="text-xs text-[#6B7280]">{description}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
             {/* Attributes to Except + Valid Until */}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
@@ -270,29 +220,6 @@ function AddExceptionModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            {/* Suppress warning checkbox — placed in form body per design review */}
-            <div
-              className="flex items-start gap-3 p-3.5 rounded-md"
-              style={{ backgroundColor: "#F9FAFB", border: "1px solid #E0E4E8" }}
-            >
-              <input
-                type="checkbox"
-                id="suppress-warning"
-                checked={suppressWarning}
-                onChange={(e) => setSuppressWarning(e.target.checked)}
-                className="mt-0.5 cursor-pointer accent-[#0168B3]"
-              />
-              <label htmlFor="suppress-warning" className="flex flex-col gap-0.5 cursor-pointer">
-                <span className="text-sm font-medium text-[#111827]">
-                  Suppress compliance warning for this vendor on excepted attributes
-                </span>
-                <span className="text-xs leading-relaxed text-[#6B7280]">
-                  By default, suppliers still see excepted attributes as recommended. Enable this
-                  to remove the warning entirely for this vendor.
-                </span>
-              </label>
-            </div>
-
             {/* Internal Reason */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-[#374151]">
@@ -307,17 +234,7 @@ function AddExceptionModal({ onClose }: { onClose: () => void }) {
               />
             </div>
 
-            {/* Audit info note */}
-            <div
-              className="flex items-start gap-2.5 p-3.5 rounded-md text-xs leading-relaxed"
-              style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE", color: "#1E40AF" }}
-            >
-              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#0168B3]" />
-              <span>
-                Exceptions are logged with your user ID and timestamp. They do not suppress
-                supplier-facing warnings unless you enable the option above.
-              </span>
-            </div>
+
           </div>
         </div>
 
@@ -468,10 +385,7 @@ export function Screen3VendorExceptions() {
           </table>
         </div>
 
-        {/* Footer note */}
-        <p className="text-xs" style={{ color: "#9CA3AF" }}>
-          2 exceptions active · 1 draft
-        </p>
+
       </div>
 
       {/* Modal */}
