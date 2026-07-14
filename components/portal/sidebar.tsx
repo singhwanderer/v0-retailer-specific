@@ -10,7 +10,7 @@ interface SidebarProps {
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "attribute-profiles", label: "Attribute Profiles", icon: Tag },
+  { id: "attribute-profiles", label: "Attributes & Images", icon: Tag },
 ]
 
 export function Sidebar({ activeScreen, onNavigate }: SidebarProps) {

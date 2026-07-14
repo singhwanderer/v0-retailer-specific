@@ -8,6 +8,8 @@ import {
   Pencil,
   Plus,
   Search,
+  X,
+  CheckCircle,
 } from "lucide-react"
 import {
   Dialog,
@@ -79,14 +81,127 @@ const initialImageRows: ImageRequirementRow[] = [
   },
 ]
 
-// ── Attribute table ───────────────────────────────────────────────────────────
-function AttributeTable({
-  rows,
-  onEditGuidance,
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white"
+      style={{ backgroundColor: "#0168B3" }}
+    >
+      <CheckCircle className="w-4 h-4 shrink-0" />
+      {message}
+      <button onClick={onDismiss} className="ml-1 opacity-70 hover:opacity-100 transition-opacity">
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
+}
+
+// ── Confirm Deactivate Modal ──────────────────────────────────────────────────
+function ConfirmDeactivateModal({
+  open,
+  onClose,
+  onConfirm,
+  categoryName,
 }: {
-  rows: AttributeRow[]
-  onEditGuidance?: (idx: number, value: string) => void
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  categoryName: string
 }) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Deactivate Category Requirements
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm leading-relaxed py-2" style={{ color: "#6B7280" }}>
+          Suppliers will no longer see the requirements for &ldquo;{categoryName}&rdquo; until
+          it is reactivated. No attribute data will be deleted.
+        </p>
+        <DialogFooter>
+          <button
+            onClick={onClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onConfirm(); onClose() }}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#DC2626" }}
+          >
+            Deactivate
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Rename Category Modal ─────────────────────────────────────────────────────
+function RenameCategoryModal({
+  open,
+  onClose,
+  onSave,
+  currentName,
+}: {
+  open: boolean
+  onClose: () => void
+  onSave: (name: string) => void
+  currentName: string
+}) {
+  const [value, setValue] = useState(currentName)
+  function handleSave() {
+    if (!value.trim()) return
+    onSave(value.trim())
+    onClose()
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { setValue(currentName); onClose() } }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Rename Category Requirements
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2">
+          <input
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSave() }}
+            className="w-full px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827]"
+            style={{ borderColor: "#E0E4E8" }}
+          />
+        </div>
+        <DialogFooter>
+          <button
+            onClick={() => { setValue(currentName); onClose() }}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!value.trim()}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: "#0168B3" }}
+          >
+            Save
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Attribute table ───────────────────────────────────────────────────────────
+function AttributeTable({ rows }: { rows: AttributeRow[] }) {
   return (
     <>
       <table className="w-full text-sm">
@@ -386,7 +501,7 @@ function AddAttributeDialog({
               className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
               style={{ backgroundColor: "#0168B3" }}
             >
-              Add to profile
+              Add to category
             </button>
           )}
         </DialogFooter>
@@ -485,8 +600,8 @@ function AddImageRequirementDialog({
   )
 }
 
-// ── Right column — Profile summary card ──────────────────────────────────────
-function ProfileSummaryCard({
+// ── Right column — Category summary card ─────────────────────────────────────
+function CategorySummaryCard({
   coreCount,
   extendedCount,
   imageCount,
@@ -501,7 +616,7 @@ function ProfileSummaryCard({
       style={{ borderColor: "#E0E4E8", borderTopColor: "#0168B3", borderTopWidth: "4px" }}
     >
       <div className="p-5 flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-[#111827]">Profile Summary</h2>
+        <h2 className="text-sm font-semibold text-[#111827]">Category Summary</h2>
 
         {/* Stats 1×3 */}
         <div className="flex flex-col gap-3">
@@ -551,6 +666,15 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
 
   const [addAttrTarget, setAddAttrTarget] = useState<AddAttrTarget>(null)
   const [addImageOpen, setAddImageOpen] = useState(false)
+  const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [categoryName, setCategoryName] = useState("Footwear — Core Compliance")
+  const [toast, setToast] = useState<string | null>(null)
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3500)
+  }
 
   function handleAddAttr(row: AttributeRow) {
     if (addAttrTarget === "core") setCoreRows((r) => [...r, row])
@@ -567,10 +691,10 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
           className="hover:underline cursor-pointer"
           style={{ color: "#0168B3" }}
         >
-          Attribute Profiles
+          Attributes &amp; Images Requirements
         </button>
         <ChevronRight className="w-3.5 h-3.5 text-[#9CA3AF]" />
-        <span className="text-[#111827] font-medium">Footwear — Core Compliance</span>
+        <span className="text-[#111827] font-medium">{categoryName}</span>
       </nav>
 
       {/* Two-column layout */}
@@ -581,7 +705,7 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl font-semibold text-[#111827]">
-                Footwear — Core Compliance
+                {categoryName}
               </h1>
               <span
                 className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
@@ -590,7 +714,11 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
                 <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
                 Active
               </span>
-              <button className="ml-1 text-[#9CA3AF] hover:text-[#6B7280] cursor-pointer transition-colors">
+              <button
+                onClick={() => setRenameOpen(true)}
+                className="ml-1 text-[#9CA3AF] hover:text-[#6B7280] cursor-pointer transition-colors"
+                title="Rename category"
+              >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -613,7 +741,6 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
 
           {/* Attribute groups */}
           <div className="flex flex-col gap-3">
-            {/* Core Attributes */}
             <AttributeGroup
               title="Core Attributes"
               count={coreRows.length}
@@ -623,7 +750,6 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               <AttributeTable rows={coreRows} />
             </AttributeGroup>
 
-            {/* Extended Attributes */}
             <AttributeGroup
               title="Extended Attributes"
               count={extendedRows.length}
@@ -633,7 +759,6 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               <AttributeTable rows={extendedRows} />
             </AttributeGroup>
 
-            {/* Image Requirements */}
             <AttributeGroup
               title="Image Requirements"
               count={imageRows.length}
@@ -651,29 +776,32 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
             style={{ borderTop: "1px solid #E0E4E8" }}
           >
             <button
+              onClick={() => showToast("Changes saved successfully.")}
               className="px-4 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity"
               style={{ backgroundColor: "#0168B3" }}
             >
               Save Changes
             </button>
             <button
+              onClick={onBack}
               className="px-4 py-2 rounded-md text-sm font-medium border hover:bg-[#F4F6F8] transition-colors"
               style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
             >
               Cancel
             </button>
             <button
-              className="ml-auto text-sm font-medium hover:underline cursor-pointer"
+              onClick={() => setDeactivateOpen(true)}
+              className="ml-auto text-sm font-medium hover:underline cursor-pointer transition-colors"
               style={{ color: "#DC2626" }}
             >
-              Deactivate Profile
+              Deactivate Category
             </button>
           </div>
         </div>
 
         {/* Right column — 35% */}
         <div style={{ flex: "0 0 35%" }}>
-          <ProfileSummaryCard
+          <CategorySummaryCard
             coreCount={coreRows.length}
             extendedCount={extendedRows.length}
             imageCount={imageRows.length}
@@ -692,6 +820,21 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
         onClose={() => setAddImageOpen(false)}
         onAdd={(row) => setImageRows((r) => [...r, row])}
       />
+      <ConfirmDeactivateModal
+        open={deactivateOpen}
+        onClose={() => setDeactivateOpen(false)}
+        onConfirm={() => { onBack() }}
+        categoryName={categoryName}
+      />
+      <RenameCategoryModal
+        open={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        onSave={(name) => { setCategoryName(name); showToast(`Renamed to "${name}".`) }}
+        currentName={categoryName}
+      />
+
+      {/* Toast */}
+      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>
   )
 }

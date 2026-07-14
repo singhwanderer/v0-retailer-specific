@@ -9,7 +9,7 @@ interface TopNavProps {
 
 const navLinks = [
   { id: "dashboard", label: "Dashboard" },
-  { id: "attribute-profiles", label: "Attribute Profiles" },
+  { id: "attribute-profiles", label: "Attributes & Images" },
 ]
 
 export function TopNav({ activeScreen, onNavigate }: TopNavProps) {
