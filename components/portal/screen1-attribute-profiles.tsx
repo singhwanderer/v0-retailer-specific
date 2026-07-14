@@ -21,7 +21,7 @@ const categories = [
     attributes: "34 attributes · 1 image requirement",
     status: "Active" as const,
     lastUpdated: "Mar 8, 2026",
-    actions: ["Edit", "Duplicate", "Deactivate"] as const,
+    actions: ["Edit", "Deactivate"] as const,
     isLink: true,
   },
   {
@@ -30,7 +30,7 @@ const categories = [
     attributes: "51 attributes",
     status: "Active" as const,
     lastUpdated: "Feb 14, 2026",
-    actions: ["Edit", "Duplicate", "Deactivate"] as const,
+    actions: ["Edit", "Deactivate"] as const,
     isLink: true,
   },
   {
@@ -39,7 +39,7 @@ const categories = [
     attributes: "22 attributes",
     status: "Draft" as const,
     lastUpdated: "Mar 11, 2026",
-    actions: ["Edit", "Duplicate", "Activate"] as const,
+    actions: ["Edit", "Activate"] as const,
     isLink: true,
   },
 ]
@@ -256,12 +256,6 @@ function ConfirmActionModal({
       confirm: "Activate",
       danger: false,
     },
-    Duplicate: {
-      title: "Duplicate Category Requirements",
-      body: `A draft copy of "${categoryName}" will be created. You can edit it before activating.`,
-      confirm: "Duplicate",
-      danger: false,
-    },
   }
 
   const { title, body, confirm, danger } = config[action]
@@ -301,7 +295,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
   const [toast, setToast] = useState<string | null>(null)
   const [confirmState, setConfirmState] = useState<{
     open: boolean
-    action: "Deactivate" | "Activate" | "Duplicate" | null
+    action: "Deactivate" | "Activate" | null
     name: string
   }>({ open: false, action: null, name: "" })
 
@@ -315,7 +309,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
       onNavigateToProfile()
       return
     }
-    if (action === "Deactivate" || action === "Activate" || action === "Duplicate") {
+    if (action === "Deactivate" || action === "Activate") {
       setConfirmState({ open: true, action, name })
     }
   }
@@ -324,7 +318,6 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
     const { action, name } = confirmState
     if (action === "Deactivate") showToast(`"${name}" has been deactivated.`)
     if (action === "Activate") showToast(`"${name}" is now active.`)
-    if (action === "Duplicate") showToast(`A draft copy of "${name}" was created.`)
   }
 
   return (
@@ -336,7 +329,6 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
         </h1>
         <p className="mt-1 text-sm leading-relaxed" style={{ color: "#6B7280" }}>
           Define which attributes and image specifications your suppliers must meet by product category.
-          Suppliers see these requirements when uploading GTINs.
         </p>
       </div>
 

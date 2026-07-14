@@ -4,7 +4,6 @@ import { useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
-  Info,
   Pencil,
   Plus,
   Search,
@@ -200,8 +199,122 @@ function RenameCategoryModal({
   )
 }
 
+// ── Edit Attribute Dialog ─────────────────────────────────────────────────────
+function EditAttributeDialog({
+  open,
+  row,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  row: AttributeRow | null
+  onClose: () => void
+  onSave: (updated: AttributeRow) => void
+}) {
+  const [retailerName, setRetailerName] = useState(row?.retailerName ?? "")
+  const [guidance, setGuidance] = useState(row?.guidance ?? "")
+
+  // Sync form when row changes (different row opened)
+  if (row && retailerName === "" && row.retailerName !== "") {
+    setRetailerName(row.retailerName)
+    setGuidance(row.guidance)
+  }
+
+  function handleOpen() {
+    setRetailerName(row?.retailerName ?? "")
+    setGuidance(row?.guidance ?? "")
+  }
+
+  function handleSave() {
+    if (!row || !retailerName.trim()) return
+    onSave({ ...row, retailerName: retailerName.trim(), guidance: guidance.trim() })
+    onClose()
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (o) handleOpen()
+        else onClose()
+      }}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Edit Attribute
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 py-2">
+          {/* TGC GS1 — read-only */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[#6B7280]">TGC Attribute Name (GS1)</label>
+            <div
+              className="px-3 py-2 rounded-md text-sm"
+              style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
+            >
+              {row?.tgcGs1Name}
+            </div>
+          </div>
+          {/* Retailer label — editable */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[#111827]">
+              Retailer Attribute Name <span style={{ color: "#DC2626" }}>*</span>
+            </label>
+            <input
+              autoFocus
+              value={retailerName}
+              onChange={(e) => setRetailerName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSave() }}
+              className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827]"
+              style={{ borderColor: "#E0E4E8" }}
+            />
+          </div>
+          {/* Guidance — editable */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[#6B7280]">
+              Supplier Guidance Note (optional)
+            </label>
+            <textarea
+              value={guidance}
+              onChange={(e) => setGuidance(e.target.value)}
+              rows={2}
+              className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 resize-none text-[#111827] placeholder:text-[#9CA3AF]"
+              style={{ borderColor: "#E0E4E8" }}
+              placeholder="Optional note shown to suppliers"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <button
+            onClick={onClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!retailerName.trim()}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: "#0168B3" }}
+          >
+            Save
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Attribute table ───────────────────────────────────────────────────────────
-function AttributeTable({ rows }: { rows: AttributeRow[] }) {
+function AttributeTable({
+  rows,
+  onEditRow,
+}: {
+  rows: AttributeRow[]
+  onEditRow: (idx: number) => void
+}) {
   return (
     <>
       <table className="w-full text-sm">
@@ -216,6 +329,7 @@ function AttributeTable({ rows }: { rows: AttributeRow[] }) {
             <th className="text-left px-4 py-2.5 font-medium text-[#6B7280]">
               Supplier Guidance Note (optional)
             </th>
+            <th className="px-4 py-2.5 w-10" />
           </tr>
         </thead>
         <tbody>
@@ -223,7 +337,7 @@ function AttributeTable({ rows }: { rows: AttributeRow[] }) {
             <tr
               key={idx}
               style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
-              className="hover:bg-[#F4F6F8]/40 transition-colors"
+              className="group hover:bg-[#F4F6F8]/40 transition-colors"
             >
               <td className="px-4 py-2.5 font-medium text-[#111827]">{row.retailerName}</td>
               <td
@@ -234,6 +348,15 @@ function AttributeTable({ rows }: { rows: AttributeRow[] }) {
               </td>
               <td className="px-4 py-2.5 text-xs leading-relaxed" style={{ color: "#6B7280" }}>
                 {row.guidance ? row.guidance : <span style={{ color: "#D1D5DB" }}>—</span>}
+              </td>
+              <td className="px-4 py-2.5 text-right">
+                <button
+                  onClick={() => onEditRow(idx)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#0168B3]"
+                  title="Edit row"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
               </td>
             </tr>
           ))}
@@ -246,16 +369,119 @@ function AttributeTable({ rows }: { rows: AttributeRow[] }) {
   )
 }
 
+// ── Edit Image Requirement Dialog ─────────────────────────────────────────────
+function EditImageRequirementDialog({
+  open,
+  row,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  row: ImageRequirementRow | null
+  onClose: () => void
+  onSave: (updated: ImageRequirementRow) => void
+}) {
+  const empty: ImageRequirementRow = {
+    requirementName: "",
+    format: "",
+    background: "",
+    minDimensions: "",
+    maxFileSize: "",
+    shapeCrop: "",
+    guidanceNote: "",
+  }
+  const [form, setForm] = useState<ImageRequirementRow>(row ?? empty)
+
+  function handleOpen() {
+    setForm(row ?? empty)
+  }
+
+  function set(key: keyof ImageRequirementRow, value: string) {
+    setForm((f) => ({ ...f, [key]: value }))
+  }
+
+  function handleSave() {
+    if (!form.requirementName.trim()) return
+    onSave(form)
+    onClose()
+  }
+
+  const fields: { key: keyof ImageRequirementRow; label: string; placeholder: string }[] = [
+    { key: "requirementName", label: "Requirement Name", placeholder: "e.g. Hero Shot" },
+    { key: "format", label: "Format", placeholder: "e.g. JPEG" },
+    { key: "background", label: "Background", placeholder: "e.g. Pure white (#FFFFFF)" },
+    { key: "minDimensions", label: "Minimum Dimensions", placeholder: "e.g. 2000 × 2000 px" },
+    { key: "maxFileSize", label: "Maximum File Size", placeholder: "e.g. 10 MB" },
+    { key: "shapeCrop", label: "Shape/Crop", placeholder: "e.g. Square, product centered" },
+    { key: "guidanceNote", label: "Guidance Note (optional)", placeholder: "e.g. No mannequin, no props." },
+  ]
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (o) handleOpen()
+        else onClose()
+      }}
+    >
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Edit Image Requirement
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 py-2">
+          {fields.map(({ key, label, placeholder }) => (
+            <div key={key} className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#6B7280]">{label}</label>
+              <input
+                value={form[key]}
+                onChange={(e) => set(key, e.target.value)}
+                placeholder={placeholder}
+                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
+                style={{ borderColor: "#E0E4E8" }}
+              />
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <button
+            onClick={onClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!form.requirementName.trim()}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: "#0168B3" }}
+          >
+            Save
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Image requirements table ──────────────────────────────────────────────────
-function ImageRequirementsTable({ rows }: { rows: ImageRequirementRow[] }) {
+function ImageRequirementsTable({
+  rows,
+  onEditRow,
+}: {
+  rows: ImageRequirementRow[]
+  onEditRow: (idx: number) => void
+}) {
   return (
     <>
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: 800 }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8" }}>
-              {["Requirement Name", "Format", "Background", "Min Dimensions", "Max File Size", "Shape/Crop", "Guidance Note (optional)"].map((h) => (
-                <th key={h} className="text-left px-4 py-2.5 font-medium text-[#6B7280] whitespace-nowrap">
+              {["Requirement Name", "Format", "Background", "Min Dimensions", "Max File Size", "Shape/Crop", "Guidance Note (optional)", ""].map((h, i) => (
+                <th key={i} className="text-left px-4 py-2.5 font-medium text-[#6B7280] whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -266,7 +492,7 @@ function ImageRequirementsTable({ rows }: { rows: ImageRequirementRow[] }) {
               <tr
                 key={idx}
                 style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
-                className="hover:bg-[#F4F6F8]/40 transition-colors"
+                className="group hover:bg-[#F4F6F8]/40 transition-colors"
               >
                 <td className="px-4 py-2.5 font-medium text-[#111827]">{row.requirementName}</td>
                 <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.format}</td>
@@ -276,6 +502,15 @@ function ImageRequirementsTable({ rows }: { rows: ImageRequirementRow[] }) {
                 <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.shapeCrop}</td>
                 <td className="px-4 py-2.5 text-[#6B7280] text-xs">
                   {row.guidanceNote || <span style={{ color: "#D1D5DB" }}>—</span>}
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  <button
+                    onClick={() => onEditRow(idx)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#0168B3]"
+                    title="Edit row"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -671,6 +906,19 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
   const [categoryName, setCategoryName] = useState("Footwear — Core Compliance")
   const [toast, setToast] = useState<string | null>(null)
 
+  // Edit attribute row state
+  const [editAttrState, setEditAttrState] = useState<{
+    open: boolean
+    target: "core" | "extended" | null
+    idx: number
+  }>({ open: false, target: null, idx: -1 })
+
+  // Edit image row state
+  const [editImageState, setEditImageState] = useState<{ open: boolean; idx: number }>({
+    open: false,
+    idx: -1,
+  })
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 3500)
@@ -680,6 +928,20 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
     if (addAttrTarget === "core") setCoreRows((r) => [...r, row])
     if (addAttrTarget === "extended") setExtendedRows((r) => [...r, row])
     setAddAttrTarget(null)
+  }
+
+  function handleSaveAttr(updated: AttributeRow) {
+    if (editAttrState.target === "core") {
+      setCoreRows((rows) => rows.map((r, i) => (i === editAttrState.idx ? updated : r)))
+    } else if (editAttrState.target === "extended") {
+      setExtendedRows((rows) => rows.map((r, i) => (i === editAttrState.idx ? updated : r)))
+    }
+    showToast("Attribute updated.")
+  }
+
+  function handleSaveImageRow(updated: ImageRequirementRow) {
+    setImageRows((rows) => rows.map((r, i) => (i === editImageState.idx ? updated : r)))
+    showToast("Image requirement updated.")
   }
 
   return (
@@ -727,18 +989,6 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
             </p>
           </div>
 
-          {/* Info banner */}
-          <div
-            className="flex items-start gap-3 p-3.5 rounded-md text-sm leading-relaxed"
-            style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
-          >
-            <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#0168B3" }} />
-            <span style={{ color: "#1E40AF" }}>
-              Suppliers uploading GTINs in the Footwear category will see these requirements
-              when they view their catalogue.
-            </span>
-          </div>
-
           {/* Attribute groups */}
           <div className="flex flex-col gap-3">
             <AttributeGroup
@@ -747,7 +997,10 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               defaultExpanded
               onAddClick={() => setAddAttrTarget("core")}
             >
-              <AttributeTable rows={coreRows} />
+              <AttributeTable
+                rows={coreRows}
+                onEditRow={(idx) => setEditAttrState({ open: true, target: "core", idx })}
+              />
             </AttributeGroup>
 
             <AttributeGroup
@@ -756,7 +1009,10 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               defaultExpanded
               onAddClick={() => setAddAttrTarget("extended")}
             >
-              <AttributeTable rows={extendedRows} />
+              <AttributeTable
+                rows={extendedRows}
+                onEditRow={(idx) => setEditAttrState({ open: true, target: "extended", idx })}
+              />
             </AttributeGroup>
 
             <AttributeGroup
@@ -766,7 +1022,10 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               onAddClick={() => setAddImageOpen(true)}
               addLabel="+ Add Image Requirement"
             >
-              <ImageRequirementsTable rows={imageRows} />
+              <ImageRequirementsTable
+                rows={imageRows}
+                onEditRow={(idx) => setEditImageState({ open: true, idx })}
+              />
             </AttributeGroup>
           </div>
 
@@ -819,6 +1078,24 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
         open={addImageOpen}
         onClose={() => setAddImageOpen(false)}
         onAdd={(row) => setImageRows((r) => [...r, row])}
+      />
+      <EditAttributeDialog
+        open={editAttrState.open}
+        row={
+          editAttrState.target === "core"
+            ? (coreRows[editAttrState.idx] ?? null)
+            : editAttrState.target === "extended"
+            ? (extendedRows[editAttrState.idx] ?? null)
+            : null
+        }
+        onClose={() => setEditAttrState({ open: false, target: null, idx: -1 })}
+        onSave={handleSaveAttr}
+      />
+      <EditImageRequirementDialog
+        open={editImageState.open}
+        row={imageRows[editImageState.idx] ?? null}
+        onClose={() => setEditImageState({ open: false, idx: -1 })}
+        onSave={handleSaveImageRow}
       />
       <ConfirmDeactivateModal
         open={deactivateOpen}
