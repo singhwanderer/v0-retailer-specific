@@ -6,12 +6,20 @@ import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
+import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
+import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
 
-type Screen =
+type Perspective = "retailer" | "supplier"
+
+type RetailerScreen =
   | "dashboard"
   | "attribute-profiles"
   | "vendor-exceptions"
   | "profile-detail"
+
+type SupplierScreen =
+  | "supplier-products"
+  | "supplier-gap-detail"
 
 function DashboardPlaceholder() {
   return (
@@ -23,31 +31,68 @@ function DashboardPlaceholder() {
 }
 
 export default function RetailerPortal() {
-  const [screen, setScreen] = useState<Screen>("attribute-profiles")
+  const [perspective, setPerspective] = useState<Perspective>("retailer")
 
-  // Map top nav / sidebar IDs to screen state
-  const handleNavigate = (id: string) => {
+  // Retailer screen state
+  const [retailerScreen, setRetailerScreen] = useState<RetailerScreen>("attribute-profiles")
+
+  // Supplier screen state
+  const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("supplier-products")
+  const [gapProduct, setGapProduct] = useState<{ productName: string; retailer: string } | null>(null)
+
+  // ── Perspective switch ──────────────────────────────────────────────────────
+  function handlePerspectiveChange(p: Perspective) {
+    setPerspective(p)
+  }
+
+  // ── Retailer navigation ─────────────────────────────────────────────────────
+  const handleRetailerNavigate = (id: string) => {
     if (
       id === "dashboard" ||
       id === "attribute-profiles" ||
       id === "vendor-exceptions"
     ) {
-      setScreen(id as Screen)
+      setRetailerScreen(id as RetailerScreen)
     }
   }
 
-  // Which sidebar/topnav item is "active" — profile-detail is a child of attribute-profiles
+  // ── Supplier navigation ─────────────────────────────────────────────────────
+  const handleSupplierNavigate = (id: string) => {
+    if (id === "supplier-products") {
+      setSupplierScreen("supplier-products")
+    }
+  }
+
+  function handleNavigateToGapDetail(productName: string, retailer: string) {
+    setGapProduct({ productName, retailer })
+    setSupplierScreen("supplier-gap-detail")
+  }
+
+  function handleBackToCatalogue() {
+    setSupplierScreen("supplier-products")
+    setGapProduct(null)
+  }
+
+  // ── Active sidebar item ─────────────────────────────────────────────────────
+  const retailerActiveScreen =
+    retailerScreen === "profile-detail" ? "attribute-profiles" : retailerScreen
+
+  const supplierActiveScreen =
+    supplierScreen === "supplier-gap-detail" ? "supplier-products" : supplierScreen
+
   const activeScreen =
-    screen === "profile-detail" ? "attribute-profiles" : screen
+    perspective === "retailer" ? retailerActiveScreen : supplierActiveScreen
+
+  // ── Navigation handler passed to TopNav / Sidebar ──────────────────────────
+  const handleNavigate =
+    perspective === "retailer" ? handleRetailerNavigate : handleSupplierNavigate
 
   return (
     <div className="flex flex-col h-screen overflow-hidden relative" style={{ backgroundColor: "#F4F6F8" }}>
       {/* Watermark overlay */}
       <div
         className="fixed inset-0 pointer-events-none flex items-center justify-center z-10"
-        style={{
-          opacity: 0.2,
-        }}
+        style={{ opacity: 0.2 }}
       >
         <div className="text-center">
           <p
@@ -66,25 +111,57 @@ export default function RetailerPortal() {
       </div>
 
       {/* Top navigation bar */}
-      <TopNav activeScreen={activeScreen} onNavigate={handleNavigate} />
+      <TopNav
+        activeScreen={activeScreen}
+        onNavigate={handleNavigate}
+        perspective={perspective}
+        onPerspectiveChange={handlePerspectiveChange}
+      />
 
       {/* Body: sidebar + main content */}
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar activeScreen={activeScreen} onNavigate={handleNavigate} />
+        <Sidebar
+          activeScreen={activeScreen}
+          onNavigate={handleNavigate}
+          perspective={perspective}
+        />
 
         {/* Scrollable main area */}
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: "#F4F6F8" }}>
-          {screen === "dashboard" && <DashboardPlaceholder />}
 
-          {screen === "attribute-profiles" && (
-            <Screen1AttributeProfiles onNavigateToProfile={() => setScreen("profile-detail")} />
+          {/* ── Retailer screens ── */}
+          {perspective === "retailer" && (
+            <>
+              {retailerScreen === "dashboard" && <DashboardPlaceholder />}
+
+              {retailerScreen === "attribute-profiles" && (
+                <Screen1AttributeProfiles onNavigateToProfile={() => setRetailerScreen("profile-detail")} />
+              )}
+
+              {retailerScreen === "profile-detail" && (
+                <Screen2ProfileDetail onBack={() => setRetailerScreen("attribute-profiles")} />
+              )}
+
+              {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
+            </>
           )}
 
-          {screen === "profile-detail" && (
-            <Screen2ProfileDetail onBack={() => setScreen("attribute-profiles")} />
-          )}
+          {/* ── Supplier screens ── */}
+          {perspective === "supplier" && (
+            <>
+              {supplierScreen === "supplier-products" && (
+                <ScreenSupplierProducts onNavigateToGapDetail={handleNavigateToGapDetail} />
+              )}
 
-          {screen === "vendor-exceptions" && <Screen3VendorExceptions />}
+              {supplierScreen === "supplier-gap-detail" && gapProduct && (
+                <ScreenSupplierGapDetail
+                  productName={gapProduct.productName}
+                  retailer={gapProduct.retailer}
+                  onBack={handleBackToCatalogue}
+                />
+              )}
+            </>
+          )}
         </main>
       </div>
     </div>

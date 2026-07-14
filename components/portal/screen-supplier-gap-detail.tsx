@@ -1,0 +1,242 @@
+"use client"
+
+interface GapDetailProps {
+  productName: string
+  retailer: string
+  onBack: () => void
+}
+
+// ── Data shapes ───────────────────────────────────────────────────────────────
+
+type MissingAttribute = {
+  retailerLabel: string
+  tgcName: string
+  tgcCode: string
+}
+
+type ImageRow = {
+  name: string
+  provided: boolean
+}
+
+// ── Mock data per retailer ────────────────────────────────────────────────────
+
+const DILLARDS_MISSING_ATTRS: MissingAttribute[] = [
+  { retailerLabel: "Boot Heel Type", tgcName: "Heel Type", tgcCode: "GM03HLTY" },
+  { retailerLabel: "Outsole Type", tgcName: "Outsole Type", tgcCode: "GM03OUTS" },
+  { retailerLabel: "Closure", tgcName: "Closure", tgcCode: "GM03CLOS" },
+]
+
+const DILLARDS_IMAGES: ImageRow[] = [
+  { name: "Hero Shot", provided: false },
+  { name: "Detail Shot", provided: true },
+]
+
+// For Belk (Complete) — no missing attrs, all images provided
+const BELK_IMAGES: ImageRow[] = [
+  { name: "Hero Shot", provided: true },
+  { name: "Detail Shot", provided: true },
+]
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function Dot({ color }: { color: string }) {
+  return (
+    <span
+      className="w-2 h-2 rounded-full shrink-0 inline-block"
+      style={{ backgroundColor: color }}
+    />
+  )
+}
+
+function SummaryPill({ complete, label }: { complete: boolean; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+      style={
+        complete
+          ? { backgroundColor: "#DCFCE7", color: "#15803D" }
+          : { backgroundColor: "#FEF3C7", color: "#92400E" }
+      }
+    >
+      <span
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ backgroundColor: complete ? "#16A34A" : "#F59E0B" }}
+      />
+      {label}
+    </span>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function ScreenSupplierGapDetail({ productName, retailer, onBack }: GapDetailProps) {
+  const isDillards = retailer === "Dillard's"
+  const missingAttrs = isDillards ? DILLARDS_MISSING_ATTRS : []
+  const imageRows = isDillards ? DILLARDS_IMAGES : BELK_IMAGES
+
+  const providedAttrCount = isDillards ? 4 : 7
+  const totalAttrCount = 7
+  const providedImageCount = imageRows.filter((r) => r.provided).length
+  const totalImageCount = imageRows.length
+  const gapCount = (totalAttrCount - providedAttrCount) + (totalImageCount - providedImageCount)
+  const isComplete = gapCount === 0
+
+  return (
+    <div className="p-8 flex flex-col gap-6 max-w-3xl">
+
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm">
+        <button
+          onClick={onBack}
+          className="font-light hover:underline"
+          style={{ color: "#0168B3" }}
+        >
+          Catalogue
+        </button>
+        <span className="text-[#9CA3AF]">›</span>
+        <span className="text-[#6B7280] font-light">
+          {productName} &mdash; {retailer}
+        </span>
+      </nav>
+
+      {/* Header */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-xl font-semibold text-[#111827]">
+          Requirements Status &mdash; {retailer}
+        </h1>
+        <p className="text-sm font-light text-[#6B7280]">
+          {productName} &middot; Women&apos;s Dresses
+        </p>
+
+        {/* Summary strip */}
+        <div
+          className="flex items-center gap-4 mt-2 px-4 py-3 rounded-md flex-wrap"
+          style={{ backgroundColor: "#F9FAFB", border: "1px solid #E0E4E8" }}
+        >
+          <span className="text-sm font-light text-[#6B7280]">
+            Attributes:{" "}
+            <span className="font-medium text-[#111827]">
+              {providedAttrCount} of {totalAttrCount} provided
+            </span>
+          </span>
+          <span className="text-[#E0E4E8]">|</span>
+          <span className="text-sm font-light text-[#6B7280]">
+            Images:{" "}
+            <span className="font-medium text-[#111827]">
+              {providedImageCount} of {totalImageCount} provided
+            </span>
+          </span>
+          <span className="text-[#E0E4E8]">|</span>
+          <SummaryPill
+            complete={isComplete}
+            label={isComplete ? "Complete" : `${gapCount} gaps`}
+          />
+        </div>
+      </div>
+
+      {/* Section A — Missing Attributes */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-[#111827]">Missing Attributes</h2>
+        <div
+          className="rounded-lg overflow-hidden"
+          style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
+        >
+          {isComplete || missingAttrs.length === 0 ? (
+            <div className="flex items-center gap-2 px-4 py-3">
+              <Dot color="#16A34A" />
+              <span className="text-sm font-light" style={{ color: "#15803D" }}>
+                All required attributes provided.
+              </span>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody>
+                {missingAttrs.map((attr, idx) => (
+                  <tr
+                    key={attr.tgcCode}
+                    style={{
+                      borderBottom:
+                        idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
+                    }}
+                  >
+                    <td className="px-4 py-3 w-8 align-middle">
+                      <Dot color="#F59E0B" />
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="font-medium text-[#111827]">{attr.retailerLabel}</span>
+                      <span className="ml-2 text-xs font-light text-[#9CA3AF]">
+                        TGC: {attr.tgcName} ({attr.tgcCode})
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right align-middle">
+                      <span className="text-xs font-light text-[#92400E]">Not provided</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
+      {/* Section B — Image Requirements */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-[#111827]">Image Requirements</h2>
+        <div
+          className="rounded-lg overflow-hidden"
+          style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
+        >
+          <table className="w-full text-sm">
+            <tbody>
+              {imageRows.map((img, idx) => (
+                <tr
+                  key={img.name}
+                  style={{
+                    borderBottom:
+                      idx < imageRows.length - 1 ? "1px solid #F3F4F6" : undefined,
+                  }}
+                >
+                  <td className="px-4 py-3 w-8 align-middle">
+                    <Dot color={img.provided ? "#16A34A" : "#F59E0B"} />
+                  </td>
+                  <td className="px-4 py-3 font-medium text-[#111827] align-middle">
+                    {img.name}
+                  </td>
+                  <td className="px-4 py-3 align-middle">
+                    <span
+                      className="text-xs font-light"
+                      style={{ color: img.provided ? "#15803D" : "#92400E" }}
+                    >
+                      {img.provided ? "Image provided" : "Required image not provided"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right align-middle">
+                    {!img.provided && (
+                      <button
+                        className="px-3 py-1.5 rounded-md text-xs font-medium text-white transition-opacity hover:opacity-80 cursor-pointer"
+                        style={{ backgroundColor: "#0168B3" }}
+                        onClick={() => {}}
+                      >
+                        Upload Image
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Caption */}
+      <p
+        className="text-[11px] font-light leading-relaxed"
+        style={{ color: "#9CA3AF" }}
+      >
+        This shows what {retailer} requires that is not yet in your catalogue for this product.
+        Image requirements are confirmed as provided or not &mdash; image content is not verified.
+      </p>
+    </div>
+  )
+}
