@@ -7,130 +7,170 @@ import {
   Info,
   Pencil,
   Plus,
-  AlertTriangle,
-  ArrowRight,
+  Search,
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
-// ── Required-level badge ──────────────────────────────────────────────────────
-// Mandatory  → red asterisk *
-// Recommended → amber filled diamond ◆
-// Optional   → grey filled circle ●
-
-type RequiredLevel = "Mandatory" | "Recommended" | "Optional"
-
-function RequiredBadge({ level }: { level: RequiredLevel }) {
-  if (level === "Mandatory")
-    return (
-      <span className="text-base font-bold leading-none" style={{ color: "#DC2626" }}>
-        *
-      </span>
-    )
-  if (level === "Recommended")
-    return (
-      <span className="text-sm leading-none" style={{ color: "#F59E0B" }}>
-        ◆
-      </span>
-    )
-  return (
-    <span className="text-sm leading-none" style={{ color: "#9CA3AF" }}>
-      ●
-    </span>
-  )
-}
-
-function RequiredLevelSelect({ value }: { value: RequiredLevel }) {
-  const colourMap: Record<RequiredLevel, string> = {
-    Mandatory: "#DC2626",
-    Recommended: "#F59E0B",
-    Optional: "#6B7280",
-  }
-  return (
-    <div className="flex items-center gap-1.5">
-      <RequiredBadge level={value} />
-      <select
-        className="text-xs border rounded px-1.5 py-0.5 cursor-pointer"
-        defaultValue={value}
-        style={{ borderColor: "#E0E4E8", color: colourMap[value] }}
-      >
-        <option value="Mandatory">Mandatory</option>
-        <option value="Recommended">Recommended</option>
-        <option value="Optional">Optional</option>
-      </select>
-    </div>
-  )
-}
-
-// ── Attribute row types ───────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface AttributeRow {
-  name: string
-  level: RequiredLevel
+  retailerName: string
+  tgcGs1Name: string
   guidance: string
 }
 
-// ── Group 1 ───────────────────────────────────────────────────────────────────
-const group1Rows: AttributeRow[] = [
-  { name: "GTIN Description", level: "Mandatory", guidance: "Max 35 characters. Plain language product name." },
-  { name: "NRF Color Code", level: "Mandatory", guidance: "Must match NRF standard code table. See NRF guide." },
-  { name: "NRF Size Code", level: "Mandatory", guidance: "Primary and secondary codes both required." },
-  { name: "Color Description", level: "Mandatory", guidance: "Max 10 characters. All caps." },
-  { name: "Size Description", level: "Mandatory", guidance: "" },
-  { name: "Country of Origin", level: "Mandatory", guidance: "" },
-  { name: "CPSIA Certified Y/N", level: "Mandatory", guidance: "" },
-  { name: "Material Country of Origin", level: "Recommended", guidance: "Required if Country of Origin is non-domestic." },
+interface ImageRequirementRow {
+  requirementName: string
+  format: string
+  background: string
+  minDimensions: string
+  maxFileSize: string
+  shapeCrop: string
+  guidanceNote: string
+}
+
+// ── GS1 catalogue (mock) ──────────────────────────────────────────────────────
+const gs1Catalogue = [
+  { name: "Heel Type", code: "GM03HLTY" },
+  { name: "Heel Height Range", code: "GM03HLHT" },
+  { name: "Toe Shape", code: "GM03TOES" },
+  { name: "Outsole Type", code: "GM03OUTS" },
+  { name: "Closure", code: "GM03CLOS" },
+  { name: "Lining Material", code: "GM03LIMT" },
+  { name: "Fabric or Material", code: "GM03FBMC" },
+  { name: "Fit", code: "GM03FITT" },
+  { name: "Fur Treatment", code: "GM03FTMT" },
+  { name: "Gender", code: "GENDER" },
+  { name: "Consumer Life Stage", code: "CONLIFESTAGE" },
 ]
 
-// ── Group 2 — 3 visible + 6 hidden ────────────────────────────────────────────
-const group2VisibleRows: AttributeRow[] = [
-  { name: "Heel Type", level: "Mandatory", guidance: "" },
-  { name: "Heel Height", level: "Mandatory", guidance: "" },
-  { name: "Toe Shape", level: "Recommended", guidance: "" },
+// ── Seeded data ───────────────────────────────────────────────────────────────
+const initialCoreRows: AttributeRow[] = [
+  { retailerName: "GTIN code", tgcGs1Name: "GTIN code", guidance: "" },
+  { retailerName: "GTIN Description", tgcGs1Name: "GTIN Description", guidance: "Max 35 characters. Plain language product name." },
+  { retailerName: "NRF Color Code", tgcGs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide." },
+  { retailerName: "NRF Size Code", tgcGs1Name: "NRF Size Code", guidance: "Primary and secondary codes both required." },
+  { retailerName: "Color Description", tgcGs1Name: "Color Description", guidance: "Max 10 characters. All caps." },
+  { retailerName: "Size Description", tgcGs1Name: "Size Description", guidance: "" },
 ]
 
-// Placeholder rows for "Show 6 more" — confirmed as acceptable placeholders
-const group2HiddenRows: AttributeRow[] = [
-  { name: "Platform Height", level: "Mandatory", guidance: "" },
-  { name: "Outsole Material", level: "Mandatory", guidance: "" },
-  { name: "Upper Material", level: "Mandatory", guidance: "" },
-  { name: "Lining Material", level: "Recommended", guidance: "" },
-  { name: "Closure Type", level: "Recommended", guidance: "" },
-  { name: "Shaft Height", level: "Optional", guidance: "" },
+const initialExtendedRows: AttributeRow[] = [
+  { retailerName: "Heel Type", tgcGs1Name: "Heel Type (GM03HLTY)", guidance: "" },
+  { retailerName: "Toe Shape", tgcGs1Name: "Toe Shape (GM03TOES)", guidance: "" },
+  { retailerName: "Outsole Type", tgcGs1Name: "Outsole Type (GM03OUTS)", guidance: "" },
+  { retailerName: "Lining Material", tgcGs1Name: "Lining Material (GM03LIMT)", guidance: "" },
+  { retailerName: "Closure", tgcGs1Name: "Closure (GM03CLOS)", guidance: "" },
 ]
 
-// ── Attribute table sub-component ────────────────────────────────────────────
-function AttributeTable({ rows }: { rows: AttributeRow[] }) {
+const initialImageRows: ImageRequirementRow[] = [
+  {
+    requirementName: "Hero Shot",
+    format: "JPEG",
+    background: "Pure white (#FFFFFF)",
+    minDimensions: "2000 × 2000 px",
+    maxFileSize: "10 MB",
+    shapeCrop: "Square, product centered",
+    guidanceNote: "No mannequin, no props.",
+  },
+]
+
+// ── Attribute table ───────────────────────────────────────────────────────────
+function AttributeTable({
+  rows,
+  onEditGuidance,
+}: {
+  rows: AttributeRow[]
+  onEditGuidance?: (idx: number, value: string) => void
+}) {
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr style={{ borderBottom: "1px solid #E0E4E8" }}>
-          <th className="text-left px-4 py-2.5 font-medium text-[#6B7280] w-[30%]">
-            Attribute Name
-          </th>
-          <th className="text-left px-4 py-2.5 font-medium text-[#6B7280] w-[22%]">
-            Required Level
-          </th>
-          <th className="text-left px-4 py-2.5 font-medium text-[#6B7280]">
-            Supplier Guidance Note
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, idx) => (
-          <tr
-            key={row.name}
-            style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
-            className="hover:bg-[#F4F6F8]/40 transition-colors"
-          >
-            <td className="px-4 py-2.5 font-medium text-[#111827]">{row.name}</td>
-            <td className="px-4 py-2.5">
-              <RequiredLevelSelect value={row.level} />
-            </td>
-            <td className="px-4 py-2.5 text-[#6B7280] text-xs leading-relaxed">
-              {row.guidance || <span className="text-[#D1D5DB]">—</span>}
-            </td>
+    <>
+      <table className="w-full text-sm">
+        <thead>
+          <tr style={{ borderBottom: "1px solid #E0E4E8" }}>
+            <th className="text-left px-4 py-2.5 font-medium text-[#6B7280] w-[28%]">
+              Retailer Attribute Name
+            </th>
+            <th className="text-left px-4 py-2.5 font-medium text-[#6B7280] w-[32%]">
+              TGC Attribute Name (GS1)
+            </th>
+            <th className="text-left px-4 py-2.5 font-medium text-[#6B7280]">
+              Supplier Guidance Note (optional)
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr
+              key={idx}
+              style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
+              className="hover:bg-[#F4F6F8]/40 transition-colors"
+            >
+              <td className="px-4 py-2.5 font-medium text-[#111827]">{row.retailerName}</td>
+              <td
+                className="px-4 py-2.5 text-xs"
+                style={{ color: "#6B7280", backgroundColor: "#F9FAFB" }}
+              >
+                {row.tgcGs1Name}
+              </td>
+              <td className="px-4 py-2.5 text-xs leading-relaxed" style={{ color: "#6B7280" }}>
+                {row.guidance ? row.guidance : <span style={{ color: "#D1D5DB" }}>—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="px-4 py-2 text-[10px] leading-relaxed italic" style={{ color: "#9CA3AF", borderTop: "1px solid #F3F4F6" }}>
+        The GS1 code ties this requirement to the supplier&apos;s submitted data, regardless of the label used here.
+      </p>
+    </>
+  )
+}
+
+// ── Image requirements table ──────────────────────────────────────────────────
+function ImageRequirementsTable({ rows }: { rows: ImageRequirementRow[] }) {
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ minWidth: 800 }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid #E0E4E8" }}>
+              {["Requirement Name", "Format", "Background", "Min Dimensions", "Max File Size", "Shape/Crop", "Guidance Note (optional)"].map((h) => (
+                <th key={h} className="text-left px-4 py-2.5 font-medium text-[#6B7280] whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr
+                key={idx}
+                style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
+                className="hover:bg-[#F4F6F8]/40 transition-colors"
+              >
+                <td className="px-4 py-2.5 font-medium text-[#111827]">{row.requirementName}</td>
+                <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.format}</td>
+                <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.background}</td>
+                <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.minDimensions}</td>
+                <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.maxFileSize}</td>
+                <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.shapeCrop}</td>
+                <td className="px-4 py-2.5 text-[#6B7280] text-xs">
+                  {row.guidanceNote || <span style={{ color: "#D1D5DB" }}>—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="px-4 py-2 text-[10px] leading-relaxed italic" style={{ color: "#9CA3AF", borderTop: "1px solid #F3F4F6" }}>
+        These specifications are shared with suppliers as guidance. TGC confirms an image was provided against each requirement — it does not verify image content, dimensions, or format.
+      </p>
+    </>
   )
 }
 
@@ -139,10 +179,19 @@ interface GroupProps {
   title: string
   count: number
   defaultExpanded?: boolean
+  onAddClick?: () => void
+  addLabel?: string
   children: React.ReactNode
 }
 
-function AttributeGroup({ title, count, defaultExpanded = false, children }: GroupProps) {
+function AttributeGroup({
+  title,
+  count,
+  defaultExpanded = false,
+  onAddClick,
+  addLabel = "+ Add Attribute",
+  children,
+}: GroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   return (
     <div className="border rounded-lg overflow-hidden" style={{ borderColor: "#E0E4E8" }}>
@@ -158,54 +207,294 @@ function AttributeGroup({ title, count, defaultExpanded = false, children }: Gro
             <ChevronRight className="w-4 h-4 text-[#6B7280]" />
           )}
           <span className="text-sm font-semibold text-[#111827]">{title}</span>
-          <span className="text-xs text-[#6B7280]">— {count} attributes</span>
+          <span className="text-xs text-[#6B7280]">— {count} required</span>
         </div>
-        <button
-          onClick={(e) => e.stopPropagation()}
-          className="text-xs font-medium hover:underline cursor-pointer"
-          style={{ color: "#0168B3" }}
-        >
-          + Add Attribute
-        </button>
+        {onAddClick && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onAddClick()
+            }}
+            className="text-xs font-medium hover:underline cursor-pointer"
+            style={{ color: "#0168B3" }}
+          >
+            {addLabel}
+          </button>
+        )}
       </div>
       {expanded && <div className="bg-white">{children}</div>}
     </div>
   )
 }
 
-// ── Group 2 with "Show 6 more" ────────────────────────────────────────────────
-function Group2() {
-  const [showAll, setShowAll] = useState(false)
-  const rows = showAll ? [...group2VisibleRows, ...group2HiddenRows] : group2VisibleRows
+// ── Add Attribute Dialog ──────────────────────────────────────────────────────
+type AddAttrTarget = "core" | "extended" | null
+
+function AddAttributeDialog({
+  open,
+  onClose,
+  onAdd,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (row: AttributeRow) => void
+}) {
+  const [query, setQuery] = useState("")
+  const [selected, setSelected] = useState<{ name: string; code: string } | null>(null)
+  const [retailerLabel, setRetailerLabel] = useState("")
+  const [guidance, setGuidance] = useState("")
+
+  const filtered = gs1Catalogue.filter((item) =>
+    item.name.toLowerCase().includes(query.toLowerCase())
+  )
+
+  function handleClose() {
+    setQuery("")
+    setSelected(null)
+    setRetailerLabel("")
+    setGuidance("")
+    onClose()
+  }
+
+  function handleAdd() {
+    if (!selected || !retailerLabel.trim()) return
+    onAdd({
+      retailerName: retailerLabel.trim(),
+      tgcGs1Name: selected.code !== selected.name
+        ? `${selected.name} (${selected.code})`
+        : selected.name,
+      guidance: guidance.trim(),
+    })
+    handleClose()
+  }
+
   return (
-    <AttributeGroup title="Physical Attributes" count={9} defaultExpanded>
-      <AttributeTable rows={rows} />
-      {!showAll && (
-        <div className="px-4 py-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Add Attribute
+          </DialogTitle>
+        </DialogHeader>
+
+        {!selected ? (
+          /* Step 1 — search */
+          <div className="flex flex-col gap-3 py-2">
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-md border"
+              style={{ borderColor: "#E0E4E8" }}
+            >
+              <Search className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search attribute name (e.g. Heel Type, Closure, Fabric)"
+                className="flex-1 text-sm outline-none bg-transparent text-[#111827] placeholder:text-[#9CA3AF]"
+              />
+            </div>
+            <div
+              className="rounded-md border overflow-hidden"
+              style={{ borderColor: "#E0E4E8", maxHeight: 280, overflowY: "auto" }}
+            >
+              {filtered.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-[#9CA3AF]">No matches found.</p>
+              ) : (
+                filtered.map((item) => (
+                  <button
+                    key={item.code}
+                    onClick={() => setSelected(item)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-[#F4F6F8] transition-colors"
+                    style={{ borderBottom: "1px solid #F3F4F6" }}
+                  >
+                    <span className="text-sm font-medium text-[#111827]">{item.name}</span>
+                    <span className="text-xs" style={{ color: "#9CA3AF" }}>{item.code}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Step 2 — configure */
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#6B7280]">TGC Attribute Name</label>
+              <div
+                className="px-3 py-2 rounded-md text-sm"
+                style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
+              >
+                {selected.name}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#6B7280]">GS1 Code</label>
+              <div
+                className="px-3 py-2 rounded-md text-sm font-mono"
+                style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
+              >
+                {selected.code}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#111827]">
+                Your label for this attribute <span style={{ color: "#DC2626" }}>*</span>
+              </label>
+              <input
+                autoFocus
+                value={retailerLabel}
+                onChange={(e) => setRetailerLabel(e.target.value)}
+                placeholder="e.g. Boot Heel Type"
+                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827]"
+                style={{ borderColor: "#E0E4E8" }}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#6B7280]">
+                Supplier Guidance Note (optional)
+              </label>
+              <textarea
+                value={guidance}
+                onChange={(e) => setGuidance(e.target.value)}
+                rows={2}
+                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 resize-none text-[#111827] placeholder:text-[#9CA3AF]"
+                style={{ borderColor: "#E0E4E8" }}
+                placeholder="Optional note shown to suppliers"
+              />
+            </div>
+            <button
+              onClick={() => setSelected(null)}
+              className="self-start text-xs hover:underline"
+              style={{ color: "#6B7280" }}
+            >
+              ← Back to search
+            </button>
+          </div>
+        )}
+
+        <DialogFooter>
           <button
-            onClick={() => setShowAll(true)}
-            className="text-xs text-[#6B7280] hover:text-[#111827] hover:underline cursor-pointer transition-colors"
+            onClick={handleClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
           >
-            Show 6 more
+            Cancel
           </button>
+          {selected && (
+            <button
+              onClick={handleAdd}
+              disabled={!retailerLabel.trim()}
+              className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
+              style={{ backgroundColor: "#0168B3" }}
+            >
+              Add to profile
+            </button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Add Image Requirement Dialog ──────────────────────────────────────────────
+function AddImageRequirementDialog({
+  open,
+  onClose,
+  onAdd,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (row: ImageRequirementRow) => void
+}) {
+  const empty: ImageRequirementRow = {
+    requirementName: "",
+    format: "",
+    background: "",
+    minDimensions: "",
+    maxFileSize: "",
+    shapeCrop: "",
+    guidanceNote: "",
+  }
+  const [form, setForm] = useState<ImageRequirementRow>(empty)
+
+  function set(key: keyof ImageRequirementRow, value: string) {
+    setForm((f) => ({ ...f, [key]: value }))
+  }
+
+  function handleClose() {
+    setForm(empty)
+    onClose()
+  }
+
+  function handleAdd() {
+    if (!form.requirementName.trim()) return
+    onAdd(form)
+    handleClose()
+  }
+
+  const fields: { key: keyof ImageRequirementRow; label: string; placeholder: string }[] = [
+    { key: "requirementName", label: "Requirement Name", placeholder: "e.g. Hero Shot" },
+    { key: "format", label: "Format", placeholder: "e.g. JPEG" },
+    { key: "background", label: "Background", placeholder: "e.g. Pure white (#FFFFFF)" },
+    { key: "minDimensions", label: "Minimum Dimensions", placeholder: "e.g. 2000 × 2000 px" },
+    { key: "maxFileSize", label: "Maximum File Size", placeholder: "e.g. 10 MB" },
+    { key: "shapeCrop", label: "Shape/Crop", placeholder: "e.g. Square, product centered" },
+    { key: "guidanceNote", label: "Guidance Note (optional)", placeholder: "e.g. No mannequin, no props." },
+  ]
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Add Image Requirement
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 py-2">
+          {fields.map(({ key, label, placeholder }) => (
+            <div key={key} className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#6B7280]">{label}</label>
+              <input
+                value={form[key]}
+                onChange={(e) => set(key, e.target.value)}
+                placeholder={placeholder}
+                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
+                style={{ borderColor: "#E0E4E8" }}
+              />
+            </div>
+          ))}
         </div>
-      )}
-      {showAll && (
-        <div className="px-4 py-3" style={{ borderTop: "1px solid #F3F4F6" }}>
+        <DialogFooter>
           <button
-            onClick={() => setShowAll(false)}
-            className="text-xs text-[#6B7280] hover:text-[#111827] hover:underline cursor-pointer transition-colors"
+            onClick={handleClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
           >
-            Show fewer
+            Cancel
           </button>
-        </div>
-      )}
-    </AttributeGroup>
+          <button
+            onClick={handleAdd}
+            disabled={!form.requirementName.trim()}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: "#0168B3" }}
+          >
+            Add Image Requirement
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 // ── Right column — Profile summary card ──────────────────────────────────────
-function ProfileSummaryCard() {
+function ProfileSummaryCard({
+  coreCount,
+  extendedCount,
+  imageCount,
+}: {
+  coreCount: number
+  extendedCount: number
+  imageCount: number
+}) {
   return (
     <div
       className="rounded-lg border bg-white overflow-hidden"
@@ -214,13 +503,12 @@ function ProfileSummaryCard() {
       <div className="p-5 flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-[#111827]">Profile Summary</h2>
 
-        {/* Stats 2×2 */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Stats 1×3 */}
+        <div className="flex flex-col gap-3">
           {[
-            { label: "Total Attributes Required", value: "34" },
-            { label: "Mandatory", value: "26" },
-            { label: "Recommended", value: "6" },
-            { label: "Optional", value: "2" },
+            { label: "Core Attributes Required", value: String(coreCount) },
+            { label: "Extended Attributes Required", value: String(extendedCount) },
+            { label: "Image Requirements Required", value: String(imageCount) },
           ].map(({ label, value }) => (
             <div
               key={label}
@@ -246,48 +534,6 @@ function ProfileSummaryCard() {
             Visible to all Dillard&apos;s suppliers in the Footwear category.
           </div>
         </div>
-
-        <hr style={{ borderColor: "#E0E4E8" }} />
-
-        {/* Compliance Impact */}
-        <div>
-          <p className="text-xs font-medium text-[#111827] mb-2">Compliance Impact</p>
-          <table className="w-full text-xs">
-            <tbody>
-              {[
-                { label: "Suppliers affected", value: "847" },
-                { label: "Average current fill rate", value: "41%" },
-                { label: "Suppliers meeting profile", value: "312 of 847" },
-              ].map(({ label, value }) => (
-                <tr key={label} className="border-b last:border-0" style={{ borderColor: "#F3F4F6" }}>
-                  <td className="py-1.5 text-[#6B7280]">{label}</td>
-                  <td className="py-1.5 text-right font-medium text-[#111827]">{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Amber callout */}
-        <div
-          className="rounded-md p-3 text-xs leading-relaxed flex items-start gap-2"
-          style={{ backgroundColor: "#FFFBEB", color: "#92400E" }}
-        >
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: "#F59E0B" }} />
-          <span>
-            <strong className="font-semibold">535 suppliers</strong> are below profile
-            requirements. A compliance gap report can be sent from the Reports section.
-          </span>
-        </div>
-
-        {/* Compliance gap link */}
-        <button
-          className="flex items-center gap-1 text-xs font-medium hover:underline cursor-pointer self-start"
-          style={{ color: "#0168B3" }}
-        >
-          View Compliance Gap
-          <ArrowRight className="w-3 h-3" />
-        </button>
       </div>
     </div>
   )
@@ -299,6 +545,19 @@ interface Screen2Props {
 }
 
 export function Screen2ProfileDetail({ onBack }: Screen2Props) {
+  const [coreRows, setCoreRows] = useState<AttributeRow[]>(initialCoreRows)
+  const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(initialExtendedRows)
+  const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(initialImageRows)
+
+  const [addAttrTarget, setAddAttrTarget] = useState<AddAttrTarget>(null)
+  const [addImageOpen, setAddImageOpen] = useState(false)
+
+  function handleAddAttr(row: AttributeRow) {
+    if (addAttrTarget === "core") setCoreRows((r) => [...r, row])
+    if (addAttrTarget === "extended") setExtendedRows((r) => [...r, row])
+    setAddAttrTarget(null)
+  }
+
   return (
     <div className="flex flex-col gap-0 p-8 max-w-[1200px]">
       {/* Breadcrumb */}
@@ -336,7 +595,7 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               </button>
             </div>
             <p className="text-xs" style={{ color: "#6B7280" }}>
-              Category: Footwear · 34 attributes required
+              Category: Footwear · {coreRows.length + extendedRows.length} attributes required
             </p>
           </div>
 
@@ -348,46 +607,42 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
             <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#0168B3" }} />
             <span style={{ color: "#1E40AF" }}>
               Suppliers uploading GTINs in the Footwear category will see these requirements
-              and receive warnings for any attributes left empty.
+              when they view their catalogue.
             </span>
           </div>
 
           {/* Attribute groups */}
           <div className="flex flex-col gap-3">
-            {/* Group 1 */}
-            <AttributeGroup title="Core Identification" count={8} defaultExpanded>
-              <AttributeTable rows={group1Rows} />
-            </AttributeGroup>
-
-            {/* Group 2 */}
-            <Group2 />
-
-            {/* Group 3 — collapsed */}
-            <AttributeGroup title="Packaging & Logistics" count={11}>
-              <div />
-            </AttributeGroup>
-
-            {/* Group 4 — collapsed */}
-            <AttributeGroup title="Sustainability & Compliance" count={6}>
-              <div />
-            </AttributeGroup>
-          </div>
-
-          {/* Add attribute dashed box */}
-          <div
-            className="rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 py-6"
-            style={{ borderColor: "#E0E4E8" }}
-          >
-            <button
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-md text-sm font-medium text-white"
-              style={{ backgroundColor: "#0168B3" }}
+            {/* Core Attributes */}
+            <AttributeGroup
+              title="Core Attributes"
+              count={coreRows.length}
+              defaultExpanded
+              onAddClick={() => setAddAttrTarget("core")}
             >
-              <Plus className="w-4 h-4" />
-              Add Attribute
-            </button>
-            <p className="text-xs" style={{ color: "#9CA3AF" }}>
-              Search from 700 available AC attributes
-            </p>
+              <AttributeTable rows={coreRows} />
+            </AttributeGroup>
+
+            {/* Extended Attributes */}
+            <AttributeGroup
+              title="Extended Attributes"
+              count={extendedRows.length}
+              defaultExpanded
+              onAddClick={() => setAddAttrTarget("extended")}
+            >
+              <AttributeTable rows={extendedRows} />
+            </AttributeGroup>
+
+            {/* Image Requirements */}
+            <AttributeGroup
+              title="Image Requirements"
+              count={imageRows.length}
+              defaultExpanded
+              onAddClick={() => setAddImageOpen(true)}
+              addLabel="+ Add Image Requirement"
+            >
+              <ImageRequirementsTable rows={imageRows} />
+            </AttributeGroup>
           </div>
 
           {/* Bottom action bar */}
@@ -418,9 +673,25 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
 
         {/* Right column — 35% */}
         <div style={{ flex: "0 0 35%" }}>
-          <ProfileSummaryCard />
+          <ProfileSummaryCard
+            coreCount={coreRows.length}
+            extendedCount={extendedRows.length}
+            imageCount={imageRows.length}
+          />
         </div>
       </div>
+
+      {/* Dialogs */}
+      <AddAttributeDialog
+        open={addAttrTarget !== null}
+        onClose={() => setAddAttrTarget(null)}
+        onAdd={handleAddAttr}
+      />
+      <AddImageRequirementDialog
+        open={addImageOpen}
+        onClose={() => setAddImageOpen(false)}
+        onAdd={(row) => setImageRows((r) => [...r, row])}
+      />
     </div>
   )
 }

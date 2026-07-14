@@ -190,10 +190,10 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
       >
         <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#0168B3" }} />
         <p>
-          <span className="font-medium text-[#111827]">Active profiles</span> are visible to
-          all suppliers trading under your retailer account.{" "}
+          <span className="font-medium text-[#111827]">Active profiles</span> are live and
+          visible to all suppliers trading under your retailer account.{" "}
           <span className="font-medium text-[#111827]">Draft profiles</span> are not visible
-          to suppliers until published.
+          to suppliers until activated.
         </p>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, Tag, ShieldAlert } from "lucide-react"
+import { LayoutDashboard, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface SidebarProps {
@@ -11,7 +11,6 @@ interface SidebarProps {
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "attribute-profiles", label: "Attribute Profiles", icon: Tag },
-  { id: "vendor-exceptions", label: "Vendor Exceptions", icon: ShieldAlert },
 ]
 
 export function Sidebar({ activeScreen, onNavigate }: SidebarProps) {
