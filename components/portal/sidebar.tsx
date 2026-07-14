@@ -1,19 +1,30 @@
 "use client"
 
-import { LayoutDashboard, Tag } from "lucide-react"
+import { Image, LayoutDashboard, Package, Tag, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+type Perspective = "retailer" | "supplier"
 
 interface SidebarProps {
   activeScreen: string
   onNavigate: (screen: string) => void
+  perspective: Perspective
 }
 
-const navItems = [
+const retailerNavItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "attribute-profiles", label: "Attributes & Images", icon: Tag },
 ]
 
-export function Sidebar({ activeScreen, onNavigate }: SidebarProps) {
+const supplierNavItems = [
+  { id: "supplier-products", label: "Catalogue", icon: Package, wired: true },
+  { id: "supplier-image-upload", label: "Image Upload", icon: Image, wired: false },
+  { id: "supplier-trading-partners", label: "Trading Partners", icon: Users, wired: false },
+]
+
+export function Sidebar({ activeScreen, onNavigate, perspective }: SidebarProps) {
+  const items = perspective === "supplier" ? supplierNavItems : retailerNavItems
+
   return (
     <aside
       className="w-56 shrink-0 flex flex-col border-r"
@@ -23,14 +34,15 @@ export function Sidebar({ activeScreen, onNavigate }: SidebarProps) {
       }}
     >
       <nav className="flex flex-col gap-0.5 p-3 pt-4">
-        {navItems.map(({ id, label, icon: Icon }) => {
+        {items.map(({ id, label, icon: Icon, wired }) => {
           const isActive = activeScreen === id
           return (
             <button
               key={id}
-              onClick={() => onNavigate(id)}
+              onClick={() => wired !== false && onNavigate(id)}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-left w-full cursor-pointer",
+                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-left w-full",
+                wired !== false ? "cursor-pointer" : "cursor-default opacity-60",
                 isActive
                   ? "text-white"
                   : "text-[#6B7280] hover:text-[#111827] hover:bg-[#F4F6F8]"
