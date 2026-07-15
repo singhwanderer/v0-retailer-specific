@@ -1,5 +1,72 @@
 "use client"
 
+import { Download } from "lucide-react"
+
+// ── CSV generation ────────────────────────────────────────────────────────────
+// Columns: Product ID, Description, Category, Category Brick Code (GS1),
+// then one column per required attribute. Existing values are pre-populated;
+// missing values are left blank for the supplier to fill in.
+type AttributeTemplate = {
+  name: string
+  existingValue?: string
+}
+
+const ATTRIBUTE_TEMPLATE: AttributeTemplate[] = [
+  { name: "Colour", existingValue: "" },
+  { name: "Size", existingValue: "" },
+  { name: "Material Composition", existingValue: "" },
+  { name: "Care Instructions", existingValue: "" },
+  { name: "Country of Origin", existingValue: "" },
+  { name: "Brand", existingValue: "" },
+]
+
+function generateCsv(partnerName: string, codeId: string, codeDescription: string): string {
+  const attrHeaders = ATTRIBUTE_TEMPLATE.map((a) => a.name)
+  const headers = [
+    "Product ID",
+    "Description",
+    "Category",
+    "Category Brick Code (GS1)",
+    ...attrHeaders,
+  ]
+
+  // Mock product rows — in a real app these would come from the product store
+  const rows = [
+    ["1TESTPROD1", "Floral Wrap Dress", "Women's Dresses", "10001234", "", "", "", "", "", ""],
+    ["B11442", "Linen Shift Dress", "Women's Dresses", "10001234", "Beige", "10", "100% Linen", "", "China", "J.Renée"],
+    ["B11443", "Printed Midi Dress", "Women's Dresses", "10001234", "Multi", "12", "95% Cotton 5% Elastane", "Machine wash cold", "India", "J.Renée"],
+    ["B11446", "Denim Shirtdress", "", "", "", "", "", "", "", ""],
+    ["B11447", "Pleated Chiffon Gown", "", "", "", "", "", "", "", ""],
+  ]
+
+  const escape = (val: string) =>
+    val.includes(",") || val.includes('"') || val.includes("\n")
+      ? `"${val.replace(/"/g, '""')}"`
+      : val
+
+  const lines = [
+    headers.map(escape).join(","),
+    ...rows.map((r) => r.map(escape).join(",")),
+  ]
+
+  return lines.join("\n")
+}
+
+function downloadCsv(
+  partnerName: string,
+  codeId: string,
+  codeDescription: string
+) {
+  const csv = generateCsv(partnerName, codeId, codeDescription)
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${partnerName.replace(/\s+/g, "_")}_Code${codeId}_attributes.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 interface SelectionCodeListProps {
   partnerName: string
   onBack: () => void
@@ -93,7 +160,7 @@ export function ScreenSupplierSelectionCodes({
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
-              {["Code", "Description", "Products", "Compliance"].map((h) => (
+              {["Code", "Description", "Products", "Compliance", ""].map((h) => (
                 <th
                   key={h}
                   className="text-left px-4 py-3 font-medium text-[#6B7280] whitespace-nowrap"
@@ -132,10 +199,30 @@ export function ScreenSupplierSelectionCodes({
                 <td className="px-4 py-3 align-middle">
                   <GapBadge gaps={sc.gaps} complete={sc.complete} total={sc.products} />
                 </td>
+                <td className="px-4 py-3 align-middle text-right">
+                  <button
+                    onClick={() => downloadCsv(partnerName, sc.code, sc.description)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border hover:bg-[#F4F6F8] transition-colors"
+                    style={{ borderColor: "#E0E4E8", color: "#374151" }}
+                    title="Download attribute template CSV"
+                  >
+                    <Download className="w-3 h-3" />
+                    CSV
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {/* CSV caption */}
+        <p
+          className="px-4 py-2.5 text-[11px] font-light leading-relaxed"
+          style={{ color: "#9CA3AF", borderTop: "1px solid #F3F4F6" }}
+        >
+          The CSV includes all required attributes for that selection code. Category Brick Code (GS1)
+          and any values already on your products are pre-populated. Fill in the remaining columns
+          and upload the completed file on the supplier portal.
+        </p>
       </div>
     </div>
   )

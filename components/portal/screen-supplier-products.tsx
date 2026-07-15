@@ -247,7 +247,7 @@ function ComplianceTrigger({
   )
 }
 
-// ── Pagination ────────────────────────────────────────────────────────────────
+// ── Pagination ───────────────────────────────────────────────────────��────────
 function Pagination({
   page,
   total,
@@ -429,6 +429,32 @@ export function ScreenSupplierProducts({
         </div>
       </div>
 
+      {/* Urgent banner — uncategorised products */}
+      {(() => {
+        const uncategorisedCount = ALL_PRODUCTS.filter((p) => p.state === "uncategorised").length
+        if (uncategorisedCount === 0) return null
+        return (
+          <div
+            className="flex items-start gap-3 px-4 py-3 rounded-lg"
+            style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA" }}
+          >
+            <span
+              className="mt-0.5 w-2 h-2 rounded-full shrink-0 animate-pulse"
+              style={{ backgroundColor: "#DC2626" }}
+            />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-semibold" style={{ color: "#991B1B" }}>
+                {uncategorisedCount} product{uncategorisedCount !== 1 ? "s" : ""} without a category
+              </span>
+              <span className="text-xs font-light leading-relaxed" style={{ color: "#B91C1C" }}>
+                Compliance cannot be checked until a category is assigned. These products are
+                treated as non-compliant by all retailers.
+              </span>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Table */}
       <div
         className="rounded-lg overflow-hidden"
@@ -455,50 +481,71 @@ export function ScreenSupplierProducts({
                 </td>
               </tr>
             ) : (
-              pageRows.map((row, idx) => (
-                <tr
-                  key={row.id}
-                  style={{
-                    borderBottom: idx < pageRows.length - 1 ? "1px solid #F3F4F6" : undefined,
-                  }}
-                  className="hover:bg-[#F4F6F8]/40 transition-colors"
-                >
-                  <td className="px-4 py-3 font-medium text-[#111827] align-top tabular-nums">
-                    {row.id}
-                  </td>
-                  <td className="px-4 py-3 font-light text-[#6B7280] align-top">
-                    {row.description}
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    {row.state === "uncategorised" ? (
-                      <span className="flex items-center gap-1.5 text-sm">
+              pageRows.map((row, idx) => {
+                const isUncategorised = row.state === "uncategorised"
+                return (
+                  <tr
+                    key={row.id}
+                    style={{
+                      borderBottom: idx < pageRows.length - 1 ? "1px solid #F3F4F6" : undefined,
+                      backgroundColor: isUncategorised ? "#FFF7F7" : undefined,
+                    }}
+                    className="transition-colors hover:brightness-[0.98]"
+                  >
+                    <td className="px-4 py-3 font-medium align-top tabular-nums"
+                      style={{ color: isUncategorised ? "#991B1B" : "#111827" }}
+                    >
+                      {row.id}
+                    </td>
+                    <td className="px-4 py-3 font-light align-top"
+                      style={{ color: isUncategorised ? "#B91C1C" : "#6B7280" }}
+                    >
+                      {row.description}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {isUncategorised ? (
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0 animate-pulse"
+                            style={{ backgroundColor: "#DC2626" }}
+                          />
+                          <button
+                            className="text-sm font-semibold hover:underline"
+                            style={{ color: "#DC2626" }}
+                            onClick={() => {}}
+                          >
+                            Assign category
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="text-[#6B7280] font-light">{row.category}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {isUncategorised ? (
                         <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: "#F59E0B" }}
-                        />
-                        <button
-                          className="font-light hover:underline"
-                          style={{ color: "#0168B3" }}
-                          onClick={() => {}}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                          style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
                         >
-                          + Add category
-                        </button>
-                      </span>
-                    ) : (
-                      <span className="text-[#6B7280] font-light">{row.category}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <ComplianceTrigger
-                      row={row}
-                      onOpenModal={() => setModalProduct(row)}
-                      onNavigateToGapDetail={(retailer) =>
-                        onNavigateToGapDetail(row.id, retailer)
-                      }
-                    />
-                  </td>
-                </tr>
-              ))
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: "#DC2626" }}
+                          />
+                          No category — unmet
+                        </span>
+                      ) : (
+                        <ComplianceTrigger
+                          row={row}
+                          onOpenModal={() => setModalProduct(row)}
+                          onNavigateToGapDetail={(retailer) =>
+                            onNavigateToGapDetail(row.id, retailer)
+                          }
+                        />
+                      )}
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
