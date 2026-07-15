@@ -101,7 +101,7 @@ export function ScreenSupplierProducts({ onNavigateToGapDetail }: SupplierProduc
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
-              {["Product Name", "Description", "Category", "Compliance Status"].map((h) => (
+              {["Product ID", "Description", "Category", "Compliance Status"].map((h) => (
                 <th
                   key={h}
                   className="text-left px-4 py-3 font-medium text-[#6B7280] whitespace-nowrap"
