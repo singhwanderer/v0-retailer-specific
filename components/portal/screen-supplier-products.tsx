@@ -182,9 +182,10 @@ export function ScreenSupplierProducts({ onNavigateToGapDetail }: SupplierProduc
           className="px-4 py-2.5 text-[11px] font-light leading-relaxed"
           style={{ color: "#9CA3AF", borderTop: "1px solid #F3F4F6" }}
         >
-          Compliance is shown per retailer. A product must have a category before its requirements
-          can be checked. The system confirms whether required attributes and images were provided
-          &mdash; it does not verify image content.
+          You keep one product. Each retailer&apos;s requirements are checked against it &mdash;
+          filling a gap once satisfies every retailer who requires it. A product must have a
+          category before its requirements can be checked. The system confirms whether required
+          attributes and image types are present; it does not verify image content.
         </p>
       </div>
     </div>

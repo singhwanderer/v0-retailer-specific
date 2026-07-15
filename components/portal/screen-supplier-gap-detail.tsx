@@ -17,6 +17,7 @@ type MissingAttribute = {
 type ImageRow = {
   name: string
   provided: boolean
+  guidanceSpec?: string
 }
 
 // ── Mock data per retailer ────────────────────────────────────────────────────
@@ -28,8 +29,16 @@ const DILLARDS_MISSING_ATTRS: MissingAttribute[] = [
 ]
 
 const DILLARDS_IMAGES: ImageRow[] = [
-  { name: "Hero Shot", provided: false },
-  { name: "Detail Shot", provided: true },
+  {
+    name: "Hero Shot",
+    provided: false,
+    guidanceSpec: "Dillard\u2019s spec: pure white background, 2000 \u00d7 2000 px, square. Guidance only \u2014 not verified by the system.",
+  },
+  {
+    name: "Detail Shot",
+    provided: true,
+    guidanceSpec: "Dillard\u2019s spec: close-up of material/texture. Guidance only \u2014 not verified by the system.",
+  },
 ]
 
 // For Belk (Complete) — no missing attrs, all images provided
@@ -187,45 +196,63 @@ export function ScreenSupplierGapDetail({ productName, retailer, onBack }: GapDe
           className="rounded-lg overflow-hidden"
           style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
         >
-          <table className="w-full text-sm">
-            <tbody>
-              {imageRows.map((img, idx) => (
-                <tr
-                  key={img.name}
-                  style={{
-                    borderBottom:
-                      idx < imageRows.length - 1 ? "1px solid #F3F4F6" : undefined,
-                  }}
-                >
-                  <td className="px-4 py-3 w-8 align-middle">
-                    <Dot color={img.provided ? "#16A34A" : "#F59E0B"} />
-                  </td>
-                  <td className="px-4 py-3 font-medium text-[#111827] align-middle">
-                    {img.name}
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span
-                      className="text-xs font-light"
-                      style={{ color: img.provided ? "#15803D" : "#92400E" }}
-                    >
-                      {img.provided ? "Image provided" : "Required image not provided"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right align-middle">
-                    {!img.provided && (
-                      <button
-                        className="px-3 py-1.5 rounded-md text-xs font-medium text-white transition-opacity hover:opacity-80 cursor-pointer"
-                        style={{ backgroundColor: "#0168B3" }}
-                        onClick={() => {}}
+          {imageRows.every((r) => r.provided) ? (
+            <div className="flex items-center gap-2 px-4 py-3">
+              <Dot color="#16A34A" />
+              <span className="text-sm font-light" style={{ color: "#15803D" }}>
+                All required image types provided.
+              </span>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody>
+                {imageRows.map((img, idx) => (
+                  <tr
+                    key={img.name}
+                    style={{
+                      borderBottom:
+                        idx < imageRows.length - 1 ? "1px solid #F3F4F6" : undefined,
+                    }}
+                  >
+                    <td className="px-4 py-3 w-8 align-top pt-3.5">
+                      <Dot color={img.provided ? "#16A34A" : "#F59E0B"} />
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span className="font-medium text-[#111827] block">{img.name}</span>
+                      {img.guidanceSpec && (
+                        <span
+                          className="text-[11px] font-light leading-relaxed block mt-0.5"
+                          style={{ color: "#9CA3AF" }}
+                        >
+                          {img.guidanceSpec}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span
+                        className="text-xs font-light"
+                        style={{ color: img.provided ? "#15803D" : "#92400E" }}
                       >
-                        Upload Image
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {img.provided ? "Image provided" : "Required image not provided"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      {!img.provided && (
+                        <button
+                          className="px-3 py-1.5 rounded-md text-xs font-medium text-white transition-opacity hover:opacity-80 cursor-not-allowed opacity-60"
+                          style={{ backgroundColor: "#0168B3" }}
+                          onClick={() => {}}
+                          disabled
+                        >
+                          Upload Image
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
 
@@ -234,8 +261,10 @@ export function ScreenSupplierGapDetail({ productName, retailer, onBack }: GapDe
         className="text-[11px] font-light leading-relaxed"
         style={{ color: "#9CA3AF" }}
       >
-        This shows what {retailer} requires that is not yet in your catalogue for this product.
-        Image requirements are confirmed as provided or not &mdash; image content is not verified.
+        This shows the attributes and image types {retailer} requires that are not yet on your
+        product. You keep one product &mdash; filling a gap adds it to that product and satisfies
+        every retailer who requires it. Image requirements are confirmed as a matching image type
+        being present; image content is not verified.
       </p>
     </div>
   )

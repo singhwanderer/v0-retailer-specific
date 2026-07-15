@@ -238,7 +238,7 @@ function ConfirmActionModal({
   open: boolean
   onClose: () => void
   onConfirm: () => void
-  action: "Deactivate" | "Activate" | "Duplicate" | null
+  action: "Deactivate" | "Activate" | null
   categoryName: string
 }) {
   if (!action) return null
