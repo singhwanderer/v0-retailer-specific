@@ -3,7 +3,10 @@
 interface GapDetailProps {
   productName: string
   retailer: string
-  onBack: () => void
+  selectionCode: string
+  onBackToProducts: () => void
+  onBackToPartner: () => void
+  onBackToPartnerList: () => void
 }
 
 // ── Data shapes ───────────────────────────────────────────────────────────────
@@ -79,7 +82,14 @@ function SummaryPill({ complete, label }: { complete: boolean; label: string }) 
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ScreenSupplierGapDetail({ productName, retailer, onBack }: GapDetailProps) {
+export function ScreenSupplierGapDetail({
+  productName,
+  retailer,
+  selectionCode,
+  onBackToProducts,
+  onBackToPartner,
+  onBackToPartnerList,
+}: GapDetailProps) {
   const isDillards = retailer === "Dillard's"
   const missingAttrs = isDillards ? DILLARDS_MISSING_ATTRS : []
   const imageRows = isDillards ? DILLARDS_IMAGES : BELK_IMAGES
@@ -95,18 +105,32 @@ export function ScreenSupplierGapDetail({ productName, retailer, onBack }: GapDe
     <div className="p-8 flex flex-col gap-6 max-w-3xl">
 
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm">
+      <nav className="flex items-center gap-1.5 text-sm flex-wrap">
         <button
-          onClick={onBack}
+          onClick={onBackToPartnerList}
           className="font-light hover:underline"
           style={{ color: "#0168B3" }}
         >
-          Catalogue
+          Trading Partners
         </button>
-        <span className="text-[#9CA3AF]">›</span>
-        <span className="text-[#6B7280] font-light">
-          {productName} &mdash; {retailer}
-        </span>
+        <span style={{ color: "#9CA3AF" }}>›</span>
+        <button
+          onClick={onBackToPartner}
+          className="font-light hover:underline"
+          style={{ color: "#0168B3" }}
+        >
+          {retailer}
+        </button>
+        <span style={{ color: "#9CA3AF" }}>›</span>
+        <button
+          onClick={onBackToProducts}
+          className="font-light hover:underline"
+          style={{ color: "#0168B3" }}
+        >
+          Code {selectionCode}
+        </button>
+        <span style={{ color: "#9CA3AF" }}>›</span>
+        <span className="font-light text-[#6B7280]">{productName}</span>
       </nav>
 
       {/* Header */}

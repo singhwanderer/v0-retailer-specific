@@ -6,6 +6,8 @@ import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
+import { ScreenSupplierTradingPartners } from "@/components/portal/screen-supplier-trading-partners"
+import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
 import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
 
@@ -18,6 +20,8 @@ type RetailerScreen =
   | "profile-detail"
 
 type SupplierScreen =
+  | "trading-partners"
+  | "selection-codes"
   | "supplier-products"
   | "supplier-gap-detail"
 
@@ -25,7 +29,9 @@ function DashboardPlaceholder() {
   return (
     <div className="p-8 flex flex-col gap-4">
       <h1 className="text-2xl font-semibold text-[#111827]">Dashboard</h1>
-      <p className="text-sm text-[#6B7280]">Dashboard content is out of scope for this prototype.</p>
+      <p className="text-sm text-[#6B7280]">
+        Dashboard content is out of scope for this prototype.
+      </p>
     </div>
   )
 }
@@ -33,11 +39,19 @@ function DashboardPlaceholder() {
 export default function RetailerPortal() {
   const [perspective, setPerspective] = useState<Perspective>("retailer")
 
-  // Retailer screen state
+  // ── Retailer state ──────────────────────────────────────────────────────────
   const [retailerScreen, setRetailerScreen] = useState<RetailerScreen>("attribute-profiles")
 
-  // Supplier screen state
-  const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("supplier-products")
+  // ── Supplier state ──────────────────────────────────────────────────────────
+  const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("trading-partners")
+
+  // L2 context
+  const [activePartner, setActivePartner] = useState<{ id: string; name: string } | null>(null)
+
+  // L3 context
+  const [activeCode, setActiveCode] = useState<{ id: string; label: string } | null>(null)
+
+  // L4 context
   const [gapProduct, setGapProduct] = useState<{ productName: string; retailer: string } | null>(null)
 
   // ── Perspective switch ──────────────────────────────────────────────────────
@@ -46,7 +60,7 @@ export default function RetailerPortal() {
   }
 
   // ── Retailer navigation ─────────────────────────────────────────────────────
-  const handleRetailerNavigate = (id: string) => {
+  function handleRetailerNavigate(id: string) {
     if (
       id === "dashboard" ||
       id === "attribute-profiles" ||
@@ -56,20 +70,52 @@ export default function RetailerPortal() {
     }
   }
 
-  // ── Supplier navigation ─────────────────────────────────────────────────────
-  const handleSupplierNavigate = (id: string) => {
+  // ── Supplier navigation (sidebar "Catalogue" click — back to L1) ───────────
+  function handleSupplierNavigate(id: string) {
     if (id === "supplier-products") {
-      setSupplierScreen("supplier-products")
+      setSupplierScreen("trading-partners")
+      setActivePartner(null)
+      setActiveCode(null)
+      setGapProduct(null)
     }
   }
 
+  // ── L1 → L2 ────────────────────────────────────────────────────────────────
+  function handleSelectPartner(partnerId: string, partnerName: string) {
+    setActivePartner({ id: partnerId, name: partnerName })
+    setSupplierScreen("selection-codes")
+  }
+
+  // ── L2 → L3 ────────────────────────────────────────────────────────────────
+  function handleSelectCode(codeId: string, codeLabel: string) {
+    setActiveCode({ id: codeId, label: codeLabel })
+    setSupplierScreen("supplier-products")
+  }
+
+  // ── L3 → L4 ────────────────────────────────────────────────────────────────
   function handleNavigateToGapDetail(productName: string, retailer: string) {
     setGapProduct({ productName, retailer })
     setSupplierScreen("supplier-gap-detail")
   }
 
-  function handleBackToCatalogue() {
+  // ── L4 back to L3 ──────────────────────────────────────────────────────────
+  function handleBackToProducts() {
     setSupplierScreen("supplier-products")
+    setGapProduct(null)
+  }
+
+  // ── L4 back to L2 (or L3 breadcrumb "partner" click) ───────────────────────
+  function handleBackToPartner() {
+    setSupplierScreen("selection-codes")
+    setGapProduct(null)
+    setActiveCode(null)
+  }
+
+  // ── L4 back to L1 ──────────────────────────────────────────────────────────
+  function handleBackToPartnerList() {
+    setSupplierScreen("trading-partners")
+    setActivePartner(null)
+    setActiveCode(null)
     setGapProduct(null)
   }
 
@@ -77,19 +123,21 @@ export default function RetailerPortal() {
   const retailerActiveScreen =
     retailerScreen === "profile-detail" ? "attribute-profiles" : retailerScreen
 
-  const supplierActiveScreen =
-    supplierScreen === "supplier-gap-detail" ? "supplier-products" : supplierScreen
+  // All supplier screens map to "supplier-products" for the sidebar highlight
+  const supplierActiveScreen = "supplier-products"
 
   const activeScreen =
     perspective === "retailer" ? retailerActiveScreen : supplierActiveScreen
 
-  // ── Navigation handler passed to TopNav / Sidebar ──────────────────────────
   const handleNavigate =
     perspective === "retailer" ? handleRetailerNavigate : handleSupplierNavigate
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden relative" style={{ backgroundColor: "#F4F6F8" }}>
-      {/* Watermark overlay */}
+    <div
+      className="flex flex-col h-screen overflow-hidden relative"
+      style={{ backgroundColor: "#F4F6F8" }}
+    >
+      {/* Watermark */}
       <div
         className="fixed inset-0 pointer-events-none flex items-center justify-center z-10"
         style={{ opacity: 0.2 }}
@@ -101,16 +149,13 @@ export default function RetailerPortal() {
           >
             MOCK DATA FOR ILLUSTRATION ONLY
           </p>
-          <p
-            className="text-xl mt-3"
-            style={{ color: "#D1D5DB" }}
-          >
+          <p className="text-xl mt-3" style={{ color: "#D1D5DB" }}>
             This is a prototype
           </p>
         </div>
       </div>
 
-      {/* Top navigation bar */}
+      {/* Top nav */}
       <TopNav
         activeScreen={activeScreen}
         onNavigate={handleNavigate}
@@ -118,7 +163,7 @@ export default function RetailerPortal() {
         onPerspectiveChange={handlePerspectiveChange}
       />
 
-      {/* Body: sidebar + main content */}
+      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           activeScreen={activeScreen}
@@ -126,22 +171,22 @@ export default function RetailerPortal() {
           perspective={perspective}
         />
 
-        {/* Scrollable main area */}
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: "#F4F6F8" }}>
 
           {/* ── Retailer screens ── */}
           {perspective === "retailer" && (
             <>
               {retailerScreen === "dashboard" && <DashboardPlaceholder />}
-
               {retailerScreen === "attribute-profiles" && (
-                <Screen1AttributeProfiles onNavigateToProfile={() => setRetailerScreen("profile-detail")} />
+                <Screen1AttributeProfiles
+                  onNavigateToProfile={() => setRetailerScreen("profile-detail")}
+                />
               )}
-
               {retailerScreen === "profile-detail" && (
-                <Screen2ProfileDetail onBack={() => setRetailerScreen("attribute-profiles")} />
+                <Screen2ProfileDetail
+                  onBack={() => setRetailerScreen("attribute-profiles")}
+                />
               )}
-
               {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
             </>
           )}
@@ -149,17 +194,46 @@ export default function RetailerPortal() {
           {/* ── Supplier screens ── */}
           {perspective === "supplier" && (
             <>
-              {supplierScreen === "supplier-products" && (
-                <ScreenSupplierProducts onNavigateToGapDetail={handleNavigateToGapDetail} />
-              )}
-
-              {supplierScreen === "supplier-gap-detail" && gapProduct && (
-                <ScreenSupplierGapDetail
-                  productName={gapProduct.productName}
-                  retailer={gapProduct.retailer}
-                  onBack={handleBackToCatalogue}
+              {/* L1 — Trading Partner List */}
+              {supplierScreen === "trading-partners" && (
+                <ScreenSupplierTradingPartners
+                  onSelectPartner={handleSelectPartner}
                 />
               )}
+
+              {/* L2 — Selection Code List */}
+              {supplierScreen === "selection-codes" && activePartner && (
+                <ScreenSupplierSelectionCodes
+                  partnerName={activePartner.name}
+                  onBack={handleBackToPartnerList}
+                  onSelectCode={handleSelectCode}
+                />
+              )}
+
+              {/* L3 — Product List */}
+              {supplierScreen === "supplier-products" && activePartner && activeCode && (
+                <ScreenSupplierProducts
+                  partnerName={activePartner.name}
+                  selectionCode={activeCode.label}
+                  onBack={handleBackToPartner}
+                  onNavigateToGapDetail={handleNavigateToGapDetail}
+                />
+              )}
+
+              {/* L4 — Gap Detail */}
+              {supplierScreen === "supplier-gap-detail" &&
+                gapProduct &&
+                activePartner &&
+                activeCode && (
+                  <ScreenSupplierGapDetail
+                    productName={gapProduct.productName}
+                    retailer={gapProduct.retailer}
+                    selectionCode={activeCode.label}
+                    onBackToProducts={handleBackToProducts}
+                    onBackToPartner={handleBackToPartner}
+                    onBackToPartnerList={handleBackToPartnerList}
+                  />
+                )}
             </>
           )}
         </main>
