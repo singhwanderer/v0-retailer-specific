@@ -15,11 +15,28 @@ interface Screen1Props {
   onNavigateToProfile: (brickCode?: string, brickName?: string, categoryName?: string) => void
 }
 
+// These counts come directly from the seeded data in screen2-profile-detail.tsx
+// (initialCoreRows: 6, initialExtendedRows: 5, initialImageRows: 1)
+// Update here whenever the profile seed data changes.
+const PROFILE_COUNTS = {
+  attributes: 11, // 6 core + 5 extended
+  imageRequirements: 1,
+}
+
+function formatRequirementsSummary(attrCount: number, imageCount: number): string {
+  const parts: string[] = [`${attrCount} attribute${attrCount !== 1 ? "s" : ""}`]
+  if (imageCount > 0) {
+    parts.push(`${imageCount} image requirement${imageCount !== 1 ? "s" : ""}`)
+  }
+  return parts.join(" · ")
+}
+
 const categories = [
   {
     name: "Footwear",
     category: "Footwear",
-    attributes: "34 attributes · 1 image requirement",
+    attrCount: PROFILE_COUNTS.attributes,
+    imageCount: PROFILE_COUNTS.imageRequirements,
     status: "Active" as const,
     lastUpdated: "Mar 8, 2026",
     actions: ["Edit", "Deactivate"] as const,
@@ -30,7 +47,8 @@ const categories = [
   {
     name: "Apparel",
     category: "Women's Apparel",
-    attributes: "51 attributes",
+    attrCount: PROFILE_COUNTS.attributes,
+    imageCount: PROFILE_COUNTS.imageRequirements,
     status: "Active" as const,
     lastUpdated: "Feb 14, 2026",
     actions: ["Edit", "Deactivate"] as const,
@@ -41,7 +59,8 @@ const categories = [
   {
     name: "Jewellery",
     category: "Jewellery",
-    attributes: "22 attributes",
+    attrCount: PROFILE_COUNTS.attributes,
+    imageCount: 0,
     status: "Draft" as const,
     lastUpdated: "Mar 11, 2026",
     actions: ["Edit", "Activate"] as const,
@@ -733,7 +752,9 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
                     <span className="text-[10px] font-mono" style={{ color: "#9CA3AF" }}>{cat.brickCode}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3.5 text-[#111827]">{cat.attributes}</td>
+                <td className="px-4 py-3.5 text-[#111827]">
+                  {formatRequirementsSummary(cat.attrCount, cat.imageCount)}
+                </td>
                 <td className="px-4 py-3.5">
                   <StatusPill status={cat.status} />
                 </td>
