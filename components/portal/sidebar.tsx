@@ -1,9 +1,18 @@
 "use client"
 
+import React from "react"
 import { Image, LayoutDashboard, Package, Tag, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
+
+interface NavItem {
+  id: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  /** When false, the item is visible but disabled (not yet wired up). Defaults to true. */
+  wired?: boolean
+}
 
 interface SidebarProps {
   activeScreen: string
@@ -11,12 +20,12 @@ interface SidebarProps {
   perspective: Perspective
 }
 
-const retailerNavItems = [
+const retailerNavItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "attribute-profiles", label: "Attributes & Images", icon: Tag },
 ]
 
-const supplierNavItems = [
+const supplierNavItems: NavItem[] = [
   { id: "supplier-products", label: "Catalogue", icon: Package, wired: true },
   { id: "supplier-image-upload", label: "Image Upload", icon: Image, wired: false },
   { id: "supplier-trading-partners", label: "Trading Partners", icon: Users, wired: false },
