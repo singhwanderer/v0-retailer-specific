@@ -23,6 +23,8 @@ interface AttributeRow {
   retailerName: string
   tgcGs1Name: string
   guidance: string
+  /** Whether this attribute was inherited from the GS1 standard brick or added by the retailer */
+  source: "standard" | "custom"
 }
 
 interface ImageRequirementRow {
@@ -52,20 +54,20 @@ const gs1Catalogue = [
 
 // ── Seeded data ───────────────────────────────────────────────────────────────
 const initialCoreRows: AttributeRow[] = [
-  { retailerName: "GTIN code", tgcGs1Name: "GTIN code", guidance: "" },
-  { retailerName: "GTIN Description", tgcGs1Name: "GTIN Description", guidance: "Max 35 characters. Plain language product name." },
-  { retailerName: "NRF Color Code", tgcGs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide." },
-  { retailerName: "NRF Size Code", tgcGs1Name: "NRF Size Code", guidance: "Primary and secondary codes both required." },
-  { retailerName: "Color Description", tgcGs1Name: "Color Description", guidance: "Max 10 characters. All caps." },
-  { retailerName: "Size Description", tgcGs1Name: "Size Description", guidance: "" },
+  { retailerName: "GTIN code", tgcGs1Name: "GTIN code", guidance: "", source: "standard" },
+  { retailerName: "GTIN Description", tgcGs1Name: "GTIN Description", guidance: "Max 35 characters. Plain language product name.", source: "standard" },
+  { retailerName: "NRF Color Code", tgcGs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide.", source: "standard" },
+  { retailerName: "NRF Size Code", tgcGs1Name: "NRF Size Code", guidance: "Primary and secondary codes both required.", source: "standard" },
+  { retailerName: "Color Description", tgcGs1Name: "Color Description", guidance: "Max 10 characters. All caps.", source: "custom" },
+  { retailerName: "Size Description", tgcGs1Name: "Size Description", guidance: "", source: "custom" },
 ]
 
 const initialExtendedRows: AttributeRow[] = [
-  { retailerName: "Heel Type", tgcGs1Name: "Heel Type (GM03HLTY)", guidance: "" },
-  { retailerName: "Toe Shape", tgcGs1Name: "Toe Shape (GM03TOES)", guidance: "" },
-  { retailerName: "Outsole Type", tgcGs1Name: "Outsole Type (GM03OUTS)", guidance: "" },
-  { retailerName: "Lining Material", tgcGs1Name: "Lining Material (GM03LIMT)", guidance: "" },
-  { retailerName: "Closure", tgcGs1Name: "Closure (GM03CLOS)", guidance: "" },
+  { retailerName: "Heel Type", tgcGs1Name: "Heel Type (GM03HLTY)", guidance: "", source: "standard" },
+  { retailerName: "Toe Shape", tgcGs1Name: "Toe Shape (GM03TOES)", guidance: "", source: "standard" },
+  { retailerName: "Outsole Type", tgcGs1Name: "Outsole Type (GM03OUTS)", guidance: "", source: "standard" },
+  { retailerName: "Lining Material", tgcGs1Name: "Lining Material (GM03LIMT)", guidance: "", source: "standard" },
+  { retailerName: "Closure", tgcGs1Name: "Closure (GM03CLOS)", guidance: "", source: "standard" },
 ]
 
 const initialImageRows: ImageRequirementRow[] = [
@@ -307,13 +309,37 @@ function EditAttributeDialog({
   )
 }
 
+// ── Source pill ───────────────────────────────────────────────────────────────
+function SourcePill({ source }: { source: "standard" | "custom" }) {
+  if (source === "standard") {
+    return (
+      <span
+        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none"
+        style={{ backgroundColor: "#EFF6FF", color: "#0168B3" }}
+      >
+        Standard
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none"
+      style={{ backgroundColor: "#F4F6F8", color: "#6B7280" }}
+    >
+      Custom
+    </span>
+  )
+}
+
 // ── Attribute table ───────────────────────────────────────────────────────────
 function AttributeTable({
   rows,
   onEditRow,
+  showSourceTags = false,
 }: {
   rows: AttributeRow[]
   onEditRow: (idx: number) => void
+  showSourceTags?: boolean
 }) {
   return (
     <>
@@ -339,7 +365,12 @@ function AttributeTable({
               style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
               className="group hover:bg-[#F4F6F8]/40 transition-colors"
             >
-              <td className="px-4 py-2.5 font-medium text-[#111827]">{row.retailerName}</td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-[#111827]">{row.retailerName}</span>
+                  {showSourceTags && <SourcePill source={row.source} />}
+                </div>
+              </td>
               <td
                 className="px-4 py-2.5 text-xs"
                 style={{ color: "#6B7280", backgroundColor: "#F9FAFB" }}
@@ -614,6 +645,7 @@ function AddAttributeDialog({
         ? `${selected.name} (${selected.code})`
         : selected.name,
       guidance: guidance.trim(),
+      source: "custom",
     })
     handleClose()
   }
@@ -840,10 +872,12 @@ function CategorySummaryCard({
   coreCount,
   extendedCount,
   imageCount,
+  brickMapping,
 }: {
   coreCount: number
   extendedCount: number
   imageCount: number
+  brickMapping?: { code: string; name: string } | null
 }) {
   return (
     <div
@@ -852,6 +886,24 @@ function CategorySummaryCard({
     >
       <div className="p-5 flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-[#111827]">Category Summary</h2>
+
+        {/* GS1 Brick Mapping */}
+        <div
+          className="rounded-md p-3 flex flex-col gap-1"
+          style={{ backgroundColor: brickMapping ? "#EFF6FF" : "#F4F6F8" }}
+        >
+          <span className="text-[10px] font-medium leading-tight" style={{ color: brickMapping ? "#0168B3" : "#9CA3AF" }}>
+            GS1 Brick Mapping
+          </span>
+          {brickMapping ? (
+            <>
+              <span className="text-sm font-semibold text-[#111827]">{brickMapping.name}</span>
+              <span className="text-[10px] font-mono" style={{ color: "#6B7280" }}>{brickMapping.code}</span>
+            </>
+          ) : (
+            <span className="text-xs italic" style={{ color: "#9CA3AF" }}>No standard mapping</span>
+          )}
+        </div>
 
         {/* Stats 1×3 */}
         <div className="flex flex-col gap-3">
@@ -892,9 +944,10 @@ function CategorySummaryCard({
 // ── Main Screen 2 ─────────────────────────────────────────────────────────────
 interface Screen2Props {
   onBack: () => void
+  brickMapping?: { code: string; name: string } | null
 }
 
-export function Screen2ProfileDetail({ onBack }: Screen2Props) {
+export function Screen2ProfileDetail({ onBack, brickMapping }: Screen2Props) {
   const [coreRows, setCoreRows] = useState<AttributeRow[]>(initialCoreRows)
   const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(initialExtendedRows)
   const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(initialImageRows)
@@ -1012,6 +1065,7 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
               <AttributeTable
                 rows={extendedRows}
                 onEditRow={(idx) => setEditAttrState({ open: true, target: "extended", idx })}
+                showSourceTags
               />
             </AttributeGroup>
 
@@ -1064,6 +1118,7 @@ export function Screen2ProfileDetail({ onBack }: Screen2Props) {
             coreCount={coreRows.length}
             extendedCount={extendedRows.length}
             imageCount={imageRows.length}
+            brickMapping={brickMapping}
           />
         </div>
       </div>

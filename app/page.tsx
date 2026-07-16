@@ -42,6 +42,9 @@ export default function RetailerPortal() {
   // ── Retailer state ──────────────────────────────────────────────────────────
   const [retailerScreen, setRetailerScreen] = useState<RetailerScreen>("attribute-profiles")
 
+  // Brick context passed from Screen 1 into Screen 2
+  const [activeBrick, setActiveBrick] = useState<{ code: string; name: string } | null>(null)
+
   // ── Supplier state ──────────────────────────────────────────────────────────
   const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("trading-partners")
 
@@ -179,12 +182,21 @@ export default function RetailerPortal() {
               {retailerScreen === "dashboard" && <DashboardPlaceholder />}
               {retailerScreen === "attribute-profiles" && (
                 <Screen1AttributeProfiles
-                  onNavigateToProfile={() => setRetailerScreen("profile-detail")}
+                  onNavigateToProfile={(brickCode, brickName) => {
+                    setActiveBrick(
+                      brickCode && brickName ? { code: brickCode, name: brickName } : null
+                    )
+                    setRetailerScreen("profile-detail")
+                  }}
                 />
               )}
               {retailerScreen === "profile-detail" && (
                 <Screen2ProfileDetail
-                  onBack={() => setRetailerScreen("attribute-profiles")}
+                  onBack={() => {
+                    setRetailerScreen("attribute-profiles")
+                    setActiveBrick(null)
+                  }}
+                  brickMapping={activeBrick}
                 />
               )}
               {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
