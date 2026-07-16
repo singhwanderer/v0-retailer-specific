@@ -8,6 +8,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Search, X } from "lucide-react"
+// The supplier "Assign category" picker is driven by the SAME GS1/GPC standard
+// library the retailer screens use, so suppliers categorise against the exact
+// brick codes retailers build their requirement profiles on.
+import { searchBricks, getSegments, type Gs1Brick } from "@/lib/gs1-standard-library"
+
+// ── SCOPE NOTES (supplier view) ───────────────────────────────────────────────
+// - The supplier view is READ-ONLY with respect to retailer requirements and
+//   guidance; the only actions available are downloading data and assigning a
+//   GS1 category to the supplier's own product (below).
+// - Draft retailer profiles are NOT visible to suppliers (handled on the
+//   retailer side — drafts are simply never surfaced here).
+// - Supplier image/data UPLOADS are out of scope for this prototype.
+// - A supplier-level compliance overview and a per-product compliance dashboard
+//   are NOT required and are intentionally not built.
 
 interface SupplierProductsProps {
   partnerName: string
@@ -247,7 +261,7 @@ function ComplianceTrigger({
   )
 }
 
-// ── Pagination ───────────────────────────────────────────────────────��────────
+// ── Pagination ───────────────────────────────────────────────────────���────────
 function Pagination({
   page,
   total,
@@ -302,6 +316,113 @@ function Pagination({
   )
 }
 
+// ── Assign Category modal ─────────────────────────────────────────────────────
+// A searchable GS1 brick picker. Options come from the shared GS1 standard
+// library (searchBricks / getSegments) — the identical GPC source the retailer
+// uses when defining requirement profiles.
+function AssignCategoryModal({
+  open,
+  product,
+  onClose,
+  onAssign,
+}: {
+  open: boolean
+  product: ProductRow | null
+  onClose: () => void
+  onAssign: (brick: Gs1Brick) => void
+}) {
+  const [query, setQuery] = useState("")
+  const [segment, setSegment] = useState("All")
+
+  const segments = ["All", ...getSegments()]
+  const bricks = searchBricks(query).filter((b) => segment === "All" || b.segment === segment)
+
+  function handleClose() {
+    setQuery("")
+    setSegment("All")
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Assign Category{product ? ` — ${product.id}` : ""}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3 py-2">
+          <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
+            Choose a GS1 category (GPC brick) for this product. These are the same
+            standard categories retailers build their requirements on.
+          </p>
+
+          {/* Segment filter */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {segments.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSegment(s)}
+                className="px-2.5 py-1 rounded-md text-xs font-medium border transition-colors"
+                style={
+                  segment === s
+                    ? { backgroundColor: "#0168B3", borderColor: "#0168B3", color: "#FFFFFF" }
+                    : { backgroundColor: "#FFFFFF", borderColor: "#E0E4E8", color: "#6B7280" }
+                }
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-md border"
+            style={{ borderColor: "#E0E4E8" }}
+          >
+            <Search className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search category name or GS1 code"
+              className="flex-1 text-sm outline-none bg-transparent text-[#111827] placeholder:text-[#9CA3AF]"
+            />
+          </div>
+
+          {/* Brick list */}
+          <div
+            className="rounded-md border overflow-hidden"
+            style={{ borderColor: "#E0E4E8", maxHeight: 300, overflowY: "auto" }}
+          >
+            {bricks.length === 0 ? (
+              <p className="px-4 py-3 text-sm font-light text-[#9CA3AF]">No categories found.</p>
+            ) : (
+              bricks.map((b) => (
+                <button
+                  key={b.brickCode}
+                  onClick={() => { onAssign(b); handleClose() }}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-[#F4F6F8] transition-colors"
+                  style={{ borderBottom: "1px solid #F3F4F6" }}
+                >
+                  <span className="flex flex-col">
+                    <span className="text-sm font-medium text-[#111827]">{b.brickName}</span>
+                    <span className="text-[11px] font-light" style={{ color: "#9CA3AF" }}>
+                      {b.segment}
+                    </span>
+                  </span>
+                  <span className="text-xs font-mono" style={{ color: "#9CA3AF" }}>{b.brickCode}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export function ScreenSupplierProducts({
   partnerName,
@@ -313,9 +434,32 @@ export function ScreenSupplierProducts({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [page, setPage] = useState(1)
   const [modalProduct, setModalProduct] = useState<ProductRow | null>(null)
+  // Local, session-only copy so assigning a category persists while browsing.
+  const [products, setProducts] = useState<ProductRow[]>(ALL_PRODUCTS)
+  // The product currently being assigned a category (drives the picker modal).
+  const [assignProduct, setAssignProduct] = useState<ProductRow | null>(null)
+
+  // Assign the chosen GS1 brick to the product: it becomes categorised. No
+  // retailer requirement profile is matched here, so it shows "No requirements
+  // set" until a retailer defines one.
+  function handleAssignCategory(brick: Gs1Brick) {
+    if (!assignProduct) return
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === assignProduct.id
+          ? {
+              ...p,
+              state: "no-profile",
+              category: `${brick.brickName} (GS1: ${brick.brickCode})`,
+            }
+          : p,
+      ),
+    )
+    setAssignProduct(null)
+  }
 
   // ── Filter logic ────────────────────────────────────────────────────────────
-  const filtered = ALL_PRODUCTS.filter((row) => {
+  const filtered = products.filter((row) => {
     const matchesSearch =
       search.trim() === "" ||
       row.id.toLowerCase().includes(search.toLowerCase()) ||
@@ -431,7 +575,7 @@ export function ScreenSupplierProducts({
 
       {/* Urgent banner — uncategorised products */}
       {(() => {
-        const uncategorisedCount = ALL_PRODUCTS.filter((p) => p.state === "uncategorised").length
+        const uncategorisedCount = products.filter((p) => p.state === "uncategorised").length
         if (uncategorisedCount === 0) return null
         return (
           <div
@@ -512,7 +656,7 @@ export function ScreenSupplierProducts({
                           <button
                             className="text-sm font-semibold hover:underline"
                             style={{ color: "#DC2626" }}
-                            onClick={() => {}}
+                            onClick={() => setAssignProduct(row)}
                           >
                             Assign category
                           </button>
@@ -579,6 +723,14 @@ export function ScreenSupplierProducts({
           onViewGap={(retailer) => onNavigateToGapDetail(modalProduct.id, retailer)}
         />
       )}
+
+      {/* Assign category picker (GS1/GPC bricks) */}
+      <AssignCategoryModal
+        open={!!assignProduct}
+        product={assignProduct}
+        onClose={() => setAssignProduct(null)}
+        onAssign={handleAssignCategory}
+      />
     </div>
   )
 }

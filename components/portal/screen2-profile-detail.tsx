@@ -17,25 +17,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface AttributeRow {
-  retailerName: string
-  tgcGs1Name: string
-  guidance: string
-  /** Whether this attribute was inherited from the GS1 standard brick or added by the retailer */
-  source: "standard" | "custom"
-}
-
-interface ImageRequirementRow {
-  requirementName: string
-  format: string
-  background: string
-  minDimensions: string
-  maxFileSize: string
-  shapeCrop: string
-  guidanceNote: string
-}
+import type { AttributeRow, ImageRequirementRow, ProfileData } from "@/lib/profile-data"
+import {
+  initialCoreRows,
+  initialExtendedRows,
+  initialImageRows,
+} from "@/lib/profile-data"
 
 // ── GS1 catalogue (mock) ──────────────────────────────────────────────────────
 const gs1Catalogue = [
@@ -50,36 +37,6 @@ const gs1Catalogue = [
   { name: "Fur Treatment", code: "GM03FTMT" },
   { name: "Gender", code: "GENDER" },
   { name: "Consumer Life Stage", code: "CONLIFESTAGE" },
-]
-
-// ── Seeded data ───────────────────────────────────────────────────────────────
-const initialCoreRows: AttributeRow[] = [
-  { retailerName: "GTIN code", tgcGs1Name: "GTIN code", guidance: "", source: "standard" },
-  { retailerName: "GTIN Description", tgcGs1Name: "GTIN Description", guidance: "Max 35 characters. Plain language product name.", source: "standard" },
-  { retailerName: "NRF Color Code", tgcGs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide.", source: "standard" },
-  { retailerName: "NRF Size Code", tgcGs1Name: "NRF Size Code", guidance: "Primary and secondary codes both required.", source: "standard" },
-  { retailerName: "Color Description", tgcGs1Name: "Color Description", guidance: "Max 10 characters. All caps.", source: "custom" },
-  { retailerName: "Size Description", tgcGs1Name: "Size Description", guidance: "", source: "custom" },
-]
-
-const initialExtendedRows: AttributeRow[] = [
-  { retailerName: "Heel Type", tgcGs1Name: "Heel Type (GM03HLTY)", guidance: "", source: "standard" },
-  { retailerName: "Toe Shape", tgcGs1Name: "Toe Shape (GM03TOES)", guidance: "", source: "standard" },
-  { retailerName: "Outsole Type", tgcGs1Name: "Outsole Type (GM03OUTS)", guidance: "", source: "standard" },
-  { retailerName: "Lining Material", tgcGs1Name: "Lining Material (GM03LIMT)", guidance: "", source: "standard" },
-  { retailerName: "Closure", tgcGs1Name: "Closure (GM03CLOS)", guidance: "", source: "standard" },
-]
-
-const initialImageRows: ImageRequirementRow[] = [
-  {
-    requirementName: "Hero Shot",
-    format: "JPEG",
-    background: "Pure white (#FFFFFF)",
-    minDimensions: "2000 × 2000 px",
-    maxFileSize: "10 MB",
-    shapeCrop: "Square, product centered",
-    guidanceNote: "No mannequin, no props.",
-  },
 ]
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -949,6 +906,14 @@ interface Screen2Props {
   initialCategoryName?: string
   /** Standard extended attributes seeded from the GS1 brick, if one was selected */
   initialBrickExtendedRows?: AttributeRow[]
+  /**
+   * Controlled profile data lifted into page state. When provided, this screen
+   * edits the shared profile so the counts on Screen 1 (the list) update live
+   * and always match what is shown here. When omitted, the screen falls back to
+   * its own internal state (standalone use).
+   */
+  profile?: ProfileData
+  onProfileChange?: (next: ProfileData) => void
 }
 
 export function Screen2ProfileDetail({
@@ -956,12 +921,35 @@ export function Screen2ProfileDetail({
   brickMapping,
   initialCategoryName,
   initialBrickExtendedRows,
+  profile: controlledProfile,
+  onProfileChange,
 }: Screen2Props) {
-  const [coreRows, setCoreRows] = useState<AttributeRow[]>(initialCoreRows)
-  const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(
-    initialBrickExtendedRows ?? initialExtendedRows
-  )
-  const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(initialImageRows)
+  // Fallback internal state for standalone use (when not controlled by page).
+  const [internalProfile, setInternalProfile] = useState<ProfileData>(() => ({
+    coreRows: initialCoreRows,
+    extendedRows: initialBrickExtendedRows ?? initialExtendedRows,
+    imageRows: initialImageRows,
+  }))
+
+  const profile = controlledProfile ?? internalProfile
+  const coreRows = profile.coreRows
+  const extendedRows = profile.extendedRows
+  const imageRows = profile.imageRows
+
+  // Commit a new profile to whichever source owns the data.
+  function commit(next: ProfileData) {
+    if (onProfileChange) onProfileChange(next)
+    else setInternalProfile(next)
+  }
+  function setCoreRows(updater: (rows: AttributeRow[]) => AttributeRow[]) {
+    commit({ ...profile, coreRows: updater(profile.coreRows) })
+  }
+  function setExtendedRows(updater: (rows: AttributeRow[]) => AttributeRow[]) {
+    commit({ ...profile, extendedRows: updater(profile.extendedRows) })
+  }
+  function setImageRows(updater: (rows: ImageRequirementRow[]) => ImageRequirementRow[]) {
+    commit({ ...profile, imageRows: updater(profile.imageRows) })
+  }
 
   const [addAttrTarget, setAddAttrTarget] = useState<AddAttrTarget>(null)
   const [addImageOpen, setAddImageOpen] = useState(false)

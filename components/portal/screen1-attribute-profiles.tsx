@@ -13,14 +13,13 @@ import { GS1_BRICKS, searchBricks, getSegments, type Gs1Brick } from "@/lib/gs1-
 
 interface Screen1Props {
   onNavigateToProfile: (brickCode?: string, brickName?: string, categoryName?: string) => void
-}
-
-// These counts come directly from the seeded data in screen2-profile-detail.tsx
-// (initialCoreRows: 6, initialExtendedRows: 5, initialImageRows: 1)
-// Update here whenever the profile seed data changes.
-const PROFILE_COUNTS = {
-  attributes: 11, // 6 core + 5 extended
-  imageRequirements: 1,
+  /**
+   * Live per-category counts, keyed by GS1 brick code, supplied by the page.
+   * These are derived from the SAME profile data the Screen 2 editor mutates,
+   * so the list counts always match what is inside each profile and move up and
+   * down as the user adds or removes requirements.
+   */
+  profileCounts?: Record<string, { attributes: number; images: number }>
 }
 
 function formatRequirementsSummary(attrCount: number, imageCount: number): string {
@@ -35,8 +34,6 @@ const categories = [
   {
     name: "Footwear",
     category: "Footwear",
-    attrCount: PROFILE_COUNTS.attributes,
-    imageCount: PROFILE_COUNTS.imageRequirements,
     status: "Active" as const,
     lastUpdated: "Mar 8, 2026",
     actions: ["Edit", "Deactivate"] as const,
@@ -47,8 +44,6 @@ const categories = [
   {
     name: "Apparel",
     category: "Women's Apparel",
-    attrCount: PROFILE_COUNTS.attributes,
-    imageCount: PROFILE_COUNTS.imageRequirements,
     status: "Active" as const,
     lastUpdated: "Feb 14, 2026",
     actions: ["Edit", "Deactivate"] as const,
@@ -59,8 +54,6 @@ const categories = [
   {
     name: "Jewellery",
     category: "Jewellery",
-    attrCount: PROFILE_COUNTS.attributes,
-    imageCount: 0,
     status: "Draft" as const,
     lastUpdated: "Mar 11, 2026",
     actions: ["Edit", "Activate"] as const,
@@ -129,12 +122,39 @@ function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () => void 
             <p className="text-sm font-medium text-[#111827]">Drop a CSV file here</p>
             <p className="text-xs" style={{ color: "#9CA3AF" }}>or click to browse</p>
           </div>
+          {/*
+            The CSV columns below mirror exactly what a category profile holds
+            inside (Screen 2): a GS1 brick mapping, Core + Extended attributes
+            (each with a source tag), and Image Requirements with their full
+            specification. Keeping these aligned means an import produces the
+            same structure the editor shows.
+          */}
           <div
-            className="rounded-md p-3 text-xs leading-relaxed"
+            className="rounded-md p-3 text-xs leading-relaxed flex flex-col gap-3"
             style={{ backgroundColor: "#F4F6F8", color: "#6B7280" }}
           >
-            <p className="font-medium text-[#111827] mb-1">Required CSV columns</p>
-            <p>Category Name · Attribute Name · TGC GS1 Code · Guidance Note (optional)</p>
+            <div>
+              <p className="font-medium text-[#111827] mb-1">Category &amp; GS1 mapping</p>
+              <p>Category Name · GS1 Brick Code · GS1 Brick Name</p>
+            </div>
+            <div>
+              <p className="font-medium text-[#111827] mb-1">Attribute rows</p>
+              <p>
+                Attribute Group (Core / Extended) · Retailer Attribute Name · TGC GS1 Name ·
+                TGC GS1 Code · Source (Standard / Custom) · Guidance Note (optional)
+              </p>
+            </div>
+            <div>
+              <p className="font-medium text-[#111827] mb-1">Image requirement rows</p>
+              <p>
+                Requirement Name · Format · Background · Minimum Dimensions · Maximum File Size ·
+                Shape/Crop · Guidance Note (optional)
+              </p>
+            </div>
+            <p className="italic" style={{ color: "#9CA3AF" }}>
+              One row per attribute or image requirement. The Attribute Group and Source columns
+              determine where each row appears inside the profile.
+            </p>
           </div>
         </div>
         <DialogFooter>
@@ -645,7 +665,7 @@ function ConfirmActionModal({
 }
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
-export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) {
+export function Screen1AttributeProfiles({ onNavigateToProfile, profileCounts }: Screen1Props) {
   const [importOpen, setImportOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -730,7 +750,10 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
             </tr>
           </thead>
           <tbody>
-            {categories.map((cat, idx) => (
+            {categories.map((cat, idx) => {
+              // Live counts from page state (falls back to 0 if not yet seeded).
+              const counts = profileCounts?.[cat.brickCode] ?? { attributes: 0, images: 0 }
+              return (
               <tr
                 key={cat.name}
                 style={{ borderBottom: idx < categories.length - 1 ? "1px solid #E0E4E8" : undefined }}
@@ -753,7 +776,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
                   </div>
                 </td>
                 <td className="px-4 py-3.5 text-[#111827]">
-                  {formatRequirementsSummary(cat.attrCount, cat.imageCount)}
+                  {formatRequirementsSummary(counts.attributes, counts.images)}
                 </td>
                 <td className="px-4 py-3.5">
                   <StatusPill status={cat.status} />
@@ -780,7 +803,8 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
                   </div>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

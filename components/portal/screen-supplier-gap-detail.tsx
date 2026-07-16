@@ -1,5 +1,14 @@
 "use client"
 
+// ── SCOPE NOTES (supplier gap detail) ─────────────────────────────────────────
+// - This screen is READ-ONLY: it shows each retailer's required attributes,
+//   image requirements, and the retailer's own guidance notes. The supplier
+//   cannot edit any of it.
+// - The "Upload Image" action is intentionally disabled — supplier image/data
+//   uploads are out of scope for this prototype.
+// - Downloading data is the only export action offered to suppliers (handled on
+//   the selection-code screen).
+
 interface GapDetailProps {
   productName: string
   retailer: string
@@ -15,6 +24,15 @@ type MissingAttribute = {
   retailerLabel: string
   tgcName: string
   tgcCode: string
+  /**
+   * The retailer's own guidance note for this attribute (authored on the
+   * retailer side, Screen 2). Shown read-only to the supplier so they know
+   * exactly how each retailer expects the value to be filled. This is how a
+   * supplier sees per-retailer guidance across every retailer (up to 50) they
+   * trade with — each trading partner's gap detail carries that retailer's
+   * guidance.
+   */
+  guidance?: string
 }
 
 type ImageRow = {
@@ -26,9 +44,24 @@ type ImageRow = {
 // ── Mock data per retailer ────────────────────────────────────────────────────
 
 const DILLARDS_MISSING_ATTRS: MissingAttribute[] = [
-  { retailerLabel: "Boot Heel Type", tgcName: "Heel Type", tgcCode: "GM03HLTY" },
-  { retailerLabel: "Outsole Type", tgcName: "Outsole Type", tgcCode: "GM03OUTS" },
-  { retailerLabel: "Closure", tgcName: "Closure", tgcCode: "GM03CLOS" },
+  {
+    retailerLabel: "Boot Heel Type",
+    tgcName: "Heel Type",
+    tgcCode: "GM03HLTY",
+    guidance: "Use the NRF heel-type value list. For flat styles enter \u201cFlat\u201d, not blank.",
+  },
+  {
+    retailerLabel: "Outsole Type",
+    tgcName: "Outsole Type",
+    tgcCode: "GM03OUTS",
+    guidance: "State the primary outsole material (e.g. Rubber, Leather, EVA).",
+  },
+  {
+    retailerLabel: "Closure",
+    tgcName: "Closure",
+    tgcCode: "GM03CLOS",
+    guidance: "Single closure type only. If multiple, list the primary fastening.",
+  },
 ]
 
 const DILLARDS_IMAGES: ImageRow[] = [
@@ -193,16 +226,24 @@ export function ScreenSupplierGapDetail({
                         idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
                     }}
                   >
-                    <td className="px-4 py-3 w-8 align-middle">
+                    <td className="px-4 py-3 w-8 align-top pt-3.5">
                       <Dot color="#F59E0B" />
                     </td>
-                    <td className="px-4 py-3 align-middle">
+                    <td className="px-4 py-3 align-top">
                       <span className="font-medium text-[#111827]">{attr.retailerLabel}</span>
                       <span className="ml-2 text-xs font-light text-[#9CA3AF]">
                         TGC: {attr.tgcName} ({attr.tgcCode})
                       </span>
+                      {attr.guidance && (
+                        <span
+                          className="text-[11px] font-light leading-relaxed block mt-0.5"
+                          style={{ color: "#9CA3AF" }}
+                        >
+                          {retailer} guidance: {attr.guidance}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right align-middle">
+                    <td className="px-4 py-3 text-right align-top pt-3.5">
                       <span className="text-xs font-light text-[#92400E]">Not provided</span>
                     </td>
                   </tr>

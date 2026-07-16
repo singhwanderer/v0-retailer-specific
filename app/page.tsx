@@ -5,8 +5,10 @@ import { TopNav } from "@/components/portal/top-nav"
 import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
-import { getBrickByCode } from "@/lib/gs1-standard-library"
-import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
+import { type ProfileData, buildProfileForBrick, countAttributes, countImages } from "@/lib/profile-data"
+// NOTE: Screen3VendorExceptions is intentionally NOT rendered — the Vendor
+// Exceptions feature is out of scope / not required. The component file is kept
+// in the repo but is not wired into navigation.
 import { ScreenSupplierTradingPartners } from "@/components/portal/screen-supplier-trading-partners"
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
@@ -50,6 +52,35 @@ export default function RetailerPortal() {
     categoryName: string
   } | null>(null)
 
+  // ── Lifted profile data ──────────────────────────────────────────────────
+  // The profile rows (core / extended / image) for each category live HERE,
+  // keyed by GS1 brick code, so that:
+  //   1. Screen 1's per-category counts are derived from the same data the
+  //      Screen 2 editor shows — they always match.
+  //   2. Adding or removing attributes/image requirements inside Screen 2
+  //      persists and the list counts move up and down accordingly.
+  // Seeded from the GS1 standard library so each category genuinely differs
+  // (Footwear 6 core + 11 extended, Apparel 6 + 8, Jewellery 6 + 6).
+  const [profiles, setProfiles] = useState<Record<string, ProfileData>>(() => ({
+    "10005811": buildProfileForBrick("10005811"), // Footwear
+    "10001352": buildProfileForBrick("10001352"), // Apparel — Shirts/Blouses/Polo Shirts/T-Shirts
+    "10006017": buildProfileForBrick("10006017"), // Jewellery — Necklaces/Chains/Pendants
+  }))
+
+  // Key used when a profile has no GS1 brick mapping (e.g. created via wizard).
+  const NO_BRICK_KEY = "__no_brick__"
+
+  // Per-category counts for Screen 1, derived live from the profiles above.
+  const profileCounts: Record<string, { attributes: number; images: number }> =
+    Object.fromEntries(
+      Object.entries(profiles).map(([code, p]) => [
+        code,
+        { attributes: countAttributes(p), images: countImages(p) },
+      ]),
+    )
+
+  const activeProfileKey = activeBrick?.code ?? NO_BRICK_KEY
+
   // ── Supplier state ──────────────────────────────────────────────────────────
   const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("trading-partners")
 
@@ -68,12 +99,10 @@ export default function RetailerPortal() {
   }
 
   // ── Retailer navigation ─────────────────────────────────────────────────────
+  // NOTE: "vendor-exceptions" is intentionally excluded — the Vendor Exceptions
+  // feature is out of scope / not required, so it is not reachable.
   function handleRetailerNavigate(id: string) {
-    if (
-      id === "dashboard" ||
-      id === "attribute-profiles" ||
-      id === "vendor-exceptions"
-    ) {
+    if (id === "dashboard" || id === "attribute-profiles") {
       setRetailerScreen(id as RetailerScreen)
     }
   }
@@ -126,16 +155,6 @@ export default function RetailerPortal() {
     setActiveCode(null)
     setGapProduct(null)
   }
-
-  // Pre-compute extended rows for Screen 2 from the selected brick's standard attributes
-  const activeBrickExtendedRows = activeBrick
-    ? getBrickByCode(activeBrick.code)?.extendedAttributes.map((attr) => ({
-        retailerName: attr.name,
-        tgcGs1Name: `${attr.name} (${attr.code})`,
-        guidance: "",
-        source: "standard" as const,
-      }))
-    : undefined
 
   // ── Active sidebar item ─────────────────────────────────────────────────────
   const retailerActiveScreen =
@@ -197,7 +216,13 @@ export default function RetailerPortal() {
               {retailerScreen === "dashboard" && <DashboardPlaceholder />}
               {retailerScreen === "attribute-profiles" && (
                 <Screen1AttributeProfiles
+                  profileCounts={profileCounts}
                   onNavigateToProfile={(brickCode, brickName, categoryName) => {
+                    const key = brickCode ?? NO_BRICK_KEY
+                    // Lazily seed a profile if this brick has not been opened yet.
+                    setProfiles((prev) =>
+                      prev[key] ? prev : { ...prev, [key]: buildProfileForBrick(brickCode) },
+                    )
                     setActiveBrick(
                       brickCode && brickName
                         ? { code: brickCode, name: brickName, categoryName: categoryName ?? brickName }
@@ -215,11 +240,12 @@ export default function RetailerPortal() {
                   }}
                   brickMapping={activeBrick ? { code: activeBrick.code, name: activeBrick.name } : null}
                   initialCategoryName={activeBrick?.categoryName}
-                  initialBrickExtendedRows={activeBrickExtendedRows}
+                  profile={profiles[activeProfileKey] ?? buildProfileForBrick(activeBrick?.code)}
+                  onProfileChange={(next) =>
+                    setProfiles((prev) => ({ ...prev, [activeProfileKey]: next }))
+                  }
                 />
               )}
-              
-              {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
             </>
           )}
 

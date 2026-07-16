@@ -1,5 +1,10 @@
 "use client"
 
+// ── SCOPE NOTE ────────────────────────────────────────────────────────────────
+// The Vendor Exceptions feature is NOT REQUIRED and is intentionally hidden.
+// This component is kept in the repo for reference only — it is not imported or
+// rendered anywhere, and there is no navigation entry that reaches it.
+
 import { useState } from "react"
 import { Plus, Search, X, ChevronDown } from "lucide-react"
 
