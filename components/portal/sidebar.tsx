@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Image, LayoutDashboard, Package, Tag, Users } from "lucide-react"
+import { Award, Image, LayoutDashboard, Package, Tag, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
@@ -26,9 +26,10 @@ const retailerNavItems: NavItem[] = [
 ]
 
 const supplierNavItems: NavItem[] = [
-  { id: "supplier-products", label: "Catalogue", icon: Package, wired: true },
+  { id: "supplier-compliance", label: "Compliance", icon: Package, wired: true },
+  { id: "supplier-gs1-standards", label: "GS1 Standards", icon: Award, wired: true },
+  { id: "supplier-trading-partners", label: "Trading Partners", icon: Users, wired: true },
   { id: "supplier-image-upload", label: "Image Upload", icon: Image, wired: false },
-  { id: "supplier-trading-partners", label: "Trading Partners", icon: Users, wired: false },
 ]
 
 export function Sidebar({ activeScreen, onNavigate, perspective }: SidebarProps) {

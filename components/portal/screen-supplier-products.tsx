@@ -7,11 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, X } from "lucide-react"
+import { ChevronDown, Search, Sparkles, X } from "lucide-react"
 // The supplier "Assign category" picker is driven by the SAME GS1/GPC standard
 // library the retailer screens use, so suppliers categorise against the exact
 // brick codes retailers build their requirement profiles on.
-import { searchBricks, getSegments, type Gs1Brick } from "@/lib/gs1-standard-library"
+import { searchBricks, getSegments, getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
 
 // ── SCOPE NOTES (supplier view) ───────────────────────────────────────────────
 // - The supplier view is READ-ONLY with respect to retailer requirements and
@@ -40,51 +40,72 @@ type ProductRow = {
   description: string
   state: "categorised" | "uncategorised" | "no-profile"
   category?: string
+  /** GS1 brick code for this product's category, used to compute superset gaps. */
+  brickCode?: string
   retailers?: RetailerStatus[]
+  /**
+   * Superset compliance: the union of all gaps across all trading partners,
+   * split by gap type so the supplier knows which to fix once vs per-retailer.
+   *   gs1Gaps      — missing standard GS1 attrs (filling once satisfies all)
+   *   customGaps   — retailer-specific custom attrs (must be done per-retailer)
+   */
+  superset?: { gs1Gaps: number; customGaps: number }
 }
 
 // Mock product catalogue — in a real app this would be fetched per partner + code
+// superset.gs1Gaps  = GS1-standard attributes missing (fill once, satisfies all retailers)
+// superset.customGaps = retailer-specific custom attributes missing (per-retailer residual)
 const ALL_PRODUCTS: ProductRow[] = [
   {
     id: "1TESTPROD1",
     description: "Floral Wrap Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [
       { retailer: "Dillard's", gaps: 3 },
       { retailer: "Belk", gaps: "complete" },
     ],
+    superset: { gs1Gaps: 2, customGaps: 1 },
   },
   {
     id: "B11442",
     description: "Linen Shift Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [{ retailer: "Dillard's", gaps: 5 }],
+    superset: { gs1Gaps: 3, customGaps: 2 },
   },
   {
     id: "B11443",
     description: "Printed Midi Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [{ retailer: "Dillard's", gaps: "complete" }],
+    superset: { gs1Gaps: 0, customGaps: 0 },
   },
   {
     id: "B11444",
     description: "Velvet Evening Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [
       { retailer: "Dillard's", gaps: 2 },
       { retailer: "Belk", gaps: 1 },
     ],
+    superset: { gs1Gaps: 1, customGaps: 1 },
   },
   {
     id: "B11445",
     description: "Jersey Wrap Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [{ retailer: "Belk", gaps: "complete" }],
+    superset: { gs1Gaps: 0, customGaps: 0 },
   },
   {
     id: "B11446",
@@ -100,8 +121,10 @@ const ALL_PRODUCTS: ProductRow[] = [
     id: "B11448",
     description: "Satin Slip Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [{ retailer: "Dillard's", gaps: "complete" }],
+    superset: { gs1Gaps: 0, customGaps: 0 },
   },
   {
     id: "B11449",
@@ -112,8 +135,10 @@ const ALL_PRODUCTS: ProductRow[] = [
     id: "B11450",
     description: "Tiered Maxi Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [{ retailer: "Dillard's", gaps: 1 }],
+    superset: { gs1Gaps: 1, customGaps: 0 },
   },
   {
     id: "B11451",
@@ -124,14 +149,18 @@ const ALL_PRODUCTS: ProductRow[] = [
     id: "B11452",
     description: "Crepe Sheath Dress",
     state: "categorised",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
     retailers: [{ retailer: "Belk", gaps: "complete" }],
+    superset: { gs1Gaps: 0, customGaps: 0 },
   },
   {
     id: "B11453",
     description: "Silk Maxi Dress",
     state: "no-profile",
-    category: "Women's Dresses (GS1: 10001234)",
+    category: "Dresses (GS1: 10001333)",
+    brickCode: "10001333",
+    superset: { gs1Gaps: 4, customGaps: 0 },
   },
 ]
 
@@ -262,6 +291,49 @@ function ComplianceTrigger({
 }
 
 // ── Pagination ───────────────────────────────────────────────────────���────────
+// ── Superset compliance badge ─────────────────────────────────────────────────
+// Shows the union of all trading partner gaps for a product, split into
+// GS1-standard (fill once = satisfies all) vs retailer-custom (per-retailer).
+function SupersetBadge({ superset }: { superset: ProductRow["superset"] }) {
+  if (!superset) return null
+  const totalGaps = superset.gs1Gaps + superset.customGaps
+  if (totalGaps === 0) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+        style={{ backgroundColor: "#DCFCE7", color: "#15803D" }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#16A34A" }} />
+        Superset complete
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 flex-wrap">
+      {superset.gs1Gaps > 0 && (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+          style={{ backgroundColor: "#EEF2FF", color: "#3730A3" }}
+          title="Standard GS1 attributes — fill once to satisfy all trading partners"
+        >
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#6366F1" }} />
+          {superset.gs1Gaps} GS1
+        </span>
+      )}
+      {superset.customGaps > 0 && (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+          style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+          title="Retailer-specific custom attributes — must be filled per retailer"
+        >
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#F59E0B" }} />
+          {superset.customGaps} custom
+        </span>
+      )}
+    </span>
+  )
+}
+
 function Pagination({
   page,
   total,
@@ -320,6 +392,389 @@ function Pagination({
 // A searchable GS1 brick picker. Options come from the shared GS1 standard
 // library (searchBricks / getSegments) — the identical GPC source the retailer
 // uses when defining requirement profiles.
+
+// ── AI Bulk Category Assignment modal ─────────────────────────────────────────
+// Step 1 (review): Shows AI suggestions with confidence % and reasoning for each
+//                  uncategorised product. Supplier can accept or override each.
+// Step 2 (confirm): Summary of what will be applied, with "Confirm enrichment" CTA.
+// Only operates on standard GS1 attributes — never on custom retailer attrs.
+
+type AiSuggestion = {
+  productId: string
+  description: string
+  suggestedBrick: Gs1Brick
+  confidence: number      // 0–100
+  reasoning: string
+  accepted: boolean
+  overrideCode: string | null
+}
+
+// Simulate AI suggestions for uncategorised products.
+// In a real implementation this would call an LLM with product descriptions.
+function generateAiSuggestions(products: ProductRow[]): AiSuggestion[] {
+  // Hardcoded plausible suggestions for the mock product catalogue
+  const suggestions: Record<string, { brickCode: string; confidence: number; reasoning: string }> = {
+    "B11446": { brickCode: "10001333", confidence: 94, reasoning: "Product name 'Denim Shirtdress' matches GS1 Dresses brick; dress suffix and shirt construction are characteristic of this category." },
+    "B11447": { brickCode: "10001333", confidence: 89, reasoning: "Product name 'Pleated Chiffon Gown' indicates a formal dress garment. Chiffon construction and gown silhouette map to GS1 Dresses brick." },
+    "B11449": { brickCode: "10001333", confidence: 91, reasoning: "Product name 'Broderie Anglaise Dress' contains explicit dress suffix and embroidery technique; maps with high confidence to GS1 Dresses brick." },
+    "B11451": { brickCode: "10001333", confidence: 96, reasoning: "Product name 'Cotton Sundress' unambiguously identifies a dress garment; sundress is a specific dress silhouette in GS1 Dresses brick." },
+  }
+
+  return products
+    .filter((p) => p.state === "uncategorised")
+    .map((p) => {
+      const hint = suggestions[p.id] ?? {
+        brickCode: "10001333",
+        confidence: 78,
+        reasoning: `Product description "${p.description}" indicates a women's apparel item; GS1 Dresses brick is the closest match.`,
+      }
+      const brick = getBrickByCode(hint.brickCode)!
+      return {
+        productId: p.id,
+        description: p.description,
+        suggestedBrick: brick,
+        confidence: hint.confidence,
+        reasoning: hint.reasoning,
+        accepted: true,
+        overrideCode: null,
+      }
+    })
+}
+
+function ConfidencePill({ value }: { value: number }) {
+  const high = value >= 90
+  const mid = value >= 75
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums"
+      style={
+        high
+          ? { backgroundColor: "#DCFCE7", color: "#15803D" }
+          : mid
+          ? { backgroundColor: "#FEF9C3", color: "#A16207" }
+          : { backgroundColor: "#FEE2E2", color: "#991B1B" }
+      }
+    >
+      {value}% confidence
+    </span>
+  )
+}
+
+function AiBulkCategoryModal({
+  open,
+  uncategorisedProducts,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean
+  uncategorisedProducts: ProductRow[]
+  onClose: () => void
+  onConfirm: (accepted: AiSuggestion[]) => void
+}) {
+  const [step, setStep] = useState<"review" | "confirm">("review")
+  const [suggestions, setSuggestions] = useState<AiSuggestion[]>([])
+  const [expandedReasoning, setExpandedReasoning] = useState<string | null>(null)
+  const allBricks = searchBricks("")
+
+  // Generate suggestions whenever the modal opens
+  function handleOpen(isOpen: boolean) {
+    if (isOpen) {
+      setSuggestions(generateAiSuggestions(uncategorisedProducts))
+      setStep("review")
+      setExpandedReasoning(null)
+    } else {
+      onClose()
+    }
+  }
+
+  function toggleAccepted(productId: string) {
+    setSuggestions((prev) =>
+      prev.map((s) => (s.productId === productId ? { ...s, accepted: !s.accepted } : s)),
+    )
+  }
+
+  function setOverride(productId: string, brickCode: string) {
+    setSuggestions((prev) =>
+      prev.map((s) => {
+        if (s.productId !== productId) return s
+        const brick = getBrickByCode(brickCode)
+        return brick ? { ...s, overrideCode: brickCode, suggestedBrick: brick } : s
+      }),
+    )
+  }
+
+  const acceptedCount = suggestions.filter((s) => s.accepted).length
+  const totalAttrsToFill = suggestions
+    .filter((s) => s.accepted)
+    .reduce((sum, s) => sum + s.suggestedBrick.extendedAttributes.length, 0)
+
+  function handleConfirm() {
+    onConfirm(suggestions.filter((s) => s.accepted))
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <span
+              className="flex items-center justify-center w-7 h-7 rounded-full"
+              style={{ backgroundColor: "#EEF2FF" }}
+            >
+              <Sparkles className="w-3.5 h-3.5" style={{ color: "#4F46E5" }} />
+            </span>
+            <DialogTitle className="text-base font-semibold text-[#111827]">
+              {step === "review" ? "AI Category Suggestions" : "Confirm Enrichment"}
+            </DialogTitle>
+          </div>
+        </DialogHeader>
+
+        {step === "review" && (
+          <div className="flex flex-col gap-4">
+            <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
+              AI has analysed each product description and suggested a GS1 category. Each suggestion
+              shows confidence and reasoning. Accept, override the category with a dropdown, or
+              deselect any product before confirming.
+            </p>
+
+            {/* Legend */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-[11px] font-medium text-[#6B7280]">Confidence:</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ backgroundColor: "#DCFCE7", color: "#15803D" }}>90%+ high</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ backgroundColor: "#FEF9C3", color: "#A16207" }}>75–89% medium</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}>&lt;75% low</span>
+            </div>
+
+            {/* Review table */}
+            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #E0E4E8" }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
+                    {["", "Product", "AI Suggestion", "Confidence", "Reasoning", "Category"].map((h) => (
+                      <th key={h} className="text-left px-3 py-2.5 text-xs font-medium text-[#6B7280] whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {suggestions.map((s, idx) => (
+                    <tr
+                      key={s.productId}
+                      style={{
+                        borderBottom: idx < suggestions.length - 1 ? "1px solid #F3F4F6" : undefined,
+                        backgroundColor: s.accepted ? undefined : "#F9FAFB",
+                        opacity: s.accepted ? 1 : 0.55,
+                      }}
+                    >
+                      {/* Accept toggle */}
+                      <td className="px-3 py-3 align-top w-8">
+                        <input
+                          type="checkbox"
+                          checked={s.accepted}
+                          onChange={() => toggleAccepted(s.productId)}
+                          className="mt-0.5 accent-[#4F46E5] cursor-pointer"
+                          title="Include in enrichment"
+                        />
+                      </td>
+
+                      {/* Product */}
+                      <td className="px-3 py-3 align-top">
+                        <span className="block text-xs font-semibold text-[#111827]">{s.productId}</span>
+                        <span className="text-[11px] font-light text-[#6B7280]">{s.description}</span>
+                      </td>
+
+                      {/* AI suggestion */}
+                      <td className="px-3 py-3 align-top">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                          style={{ backgroundColor: "#EEF2FF", color: "#3730A3" }}
+                        >
+                          <Sparkles className="w-2.5 h-2.5 shrink-0" />
+                          {s.suggestedBrick.brickName}
+                        </span>
+                        <span className="block text-[10px] font-mono text-[#9CA3AF] mt-0.5">{s.suggestedBrick.brickCode}</span>
+                      </td>
+
+                      {/* Confidence */}
+                      <td className="px-3 py-3 align-top">
+                        <ConfidencePill value={s.confidence} />
+                      </td>
+
+                      {/* Reasoning (expandable) */}
+                      <td className="px-3 py-3 align-top max-w-[200px]">
+                        {expandedReasoning === s.productId ? (
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[11px] font-light leading-relaxed text-[#374151]">{s.reasoning}</p>
+                            <button
+                              className="text-[11px] font-medium hover:underline text-left"
+                              style={{ color: "#6B7280" }}
+                              onClick={() => setExpandedReasoning(null)}
+                            >
+                              Show less
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="text-[11px] font-medium hover:underline text-left"
+                            style={{ color: "#4F46E5" }}
+                            onClick={() => setExpandedReasoning(s.productId)}
+                          >
+                            View reasoning
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Override dropdown */}
+                      <td className="px-3 py-3 align-top">
+                        <div className="relative">
+                          <select
+                            value={s.overrideCode ?? s.suggestedBrick.brickCode}
+                            onChange={(e) => setOverride(s.productId, e.target.value)}
+                            disabled={!s.accepted}
+                            className="appearance-none text-[11px] font-medium pl-2.5 pr-6 py-1 rounded-md border outline-none bg-white cursor-pointer disabled:cursor-default disabled:opacity-50"
+                            style={{ borderColor: "#E0E4E8", color: "#111827", maxWidth: 160 }}
+                          >
+                            {allBricks.map((b) => (
+                              <option key={b.brickCode} value={b.brickCode}>
+                                {b.brickName} ({b.brickCode})
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: "#9CA3AF" }} />
+                        </div>
+                        {s.overrideCode && s.overrideCode !== suggestions.find((x) => x.productId === s.productId)?.suggestedBrick.brickCode && (
+                          <span
+                            className="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+                          >
+                            Overridden
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs font-light text-[#6B7280]">
+                {acceptedCount} of {suggestions.length} product{suggestions.length !== 1 ? "s" : ""} selected
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onClose}
+                  className="px-3.5 py-1.5 rounded-md text-xs font-medium border hover:bg-[#F4F6F8] transition-colors"
+                  style={{ borderColor: "#E0E4E8", color: "#374151" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setStep("confirm")}
+                  disabled={acceptedCount === 0}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors disabled:opacity-40"
+                  style={{ backgroundColor: "#4F46E5", color: "#FFFFFF" }}
+                >
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  Review enrichment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === "confirm" && (
+          <div className="flex flex-col gap-4">
+            {/* Summary card */}
+            <div
+              className="rounded-lg p-4 flex flex-col gap-3"
+              style={{ backgroundColor: "#F5F3FF", border: "1px solid #DDD6FE" }}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" style={{ color: "#4F46E5" }} />
+                <span className="text-sm font-semibold" style={{ color: "#3730A3" }}>
+                  Ready to enrich {acceptedCount} product{acceptedCount !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                <li className="text-xs font-light leading-relaxed" style={{ color: "#4338CA" }}>
+                  — Categories will be assigned from GS1 standard bricks (AI-suggested, supplier-reviewed)
+                </li>
+                <li className="text-xs font-light leading-relaxed" style={{ color: "#4338CA" }}>
+                  — {totalAttrsToFill} standard attributes will become required across the selected products
+                </li>
+                <li className="text-xs font-light leading-relaxed" style={{ color: "#4338CA" }}>
+                  — Compliance status will update immediately for all trading partners using these categories
+                </li>
+              </ul>
+              <div
+                className="rounded-md px-3 py-2 text-[11px] font-light leading-relaxed"
+                style={{ backgroundColor: "#EDE9FE", color: "#5B21B6" }}
+              >
+                AI works on GS1 standard attributes only. Retailer-specific custom attributes are
+                not included in this enrichment and must be completed per-retailer.
+              </div>
+            </div>
+
+            {/* Per-product summary */}
+            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #E0E4E8" }}>
+              {suggestions.filter((s) => s.accepted).map((s, idx, arr) => (
+                <div
+                  key={s.productId}
+                  className="flex items-center justify-between px-4 py-3"
+                  style={{ borderBottom: idx < arr.length - 1 ? "1px solid #F3F4F6" : undefined }}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-semibold text-[#111827]">{s.productId} &mdash; {s.description}</span>
+                    <span className="text-[11px] font-light text-[#6B7280]">
+                      {s.suggestedBrick.brickName} · {s.suggestedBrick.extendedAttributes.length} attrs
+                      {s.overrideCode ? " · overridden by you" : " · AI suggestion"}
+                    </span>
+                  </div>
+                  <ConfidencePill value={s.confidence} />
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                onClick={() => setStep("review")}
+                className="text-xs font-medium hover:underline"
+                style={{ color: "#6B7280" }}
+              >
+                Back to review
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onClose}
+                  className="px-3.5 py-1.5 rounded-md text-xs font-medium border hover:bg-[#F4F6F8] transition-colors"
+                  style={{ borderColor: "#E0E4E8", color: "#374151" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors"
+                  style={{ backgroundColor: "#4F46E5", color: "#FFFFFF" }}
+                >
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  Confirm enrichment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Assign Category modal ─────────────────────────────────────────────────────
+// A searchable GS1 brick picker. Options come from the shared GS1 standard
 function AssignCategoryModal({
   open,
   product,
@@ -438,6 +893,8 @@ export function ScreenSupplierProducts({
   const [products, setProducts] = useState<ProductRow[]>(ALL_PRODUCTS)
   // The product currently being assigned a category (drives the picker modal).
   const [assignProduct, setAssignProduct] = useState<ProductRow | null>(null)
+  // AI bulk assignment modal
+  const [aiBulkOpen, setAiBulkOpen] = useState(false)
 
   // Assign the chosen GS1 brick to the product: it becomes categorised. No
   // retailer requirement profile is matched here, so it shows "No requirements
@@ -451,11 +908,33 @@ export function ScreenSupplierProducts({
               ...p,
               state: "no-profile",
               category: `${brick.brickName} (GS1: ${brick.brickCode})`,
+              brickCode: brick.brickCode,
+              superset: { gs1Gaps: brick.extendedAttributes.length, customGaps: 0 },
             }
           : p,
       ),
     )
     setAssignProduct(null)
+  }
+
+  // AI bulk confirm: apply all accepted suggestions at once
+  function handleAiBulkConfirm(accepted: AiSuggestion[]) {
+    setProducts((prev) =>
+      prev.map((p) => {
+        const suggestion = accepted.find((s) => s.productId === p.id)
+        if (!suggestion) return p
+        return {
+          ...p,
+          state: "no-profile" as const,
+          category: `${suggestion.suggestedBrick.brickName} (GS1: ${suggestion.suggestedBrick.brickCode})`,
+          brickCode: suggestion.suggestedBrick.brickCode,
+          superset: {
+            gs1Gaps: suggestion.suggestedBrick.extendedAttributes.length,
+            customGaps: 0,
+          },
+        }
+      }),
+    )
   }
 
   // ── Filter logic ────────────────────────────────────────────────────────────
@@ -586,14 +1065,24 @@ export function ScreenSupplierProducts({
               className="mt-0.5 w-2 h-2 rounded-full shrink-0 animate-pulse"
               style={{ backgroundColor: "#DC2626" }}
             />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-semibold" style={{ color: "#991B1B" }}>
-                {uncategorisedCount} product{uncategorisedCount !== 1 ? "s" : ""} without a category
-              </span>
-              <span className="text-xs font-light leading-relaxed" style={{ color: "#B91C1C" }}>
-                Compliance cannot be checked until a category is assigned. These products are
-                treated as non-compliant by all retailers.
-              </span>
+            <div className="flex flex-1 items-center justify-between gap-4 flex-wrap">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-semibold" style={{ color: "#991B1B" }}>
+                  {uncategorisedCount} product{uncategorisedCount !== 1 ? "s" : ""} without a category
+                </span>
+                <span className="text-xs font-light leading-relaxed" style={{ color: "#B91C1C" }}>
+                  Compliance cannot be checked until a category is assigned. These products are
+                  treated as non-compliant by all retailers.
+                </span>
+              </div>
+              <button
+                onClick={() => setAiBulkOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition-colors hover:opacity-90 shrink-0"
+                style={{ backgroundColor: "#4F46E5", color: "#FFFFFF" }}
+              >
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                Assign with AI
+              </button>
             </div>
           </div>
         )
@@ -607,7 +1096,7 @@ export function ScreenSupplierProducts({
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
-              {["Product ID", "Description", "Category", "Compliance Status"].map((h) => (
+              {["Product ID", "Description", "Category", "Superset", "Per-Retailer Status"].map((h) => (
                 <th
                   key={h}
                   className="text-left px-4 py-3 font-medium text-[#6B7280] whitespace-nowrap"
@@ -620,7 +1109,7 @@ export function ScreenSupplierProducts({
           <tbody>
             {pageRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-sm font-light text-[#9CA3AF]">
+                <td colSpan={5} className="px-4 py-8 text-center text-sm font-light text-[#9CA3AF]">
                   No products match the current filter.
                 </td>
               </tr>
@@ -665,6 +1154,16 @@ export function ScreenSupplierProducts({
                         <span className="text-[#6B7280] font-light">{row.category}</span>
                       )}
                     </td>
+                    {/* Superset column */}
+                    <td className="px-4 py-3 align-top">
+                      {isUncategorised ? (
+                        <span className="text-xs font-light text-[#9CA3AF]">&mdash;</span>
+                      ) : (
+                        <SupersetBadge superset={row.superset} />
+                      )}
+                    </td>
+
+                    {/* Per-retailer status column */}
                     <td className="px-4 py-3 align-top">
                       {isUncategorised ? (
                         <span
@@ -730,6 +1229,14 @@ export function ScreenSupplierProducts({
         product={assignProduct}
         onClose={() => setAssignProduct(null)}
         onAssign={handleAssignCategory}
+      />
+
+      {/* AI bulk category assignment */}
+      <AiBulkCategoryModal
+        open={aiBulkOpen}
+        uncategorisedProducts={products.filter((p) => p.state === "uncategorised")}
+        onClose={() => setAiBulkOpen(false)}
+        onConfirm={handleAiBulkConfirm}
       />
     </div>
   )

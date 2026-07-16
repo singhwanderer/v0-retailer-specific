@@ -13,6 +13,7 @@ import { ScreenSupplierTradingPartners } from "@/components/portal/screen-suppli
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
 import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
+import { ScreenGs1Standards } from "@/components/portal/screen-gs1-standards"
 
 type Perspective = "retailer" | "supplier"
 
@@ -27,6 +28,11 @@ type SupplierScreen =
   | "selection-codes"
   | "supplier-products"
   | "supplier-gap-detail"
+  // GS1 Standards flow — same screen hierarchy, system-owned read-only partner
+  | "gs1-standards"
+  | "gs1-selection-codes"
+  | "gs1-products"
+  | "gs1-gap-detail"
 
 function DashboardPlaceholder() {
   return (
@@ -107,9 +113,21 @@ export default function RetailerPortal() {
     }
   }
 
-  // ── Supplier navigation (sidebar "Catalogue" click — back to L1) ───────────
+  // ── Supplier navigation (sidebar clicks) ────────────────────────────────────
   function handleSupplierNavigate(id: string) {
-    if (id === "supplier-products") {
+    if (id === "supplier-compliance") {
+      // "Compliance" is the renamed Catalogue — routes to Trading Partners L1
+      setSupplierScreen("trading-partners")
+      setActivePartner(null)
+      setActiveCode(null)
+      setGapProduct(null)
+    } else if (id === "supplier-gs1-standards") {
+      // GS1 Standards — dedicated flow seeded from GS1_BRICKS, no retailer partner
+      setSupplierScreen("gs1-standards")
+      setActivePartner(null)
+      setActiveCode(null)
+      setGapProduct(null)
+    } else if (id === "supplier-trading-partners") {
       setSupplierScreen("trading-partners")
       setActivePartner(null)
       setActiveCode(null)
@@ -156,12 +174,58 @@ export default function RetailerPortal() {
     setGapProduct(null)
   }
 
+  // ── GS1 Standards navigation ────────────────────────────────────────────────
+  // The GS1 flow is L1 (brick segments) → L2 (bricks) → L3 (products) → L4 (gap)
+  // using a synthetic "GS1" partner. State reuses activeCode + gapProduct.
+  const GS1_PARTNER = { id: "gs1", name: "GS1 Standards" }
+
+  function handleGs1SelectSegment(segmentId: string, segmentName: string) {
+    setActiveCode({ id: segmentId, label: segmentName })
+    setSupplierScreen("gs1-selection-codes")
+  }
+
+  function handleGs1SelectBrick(brickCode: string, brickName: string) {
+    setActiveCode({ id: brickCode, label: brickName })
+    setSupplierScreen("gs1-products")
+  }
+
+  function handleGs1NavigateToGap(productName: string) {
+    setGapProduct({ productName, retailer: "GS1 Standards" })
+    setSupplierScreen("gs1-gap-detail")
+  }
+
+  function handleGs1BackToProducts() {
+    setSupplierScreen("gs1-products")
+    setGapProduct(null)
+  }
+
+  function handleGs1BackToBricks() {
+    setSupplierScreen("gs1-selection-codes")
+    setGapProduct(null)
+    setActiveCode(null)
+  }
+
+  function handleGs1BackToSegments() {
+    setSupplierScreen("gs1-standards")
+    setActivePartner(null)
+    setActiveCode(null)
+    setGapProduct(null)
+  }
+
   // ── Active sidebar item ─────────────────────────────────────────────────────
   const retailerActiveScreen =
     retailerScreen === "profile-detail" ? "attribute-profiles" : retailerScreen
 
-  // All supplier screens map to "supplier-products" for the sidebar highlight
-  const supplierActiveScreen = "supplier-products"
+  // Map supplier screens to the correct sidebar nav item id
+  const supplierActiveScreen: string = (() => {
+    if (
+      supplierScreen === "gs1-standards" ||
+      supplierScreen === "gs1-selection-codes" ||
+      supplierScreen === "gs1-products" ||
+      supplierScreen === "gs1-gap-detail"
+    ) return "supplier-gs1-standards"
+    return "supplier-compliance"
+  })()
 
   const activeScreen =
     perspective === "retailer" ? retailerActiveScreen : supplierActiveScreen
@@ -292,6 +356,44 @@ export default function RetailerPortal() {
                     onBackToPartnerList={handleBackToPartnerList}
                   />
                 )}
+
+              {/* ── GS1 Standards flow ── */}
+              {supplierScreen === "gs1-standards" && (
+                <ScreenGs1Standards
+                  mode="segments"
+                  onSelectSegment={handleGs1SelectSegment}
+                  onBack={handleGs1BackToSegments}
+                />
+              )}
+              {supplierScreen === "gs1-selection-codes" && activeCode && (
+                <ScreenGs1Standards
+                  mode="bricks"
+                  segment={activeCode.label}
+                  onSelectBrick={handleGs1SelectBrick}
+                  onBack={handleGs1BackToSegments}
+                />
+              )}
+              {supplierScreen === "gs1-products" && activeCode && (
+                <ScreenGs1Standards
+                  mode="products"
+                  brickCode={activeCode.id}
+                  brickName={activeCode.label}
+                  onViewGap={handleGs1NavigateToGap}
+                  onBack={handleGs1BackToBricks}
+                  onBackToSegments={handleGs1BackToSegments}
+                />
+              )}
+              {supplierScreen === "gs1-gap-detail" && gapProduct && activeCode && (
+                <ScreenGs1Standards
+                  mode="gap"
+                  brickCode={activeCode.id}
+                  brickName={activeCode.label}
+                  productName={gapProduct.productName}
+                  onBack={handleGs1BackToProducts}
+                  onBackToBricks={handleGs1BackToBricks}
+                  onBackToSegments={handleGs1BackToSegments}
+                />
+              )}
             </>
           )}
         </main>
