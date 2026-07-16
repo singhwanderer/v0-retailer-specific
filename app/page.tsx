@@ -5,6 +5,7 @@ import { TopNav } from "@/components/portal/top-nav"
 import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
+import { getBrickByCode } from "@/lib/gs1-standard-library"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
 import { ScreenSupplierTradingPartners } from "@/components/portal/screen-supplier-trading-partners"
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
@@ -42,8 +43,12 @@ export default function RetailerPortal() {
   // ── Retailer state ──────────────────────────────────────────────────────────
   const [retailerScreen, setRetailerScreen] = useState<RetailerScreen>("attribute-profiles")
 
-  // Brick context passed from Screen 1 into Screen 2
-  const [activeBrick, setActiveBrick] = useState<{ code: string; name: string } | null>(null)
+  // Context passed from Screen 1 into Screen 2
+  const [activeBrick, setActiveBrick] = useState<{
+    code: string
+    name: string
+    categoryName: string
+  } | null>(null)
 
   // ── Supplier state ──────────────────────────────────────────────────────────
   const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("trading-partners")
@@ -122,6 +127,16 @@ export default function RetailerPortal() {
     setGapProduct(null)
   }
 
+  // Pre-compute extended rows for Screen 2 from the selected brick's standard attributes
+  const activeBrickExtendedRows = activeBrick
+    ? getBrickByCode(activeBrick.code)?.extendedAttributes.map((attr) => ({
+        retailerName: attr.name,
+        tgcGs1Name: `${attr.name} (${attr.code})`,
+        guidance: "",
+        source: "standard" as const,
+      }))
+    : undefined
+
   // ── Active sidebar item ─────────────────────────────────────────────────────
   const retailerActiveScreen =
     retailerScreen === "profile-detail" ? "attribute-profiles" : retailerScreen
@@ -182,9 +197,11 @@ export default function RetailerPortal() {
               {retailerScreen === "dashboard" && <DashboardPlaceholder />}
               {retailerScreen === "attribute-profiles" && (
                 <Screen1AttributeProfiles
-                  onNavigateToProfile={(brickCode, brickName) => {
+                  onNavigateToProfile={(brickCode, brickName, categoryName) => {
                     setActiveBrick(
-                      brickCode && brickName ? { code: brickCode, name: brickName } : null
+                      brickCode && brickName
+                        ? { code: brickCode, name: brickName, categoryName: categoryName ?? brickName }
+                        : null
                     )
                     setRetailerScreen("profile-detail")
                   }}
@@ -196,9 +213,12 @@ export default function RetailerPortal() {
                     setRetailerScreen("attribute-profiles")
                     setActiveBrick(null)
                   }}
-                  brickMapping={activeBrick}
+                  brickMapping={activeBrick ? { code: activeBrick.code, name: activeBrick.name } : null}
+                  initialCategoryName={activeBrick?.categoryName}
+                  initialBrickExtendedRows={activeBrickExtendedRows}
                 />
               )}
+              
               {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
             </>
           )}

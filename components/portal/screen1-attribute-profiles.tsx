@@ -12,7 +12,7 @@ import {
 import { GS1_BRICKS, searchBricks, getSegments, type Gs1Brick } from "@/lib/gs1-standard-library"
 
 interface Screen1Props {
-  onNavigateToProfile: (brickCode?: string, brickName?: string) => void
+  onNavigateToProfile: (brickCode?: string, brickName?: string, categoryName?: string) => void
 }
 
 const categories = [
@@ -643,7 +643,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
 
   function handleAction(action: string, name: string, brickCode?: string, brickName?: string) {
     if (action === "Edit") {
-      onNavigateToProfile(brickCode, brickName)
+      onNavigateToProfile(brickCode, brickName, name)
       return
     }
     if (action === "Deactivate" || action === "Activate") {
@@ -660,8 +660,8 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
   function handleCreated(result: { name: string; brickCode: string | null; brickName: string | null }) {
     const brickLabel = result.brickName ? ` mapped to ${result.brickName}` : ""
     showToast(`"${result.name}" created as Draft${brickLabel}.`)
-    // Navigate immediately into the new requirement's profile
-    onNavigateToProfile(result.brickCode ?? undefined, result.brickName ?? undefined)
+    // Navigate immediately into the new requirement's profile, passing the retailer's category name
+    onNavigateToProfile(result.brickCode ?? undefined, result.brickName ?? undefined, result.name)
   }
 
   return (
@@ -719,7 +719,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
               >
                 <td className="px-4 py-3.5">
                   <button
-                    onClick={() => onNavigateToProfile(cat.brickCode, cat.brickName)}
+                    onClick={() => onNavigateToProfile(cat.brickCode, cat.brickName, cat.name)}
                     className="font-medium hover:underline text-left cursor-pointer"
                     style={{ color: "#0168B3" }}
                   >

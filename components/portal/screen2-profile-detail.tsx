@@ -945,18 +945,29 @@ function CategorySummaryCard({
 interface Screen2Props {
   onBack: () => void
   brickMapping?: { code: string; name: string } | null
+  /** The retailer's internal category name typed in Step 1 of the Create flow */
+  initialCategoryName?: string
+  /** Standard extended attributes seeded from the GS1 brick, if one was selected */
+  initialBrickExtendedRows?: AttributeRow[]
 }
 
-export function Screen2ProfileDetail({ onBack, brickMapping }: Screen2Props) {
+export function Screen2ProfileDetail({
+  onBack,
+  brickMapping,
+  initialCategoryName,
+  initialBrickExtendedRows,
+}: Screen2Props) {
   const [coreRows, setCoreRows] = useState<AttributeRow[]>(initialCoreRows)
-  const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(initialExtendedRows)
+  const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(
+    initialBrickExtendedRows ?? initialExtendedRows
+  )
   const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(initialImageRows)
 
   const [addAttrTarget, setAddAttrTarget] = useState<AddAttrTarget>(null)
   const [addImageOpen, setAddImageOpen] = useState(false)
   const [deactivateOpen, setDeactivateOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
-  const [categoryName, setCategoryName] = useState("Footwear — Core Compliance")
+  const [categoryName, setCategoryName] = useState(initialCategoryName ?? "Footwear")
   const [toast, setToast] = useState<string | null>(null)
 
   // Edit attribute row state
