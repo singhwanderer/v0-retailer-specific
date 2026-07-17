@@ -8,7 +8,6 @@ import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
 import { ScreenSupplierCompliance } from "@/components/portal/screen-supplier-compliance"
-import { ScreenSupplierGs1Products } from "@/components/portal/screen-supplier-gs1-products"
 import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-catalogue"
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
@@ -250,10 +249,12 @@ export default function RetailerPortal() {
                 />
               )}
 
-              {/* GS1 row-zero drill-down — products vs baseline, by category */}
+              {/* GS1 row-zero drill-down — the shared product leaf in GS1 mode */}
               {supplierScreen === "gs1-products" && (
-                <ScreenSupplierGs1Products
+                <ScreenSupplierProducts
+                  target={{ kind: "gs1" }}
                   onBack={handleBackToPartnerList}
+                  onNavigateToGapDetail={handleNavigateToGapDetail}
                   onGoToCatalogue={() => setSupplierScreen("catalogue")}
                 />
               )}
@@ -270,11 +271,14 @@ export default function RetailerPortal() {
                 />
               )}
 
-              {/* L3 — Product List */}
+              {/* L3 — Product List (shared leaf in retailer mode) */}
               {supplierScreen === "supplier-products" && activePartner && activeCode && (
                 <ScreenSupplierProducts
-                  partnerName={activePartner.name}
-                  selectionCode={activeCode.label}
+                  target={{
+                    kind: "retailer",
+                    partnerName: activePartner.name,
+                    selectionCode: activeCode.label,
+                  }}
                   onBack={handleBackToPartner}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
                 />

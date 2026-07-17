@@ -3,18 +3,17 @@
 import { BadgeCheck } from "lucide-react"
 
 // ── Merged Compliance list ────────────────────────────────────────────────────
-// One list of compliance targets: GS1 Standard as "row zero" (the baseline
-// every supplier has by default), followed by the retailers who have published
-// requirements against this account. Each row drills into the same
-// product-and-gaps leaf via the filter appropriate to the target: category for
-// GS1, selection code for a retailer.
+// Evolved from the former Trading Partners screen: the same list of retailers
+// who publish requirements against this account, now preceded by GS1 Standard
+// as "row zero" — the baseline every product is assessed against. Each row is a
+// compliance target that drills into the same product-and-gaps leaf.
 
 interface SupplierComplianceProps {
   onSelectGs1: () => void
   onSelectPartner: (partnerId: string, partnerName: string) => void
 }
 
-type PartnerRow = {
+type Partner = {
   id: string
   name: string
   accountNumber: string
@@ -22,10 +21,11 @@ type PartnerRow = {
   selectionCodes: number
   totalGaps: number
   completeCodes: number
+  /** Retailer-specific attributes required on top of the GS1 baseline */
   extras: number
 }
 
-const PARTNERS: PartnerRow[] = [
+const PARTNERS: Partner[] = [
   {
     id: "dillards",
     name: "Dillard's",
@@ -58,22 +58,34 @@ const PARTNERS: PartnerRow[] = [
   },
 ]
 
-// GS1 row-zero mock stats — kept consistent with the catalogue mock data:
-// 13 products, 4 uncategorised, 6 baseline gaps across the categorised ones.
-const GS1_STATS = {
-  products: 13,
-  uncategorised: 4,
-  baselineGaps: 6,
-  complete: 5,
+// GS1 row-zero stats — consistent with the catalogue mock (13 products,
+// 4 uncategorised, 6 baseline gaps across the categorised ones).
+const GS1_STATS = { uncategorised: 4, baselineGaps: 6 }
+
+// Reused from the former Trading Partners screen — the retailer-row status pill.
+function ComplianceSummary({ gaps, complete, total }: { gaps: number; complete: number; total: number }) {
+  const allComplete = gaps === 0
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+      style={
+        allComplete
+          ? { backgroundColor: "#DCFCE7", color: "#15803D" }
+          : { backgroundColor: "#FEF3C7", color: "#92400E" }
+      }
+    >
+      <span
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ backgroundColor: allComplete ? "#16A34A" : "#F59E0B" }}
+      />
+      {allComplete
+        ? `${complete} of ${total} codes complete`
+        : `${gaps} gaps across ${total - complete} code${total - complete !== 1 ? "s" : ""}`}
+    </span>
+  )
 }
 
-function StatusPill({
-  tone,
-  label,
-}: {
-  tone: "green" | "amber" | "red"
-  label: string
-}) {
+function Pill({ tone, label }: { tone: "green" | "amber" | "red"; label: string }) {
   const cfg = {
     green: { bg: "#DCFCE7", text: "#15803D", dot: "#16A34A" },
     amber: { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
@@ -84,19 +96,13 @@ function StatusPill({
       className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
       style={{ backgroundColor: cfg.bg, color: cfg.text }}
     >
-      <span
-        className="w-1.5 h-1.5 rounded-full shrink-0"
-        style={{ backgroundColor: cfg.dot }}
-      />
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cfg.dot }} />
       {label}
     </span>
   )
 }
 
-export function ScreenSupplierCompliance({
-  onSelectGs1,
-  onSelectPartner,
-}: SupplierComplianceProps) {
+export function ScreenSupplierCompliance({ onSelectGs1, onSelectPartner }: SupplierComplianceProps) {
   return (
     <div className="p-8 flex flex-col gap-6">
       {/* Header */}
@@ -131,10 +137,7 @@ export function ScreenSupplierCompliance({
           <tbody>
             {/* ── Row zero: GS1 Standard ── */}
             <tr
-              style={{
-                borderBottom: "1px solid #E0E4E8",
-                backgroundColor: "#F8FAFF",
-              }}
+              style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F8FAFF" }}
               className="hover:bg-[#EFF6FF]/60 transition-colors"
             >
               <td className="px-4 py-3 align-middle">
@@ -164,14 +167,14 @@ export function ScreenSupplierCompliance({
                 <div className="flex items-center gap-2 flex-wrap">
                   {GS1_STATS.uncategorised > 0 && (
                     <button onClick={onSelectGs1} className="hover:opacity-80 transition-opacity">
-                      <StatusPill
+                      <Pill
                         tone="red"
                         label={`${GS1_STATS.uncategorised} uncategorised — cannot be assessed`}
                       />
                     </button>
                   )}
                   <button onClick={onSelectGs1} className="hover:opacity-80 transition-opacity">
-                    <StatusPill
+                    <Pill
                       tone={GS1_STATS.baselineGaps > 0 ? "amber" : "green"}
                       label={
                         GS1_STATS.baselineGaps > 0
@@ -184,7 +187,7 @@ export function ScreenSupplierCompliance({
               </td>
             </tr>
 
-            {/* ── Retailer rows ── */}
+            {/* ── Retailer rows (unchanged from Trading Partners) ── */}
             {PARTNERS.map((partner, idx) => (
               <tr
                 key={partner.id}
@@ -219,17 +222,12 @@ export function ScreenSupplierCompliance({
                 <td className="px-4 py-3 align-middle">
                   <button
                     onClick={() => onSelectPartner(partner.id, partner.name)}
-                    className="hover:opacity-80 transition-opacity"
+                    className="text-left"
                   >
-                    <StatusPill
-                      tone={partner.totalGaps === 0 ? "green" : "amber"}
-                      label={
-                        partner.totalGaps === 0
-                          ? `${partner.completeCodes} of ${partner.selectionCodes} codes complete`
-                          : `${partner.totalGaps} gaps across ${
-                              partner.selectionCodes - partner.completeCodes
-                            } code${partner.selectionCodes - partner.completeCodes !== 1 ? "s" : ""}`
-                      }
+                    <ComplianceSummary
+                      gaps={partner.totalGaps}
+                      complete={partner.completeCodes}
+                      total={partner.selectionCodes}
                     />
                   </button>
                 </td>
