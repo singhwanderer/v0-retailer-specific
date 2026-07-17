@@ -1,6 +1,6 @@
 "use client"
 
-import { Image, LayoutDashboard, Package, Tag, Users } from "lucide-react"
+import { Image, LayoutDashboard, Package, ShieldCheck, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
@@ -12,14 +12,14 @@ interface SidebarProps {
 }
 
 const retailerNavItems = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "attribute-profiles", label: "Attributes & Images", icon: Tag },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, wired: true },
+  { id: "attribute-profiles", label: "Attributes & Images", icon: Tag, wired: true },
 ]
 
 const supplierNavItems = [
-  { id: "supplier-products", label: "Catalogue", icon: Package, wired: true },
+  { id: "supplier-compliance", label: "Compliance", icon: ShieldCheck, wired: true },
+  { id: "supplier-catalogue", label: "Catalogue", icon: Package, wired: true },
   { id: "supplier-image-upload", label: "Image Upload", icon: Image, wired: false },
-  { id: "supplier-trading-partners", label: "Trading Partners", icon: Users, wired: false },
 ]
 
 export function Sidebar({ activeScreen, onNavigate, perspective }: SidebarProps) {

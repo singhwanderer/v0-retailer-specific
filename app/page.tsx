@@ -7,7 +7,9 @@ import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
-import { ScreenSupplierTradingPartners } from "@/components/portal/screen-supplier-trading-partners"
+import { ScreenSupplierCompliance } from "@/components/portal/screen-supplier-compliance"
+import { ScreenSupplierGs1Products } from "@/components/portal/screen-supplier-gs1-products"
+import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-catalogue"
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
 import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
@@ -21,7 +23,9 @@ type RetailerScreen =
   | "profile-detail"
 
 type SupplierScreen =
-  | "trading-partners"
+  | "compliance"
+  | "gs1-products"
+  | "catalogue"
   | "selection-codes"
   | "supplier-products"
   | "supplier-gap-detail"
@@ -51,7 +55,7 @@ export default function RetailerPortal() {
   } | null>(null)
 
   // ── Supplier state ──────────────────────────────────────────────────────────
-  const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("trading-partners")
+  const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("compliance")
 
   // L2 context
   const [activePartner, setActivePartner] = useState<{ id: string; name: string } | null>(null)
@@ -78,14 +82,25 @@ export default function RetailerPortal() {
     }
   }
 
-  // ── Supplier navigation (sidebar "Catalogue" click — back to L1) ───────────
+  // ── Supplier navigation (sidebar clicks) ────────────────────────────────────
   function handleSupplierNavigate(id: string) {
-    if (id === "supplier-products") {
-      setSupplierScreen("trading-partners")
+    if (id === "supplier-compliance") {
+      setSupplierScreen("compliance")
       setActivePartner(null)
       setActiveCode(null)
       setGapProduct(null)
     }
+    if (id === "supplier-catalogue") {
+      setSupplierScreen("catalogue")
+      setActivePartner(null)
+      setActiveCode(null)
+      setGapProduct(null)
+    }
+  }
+
+  // ── Compliance list → GS1 row zero ──────────────────────────────────────────
+  function handleSelectGs1() {
+    setSupplierScreen("gs1-products")
   }
 
   // ── L1 → L2 ────────────────────────────────────────────────────────────────
@@ -119,9 +134,9 @@ export default function RetailerPortal() {
     setActiveCode(null)
   }
 
-  // ── L4 back to L1 ──────────────────────────────────────────────────────────
+  // ── L4 back to L1 (merged Compliance list) ─────────────────────────────────
   function handleBackToPartnerList() {
-    setSupplierScreen("trading-partners")
+    setSupplierScreen("compliance")
     setActivePartner(null)
     setActiveCode(null)
     setGapProduct(null)
@@ -141,8 +156,9 @@ export default function RetailerPortal() {
   const retailerActiveScreen =
     retailerScreen === "profile-detail" ? "attribute-profiles" : retailerScreen
 
-  // All supplier screens map to "supplier-products" for the sidebar highlight
-  const supplierActiveScreen = "supplier-products"
+  // Map supplier screens to their sidebar item for the highlight
+  const supplierActiveScreen =
+    supplierScreen === "catalogue" ? "supplier-catalogue" : "supplier-compliance"
 
   const activeScreen =
     perspective === "retailer" ? retailerActiveScreen : supplierActiveScreen
@@ -226,12 +242,24 @@ export default function RetailerPortal() {
           {/* ── Supplier screens ── */}
           {perspective === "supplier" && (
             <>
-              {/* L1 — Trading Partner List */}
-              {supplierScreen === "trading-partners" && (
-                <ScreenSupplierTradingPartners
+              {/* L1 — Merged Compliance list (GS1 row zero + retailers) */}
+              {supplierScreen === "compliance" && (
+                <ScreenSupplierCompliance
+                  onSelectGs1={handleSelectGs1}
                   onSelectPartner={handleSelectPartner}
                 />
               )}
+
+              {/* GS1 row-zero drill-down — products vs baseline, by category */}
+              {supplierScreen === "gs1-products" && (
+                <ScreenSupplierGs1Products
+                  onBack={handleBackToPartnerList}
+                  onGoToCatalogue={() => setSupplierScreen("catalogue")}
+                />
+              )}
+
+              {/* Catalogue — categorisation home + AI enrichment hand-off */}
+              {supplierScreen === "catalogue" && <ScreenSupplierCatalogue />}
 
               {/* L2 — Selection Code List */}
               {supplierScreen === "selection-codes" && activePartner && (
