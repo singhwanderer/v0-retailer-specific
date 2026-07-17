@@ -38,32 +38,80 @@ Compliance assessment presupposes a category. Today:
 
 - `screen-supplier-products.tsx` shows an uncategorised product with an **"Assign category" button that does nothing** (no `onClick` handler wired).
 - The urgent red banner correctly says *"Compliance cannot be checked until a category is assigned"* — but gives no path to actually assign one.
-- A standalone **"GS1" item in the left nav** (as in your newer working copy) makes this worse: a user who clicks it before categorising anything lands on an empty or confusing screen, because GS1 compliance can't be evaluated without a category either. It also splits the mental model — GS1 stops looking like "one more thing I comply with" and starts looking like a separate system.
+- A standalone **"GS1 Standards" item in the left nav** (as in the newer working copy) makes this worse. That screen is a **read-only reference dictionary** — segments → brick counts → attributes, straight from the GPC standard. It tells a supplier *what GS1 defines*, but never *how their own products measure up*. A user who clicks it before categorising anything can't act on anything there, and it splits the mental model: GS1 stops looking like "one more thing I comply with" and starts looking like a separate reference system parked next to the compliance work.
 
 Categorisation is the gateway task. Nothing else in the flow works until it's done, so the UI should treat it as such.
 
-## 4. Recommendation 1 — GS1 Standard as "row zero" in Compliance
+## 4. Recommendation 1 — GS1 Standard as "row zero" in one merged Compliance list
 
-Rather than a standalone nav item, **GS1 should appear as a row inside the same compliance list as trading partners** (`screen-supplier-trading-partners.tsx`) — the one partner every supplier has by default, even before they're connected to any retailer.
+The fix has two moving parts: **stop treating GS1 as a place to browse, and start treating it as something to comply with.**
+
+### Reference vs. compliance — remove the reference screen
+
+The current "GS1 Standards" screen conflates two different jobs, and only does the passive one. A *reference dictionary* ("what does GS1 define?") is not the same as a *compliance assessment* ("how do my products measure up?"). Suppliers need the second; the screen only offers the first.
+
+So the standalone **GS1 Standards reference screen is removed entirely.** The brick taxonomy behind it (`lib/gs1-standard-library.ts` — `searchBricks`, `getSegments`, per-brick `extendedAttributes`) doesn't disappear; it keeps doing real work in two places where it's actually actionable: the **categorisation picker** (searching for the right brick) and the **GS1 baseline assessment** (defining what "compliant" means). What goes away is the browsable "here's the standard" destination that a supplier couldn't do anything with.
+
+### Two different navigation shapes — and why they still merge
+
+GS1 and the retailers are navigated on different axes today, and this is the crux of "how do you merge them":
+
+| | Top grouping | then | then | leaf |
+|---|---|---|---|---|
+| **Retailer** | Retailer | Selection Code | Products | product + compliance badge → gap detail |
+| **GS1 (today)** | Segment | Brick (category) | Products | product + compliance badge → gap detail |
+
+The important thing: **the leaf is already identical.** The GS1 brick screen ends in a product list with a per-product compliance badge (*3 GS1 gaps*, *GS1 complete*, …) leading to gap detail — the same shape as the retailer products screen (`screen-supplier-products.tsx`). Only the *path* differs: selection code vs. segment/brick.
+
+That path difference is an artifact of how GS1 was modelled — as a *reference taxonomy* you browse by the standard's own tree, rather than as a *compliance target* you assess your products against. Reframe it as a target and the paths converge:
+
+- A **retailer row** drills to *your products, filtered to that retailer's selection codes*.
+- The **GS1 row** drills to *your products, filtered/grouped by category* — because GS1 baseline requirements are defined per category, so category is GS1's natural filter, exactly as selection code is a retailer's.
+
+So merging does **not** flatten GS1 into a look-alike retailer row. It means: **one list of compliance targets, each drilling to the same product-and-compliance leaf via the filter that fits it.** The segment→brick tree survives as a *category filter/grouping inside the GS1 target's product view* — you still get "handbags 80% baseline-compliant, dresses 40%" — it just stops being a separate top-level nav branch.
+
+### Merge Compliance + Trading Partners, add GS1 as row zero
+
+With that reconciliation in place: the working copy's separate *Compliance* and *Trading Partners* items (both already partner-axis) collapse into a single **Compliance** list, and **GS1 joins as row zero** — the one partner every supplier has by default, even before they're connected to any retailer.
 
 - Same mechanics as any other row: product count, gap count, complete count, click through to gap detail.
-- Requirements for this row are simply **the assigned brick's standard `extendedAttributes`** — that data already exists in `lib/gs1-standard-library.ts`; no new data model is needed.
-- Visual distinction: a **"Baseline / Standard" badge** instead of a retailer logo, so it reads as the foundation everything else builds on, not just another buyer. Retailer rows can then show something like *"GS1 baseline + 3 extras"* to make the relationship explicit.
-- Uncategorised products show up **inside this row** as "cannot be assessed — assign a category," which is the natural on-ramp into Recommendation 2. This also gives new suppliers (zero retailer connections yet) something meaningful to do on day one: get GS1-compliant before a retailer relationship even exists.
+- Requirements for row zero are simply **the assigned brick's standard `extendedAttributes`** — no new data model needed.
+- A **"Baseline / Standard" badge** instead of a retailer logo, so it reads as the foundation everything else builds on. Retailer rows then show *"GS1 baseline + 3 extras"* to make the relationship explicit, and carry the old Trading-Partners metadata (account GLN, active-since) as columns on the same row.
+- Uncategorised products show up **inside row zero** as "cannot be assessed — assign a category," the natural on-ramp into Recommendation 2. This also gives brand-new suppliers (zero retailer connections yet) something meaningful to do on day one: get GS1-compliant before a retailer relationship even exists.
+
+### The concrete new state
+
+**Left nav:**
+
+| | Before | After |
+|---|---|---|
+| Items | Compliance · GS1 Standards · Trading Partners · Image Upload | **Compliance** · Image Upload |
+
+- **Compliance list screen** — row zero "GS1 Standard — Baseline" (Baseline badge, product/gap/complete counts) sits above the retailer rows; each retailer row shows its relationship metadata plus a "baseline + N extras" compliance summary.
+- **GS1 row drill-down** (this replaces the old GS1 Standards destination) — the supplier's *own products* assessed against GS1 baseline, presented as a product list with a per-product compliance badge (the leaf your Handbags/Purses screenshot already shows), **filterable/groupable by category** in place of the old segment→brick browse. Categorised products show their baseline gap status; uncategorised products are flagged "Assign category" → hands off to enrichment (Rec 2). No reference dictionary — just your products vs. the baseline.
+- **Retailer row drill-down** — the existing selection-codes → products → gap-detail flow, reframed as "GS1 baseline + this retailer's extras."
+- **Categorisation picker** — where the GS1 taxonomy now lives: a searchable brick picker (via `searchBricks`/`getSegments`), reached when assigning a category, not a standalone nav screen.
 
 ```mermaid
 flowchart TB
-    subgraph Before["Current nav"]
-        B1[Trading Partners] 
-        B2[Selection Codes]
-        B3["GS1 (standalone item)"]
+    subgraph Before["Current nav — 4 items, GS1 on its own axis"]
+        B1[Compliance]
+        B2["GS1 Standards<br/>Segment → Brick → Products"]
+        B3["Trading Partners<br/>Retailer → Selection Code → Products"]
+        B4[Image Upload]
     end
-    subgraph After["Proposed"]
-        A1["Compliance list"]
-        A1 --> A2["GS1 Standard — row zero<br/>(Baseline badge)"]
-        A1 --> A3["Dillard's — baseline + 3 extras"]
-        A1 --> A4["Nordstrom — baseline + 5 extras"]
+    subgraph After["Proposed nav — 2 items, one target list"]
+        A1["Compliance (merged list of targets)"]
+        A1 --> A2["GS1 Standard — row zero<br/>→ products, filtered by category"]
+        A1 --> A3["Dillard's<br/>→ products, filtered by selection code"]
+        A1 --> A4["Nordstrom<br/>→ products, filtered by selection code"]
+        A5[Image Upload]
     end
+    A2 --> L["Same leaf:<br/>product + compliance badge → gap detail"]
+    A3 --> L
+    A4 --> L
+    B2 -. reference removed; taxonomy becomes a category filter .-> A2
+    B3 -. merged into .-> A1
 ```
 
 ## 5. Recommendation 2 — Categorisation and attribute fill hand off to the existing AI flow, not rebuilt here
