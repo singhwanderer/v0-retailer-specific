@@ -397,7 +397,7 @@ function SummaryPill({ complete, label }: { complete: boolean; label: string }) 
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────��──────────
 
 export function ScreenSupplierGapDetail({
   productName,
@@ -488,6 +488,12 @@ export function ScreenSupplierGapDetail({
       {/* Section A — Missing Attributes */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-[#111827]">Missing Attributes</h2>
+
+        {/* AI autofill panel — standard attrs only, custom attrs flagged separately */}
+        {!isComplete && missingAttrs.length > 0 && (
+          <AiAttrFillPanel missingAttrs={missingAttrs} productName={productName} />
+        )}
+
         <div
           className="rounded-lg overflow-hidden"
           style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
@@ -514,8 +520,25 @@ export function ScreenSupplierGapDetail({
                       <Dot color="#F59E0B" />
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <span className="font-medium text-[#111827]">{attr.retailerLabel}</span>
-                      <span className="ml-2 text-xs font-light text-[#9CA3AF]">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-[#111827]">{attr.retailerLabel}</span>
+                        {attr.source === "standard" ? (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            style={{ backgroundColor: "#EEF2FF", color: "#3730A3" }}
+                          >
+                            GS1 standard
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+                          >
+                            Retailer custom
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs font-light text-[#9CA3AF]">
                         TGC: {attr.tgcName} ({attr.tgcCode})
                       </span>
                       {attr.guidance && (
