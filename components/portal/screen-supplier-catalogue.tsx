@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, CheckCircle, Search, Sparkles, X } from "lucide-react"
+import { ArrowRight, Check, CheckCircle, Search, X } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -15,36 +15,23 @@ import {
   searchBricks,
   type Gs1Brick,
 } from "@/lib/gs1-standard-library"
+import type { SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── Supplier Catalogue ────────────────────────────────────────────────────────
 // The supplier's own product list, independent of any compliance target.
 // Categorisation lives here because it is the prerequisite for every
 // compliance row — a product belongs to the supplier, not to any partner.
-// Attribute enrichment itself is handled by the separate AI enrichment flow;
-// this screen only selects products and hands off.
+// Two paths: assign a category manually (the in-prototype action), or hand the
+// selection off to the existing AI Attributes Enrichment flow (a separate
+// screen in the live product — represented here only as a hand-off signpost).
 
-type CatalogueProduct = {
-  id: string
-  description: string
-  brickCode?: string
-  source?: "manual" | "ai"
+interface SupplierCatalogueProps {
+  products: SupplierProduct[]
+  /** Product IDs to pre-select on open (e.g. arriving from an "assign" CTA) */
+  initialSelectedIds?: string[]
+  /** Manual categorisation — mutates the shared store */
+  onAssignCategory: (ids: Set<string>, brickCode: string) => void
 }
-
-const INITIAL_PRODUCTS: CatalogueProduct[] = [
-  { id: "1TESTPROD1", description: "Floral Wrap Dress", brickCode: "10001333" },
-  { id: "B11442", description: "Linen Shift Dress", brickCode: "10001333" },
-  { id: "B11443", description: "Printed Midi Dress", brickCode: "10001333" },
-  { id: "B11444", description: "Velvet Evening Dress", brickCode: "10001333" },
-  { id: "B11445", description: "Jersey Wrap Dress", brickCode: "10001333" },
-  { id: "B11446", description: "Denim Shirtdress" },
-  { id: "B11447", description: "Pleated Chiffon Gown" },
-  { id: "B11448", description: "Satin Slip Dress", brickCode: "10001333" },
-  { id: "B11449", description: "Broderie Anglaise Dress" },
-  { id: "B11450", description: "Tiered Maxi Dress", brickCode: "10005811" },
-  { id: "B11451", description: "Cotton Sundress" },
-  { id: "B11452", description: "Crepe Sheath Dress", brickCode: "10005811" },
-  { id: "B11453", description: "Silk Maxi Dress", brickCode: "10001333" },
-]
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
@@ -215,7 +202,10 @@ function AssignCategoryModal({
   )
 }
 
-// ── AI enrichment hand-off modal ──────────────────────────────────────────────
+// ── Hand-off signpost modal ───────────────────────────────────────────────────
+// NOTE: this is an audience annotation, not a working feature. The prototype
+// does NOT run AI or change any data here — it marks the point where the flow
+// merges with the live product's existing "AI Attributes Enrichment" screen.
 function EnrichHandoffModal({
   open,
   products,
@@ -223,31 +213,39 @@ function EnrichHandoffModal({
   onConfirm,
 }: {
   open: boolean
-  products: CatalogueProduct[]
+  products: SupplierProduct[]
   onClose: () => void
   onConfirm: () => void
 }) {
-  const uncategorised = products.filter((p) => !p.brickCode)
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-[#111827] flex items-center gap-2">
-            <Sparkles className="w-4 h-4" style={{ color: "#0168B3" }} />
-            Enrich with AI
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Send to AI Attributes Enrichment
           </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3 py-1">
-          <p className="text-sm leading-relaxed" style={{ color: "#6B7280" }}>
-            {products.length} product{products.length !== 1 ? "s" : ""} will be sent to the AI
-            enrichment flow{uncategorised.length > 0 && (
-              <> ({uncategorised.length} without a category — AI will suggest one)</>
-            )}. Suggested categories and GS1 baseline attribute values are reviewed and accepted
-            there, then sync back to your catalogue and compliance status.
+          {/* Audience-facing hand-off note */}
+          <div
+            className="flex items-start gap-2.5 rounded-md px-3 py-2.5"
+            style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
+          >
+            <ArrowRight className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#0168B3" }} />
+            <p className="text-xs leading-relaxed" style={{ color: "#1E40AF" }}>
+              This is where the catalogue flow merges with the existing{" "}
+              <span className="font-semibold">AI Attributes Enrichment</span> flow — a separate
+              part of the product that suggests categories and fills GS1 baseline attribute values
+              for review. It is shown here as a hand-off only; the enrichment screen itself is out
+              of scope for this prototype.
+            </p>
+          </div>
+          <p className="text-sm font-light" style={{ color: "#6B7280" }}>
+            {products.length} selected product{products.length !== 1 ? "s" : ""} would be handed off:
           </p>
           <div
             className="rounded-md border overflow-y-auto"
-            style={{ borderColor: "#E0E4E8", maxHeight: 160 }}
+            style={{ borderColor: "#E0E4E8", maxHeight: 150 }}
           >
             {products.map((p, idx) => (
               <div
@@ -265,8 +263,8 @@ function EnrichHandoffModal({
             ))}
           </div>
           <p className="text-[11px] font-light leading-relaxed" style={{ color: "#9CA3AF" }}>
-            The AI enrichment flow is a separate screen — this prototype only demonstrates the
-            hand-off and the returned result.
+            Bulk file upload is the other entry point into the same enrichment flow (not shown in
+            this prototype).
           </p>
         </div>
         <DialogFooter>
@@ -282,8 +280,8 @@ function EnrichHandoffModal({
             className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
             style={{ backgroundColor: "#0168B3" }}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            Send to AI Enrichment
+            Continue to Enrichment
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </DialogFooter>
       </DialogContent>
@@ -292,14 +290,17 @@ function EnrichHandoffModal({
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export function ScreenSupplierCatalogue() {
-  const [products, setProducts] = useState<CatalogueProduct[]>(INITIAL_PRODUCTS)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+export function ScreenSupplierCatalogue({
+  products,
+  initialSelectedIds = [],
+  onAssignCategory,
+}: SupplierCatalogueProps) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(initialSelectedIds))
   const [assignOpen, setAssignOpen] = useState(false)
   const [enrichOpen, setEnrichOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const uncategorised = products.filter((p) => !p.brickCode)
+  const uncategorised = products.filter((p) => p.state === "uncategorised")
   const selectedProducts = products.filter((p) => selected.has(p.id))
 
   function showToast(msg: string) {
@@ -321,30 +322,18 @@ export function ScreenSupplierCatalogue() {
   }
 
   function handleManualAssign(brick: Gs1Brick) {
-    setProducts((prev) =>
-      prev.map((p) =>
-        selected.has(p.id) ? { ...p, brickCode: brick.brickCode, source: "manual" } : p
-      )
-    )
+    onAssignCategory(new Set(selected), brick.brickCode)
     showToast(
-      `${selected.size} product${selected.size !== 1 ? "s" : ""} categorised as ${brick.brickName}. GS1 baseline will re-assess.`
+      `${selected.size} product${selected.size !== 1 ? "s" : ""} categorised as ${brick.brickName}. GS1 baseline re-assessed.`
     )
     setSelected(new Set())
   }
 
-  function handleAiEnrich() {
-    // Simulate the enrichment flow returning AI-suggested categories for the
-    // uncategorised products in the selection.
-    setProducts((prev) =>
-      prev.map((p) =>
-        selected.has(p.id) && !p.brickCode
-          ? { ...p, brickCode: "10001333", source: "ai" }
-          : p
-      )
-    )
+  // Hand-off is a signpost only — it does NOT change any product data.
+  function handleEnrichHandoff() {
     setEnrichOpen(false)
     showToast(
-      `${selected.size} product${selected.size !== 1 ? "s" : ""} enriched — AI-suggested categories applied. Compliance re-assessed.`
+      `${selected.size} product${selected.size !== 1 ? "s" : ""} handed off to AI Attributes Enrichment (out of scope for this prototype).`
     )
     setSelected(new Set())
   }
@@ -394,8 +383,8 @@ export function ScreenSupplierCatalogue() {
             className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40 hover:opacity-90 inline-flex items-center gap-1.5"
             style={{ backgroundColor: "#0168B3" }}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            Enrich with AI
+            Send to AI Attributes Enrichment
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -433,7 +422,7 @@ export function ScreenSupplierCatalogue() {
           <tbody>
             {products.map((row, idx) => {
               const brick = row.brickCode ? getBrickByCode(row.brickCode) : undefined
-              const isUncategorised = !row.brickCode
+              const isUncategorised = row.state === "uncategorised"
               return (
                 <tr
                   key={row.id}
@@ -475,22 +464,11 @@ export function ScreenSupplierCatalogue() {
                         No category
                       </span>
                     ) : (
-                      <span className="flex items-center gap-2">
-                        <span className="text-[#6B7280] font-light">
-                          {brick?.brickName}{" "}
-                          <span className="text-[10px] font-mono" style={{ color: "#9CA3AF" }}>
-                            {row.brickCode}
-                          </span>
+                      <span className="text-[#6B7280] font-light">
+                        {brick?.brickName}{" "}
+                        <span className="text-[10px] font-mono" style={{ color: "#9CA3AF" }}>
+                          {row.brickCode}
                         </span>
-                        {row.source === "ai" && (
-                          <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
-                            style={{ backgroundColor: "#EFF6FF", color: "#0168B3" }}
-                          >
-                            <Sparkles className="w-2.5 h-2.5" />
-                            AI
-                          </span>
-                        )}
                       </span>
                     )}
                   </td>
@@ -504,9 +482,10 @@ export function ScreenSupplierCatalogue() {
           className="px-4 py-2.5 text-[11px] font-light leading-relaxed"
           style={{ color: "#9CA3AF", borderTop: "1px solid #F3F4F6" }}
         >
-          Select products and assign a category manually, or send them to the AI enrichment flow
-          — it suggests categories and fills GS1 baseline attribute values for your review, then
-          syncs the results back here and into Compliance.
+          Select products and assign a category manually, or hand the selection to the AI
+          Attributes Enrichment flow, which suggests categories and fills GS1 baseline attribute
+          values (a separate part of the product, shown here as a hand-off only). Assigning a
+          category updates Compliance immediately.
         </p>
       </div>
 
@@ -521,7 +500,7 @@ export function ScreenSupplierCatalogue() {
         open={enrichOpen}
         products={selectedProducts}
         onClose={() => setEnrichOpen(false)}
-        onConfirm={handleAiEnrich}
+        onConfirm={handleEnrichHandoff}
       />
 
       {/* Toast */}

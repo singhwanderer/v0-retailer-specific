@@ -1,6 +1,11 @@
 "use client"
 
 import { BadgeCheck } from "lucide-react"
+import {
+  countBaselineGaps,
+  countUncategorised,
+  type SupplierProduct,
+} from "@/lib/supplier-catalogue"
 
 // ── Merged Compliance list ────────────────────────────────────────────────────
 // Evolved from the former Trading Partners screen: the same list of retailers
@@ -9,6 +14,7 @@ import { BadgeCheck } from "lucide-react"
 // compliance target that drills into the same product-and-gaps leaf.
 
 interface SupplierComplianceProps {
+  products: SupplierProduct[]
   onSelectGs1: () => void
   onSelectPartner: (partnerId: string, partnerName: string) => void
 }
@@ -58,10 +64,6 @@ const PARTNERS: Partner[] = [
   },
 ]
 
-// GS1 row-zero stats — consistent with the catalogue mock (13 products,
-// 4 uncategorised, 6 baseline gaps across the categorised ones).
-const GS1_STATS = { uncategorised: 4, baselineGaps: 6 }
-
 // Reused from the former Trading Partners screen — the retailer-row status pill.
 function ComplianceSummary({ gaps, complete, total }: { gaps: number; complete: number; total: number }) {
   const allComplete = gaps === 0
@@ -102,7 +104,17 @@ function Pill({ tone, label }: { tone: "green" | "amber" | "red"; label: string 
   )
 }
 
-export function ScreenSupplierCompliance({ onSelectGs1, onSelectPartner }: SupplierComplianceProps) {
+export function ScreenSupplierCompliance({
+  products,
+  onSelectGs1,
+  onSelectPartner,
+}: SupplierComplianceProps) {
+  // GS1 row-zero status derived live from the shared catalogue
+  const gs1Stats = {
+    uncategorised: countUncategorised(products),
+    baselineGaps: countBaselineGaps(products),
+  }
+
   return (
     <div className="p-8 flex flex-col gap-6">
       {/* Header */}
@@ -165,20 +177,20 @@ export function ScreenSupplierCompliance({ onSelectGs1, onSelectPartner }: Suppl
               </td>
               <td className="px-4 py-3 align-middle">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {GS1_STATS.uncategorised > 0 && (
+                  {gs1Stats.uncategorised > 0 && (
                     <button onClick={onSelectGs1} className="hover:opacity-80 transition-opacity">
                       <Pill
                         tone="red"
-                        label={`${GS1_STATS.uncategorised} uncategorised — cannot be assessed`}
+                        label={`${gs1Stats.uncategorised} uncategorised — cannot be assessed`}
                       />
                     </button>
                   )}
                   <button onClick={onSelectGs1} className="hover:opacity-80 transition-opacity">
                     <Pill
-                      tone={GS1_STATS.baselineGaps > 0 ? "amber" : "green"}
+                      tone={gs1Stats.baselineGaps > 0 ? "amber" : "green"}
                       label={
-                        GS1_STATS.baselineGaps > 0
-                          ? `${GS1_STATS.baselineGaps} baseline gaps`
+                        gs1Stats.baselineGaps > 0
+                          ? `${gs1Stats.baselineGaps} baseline gaps`
                           : "Baseline complete"
                       }
                     />

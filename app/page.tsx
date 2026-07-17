@@ -12,6 +12,11 @@ import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-cat
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
 import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
+import {
+  SUPPLIER_PRODUCTS_SEED,
+  assignCategory,
+  type SupplierProduct,
+} from "@/lib/supplier-catalogue"
 
 type Perspective = "retailer" | "supplier"
 
@@ -56,6 +61,12 @@ export default function RetailerPortal() {
   // ── Supplier state ──────────────────────────────────────────────────────────
   const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("compliance")
 
+  // Shared supplier catalogue — one source of truth across every supplier screen
+  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>(SUPPLIER_PRODUCTS_SEED)
+
+  // Products to pre-select when the Catalogue is opened from a "assign categories" CTA
+  const [cataloguePreselect, setCataloguePreselect] = useState<string[]>([])
+
   // L2 context
   const [activePartner, setActivePartner] = useState<{ id: string; name: string } | null>(null)
 
@@ -64,6 +75,19 @@ export default function RetailerPortal() {
 
   // L4 context
   const [gapProduct, setGapProduct] = useState<{ productName: string; retailer: string } | null>(null)
+
+  // Manual categorisation — mutates the shared store so every screen reflects it
+  function handleAssignCategory(ids: Set<string>, brickCode: string) {
+    setSupplierProducts((prev) => assignCategory(prev, ids, brickCode))
+  }
+
+  // Open the Catalogue with the uncategorised products pre-selected
+  function goToCatalogueWithUncategorised() {
+    setCataloguePreselect(
+      supplierProducts.filter((p) => p.state === "uncategorised").map((p) => p.id)
+    )
+    setSupplierScreen("catalogue")
+  }
 
   // ── Perspective switch ──────────────────────────────────────────────────────
   function handlePerspectiveChange(p: Perspective) {
@@ -91,6 +115,7 @@ export default function RetailerPortal() {
     }
     if (id === "supplier-catalogue") {
       setSupplierScreen("catalogue")
+      setCataloguePreselect([]) // direct nav — no pre-selection
       setActivePartner(null)
       setActiveCode(null)
       setGapProduct(null)
@@ -244,6 +269,7 @@ export default function RetailerPortal() {
               {/* L1 — Merged Compliance list (GS1 row zero + retailers) */}
               {supplierScreen === "compliance" && (
                 <ScreenSupplierCompliance
+                  products={supplierProducts}
                   onSelectGs1={handleSelectGs1}
                   onSelectPartner={handleSelectPartner}
                 />
@@ -253,14 +279,21 @@ export default function RetailerPortal() {
               {supplierScreen === "gs1-products" && (
                 <ScreenSupplierProducts
                   target={{ kind: "gs1" }}
+                  products={supplierProducts}
                   onBack={handleBackToPartnerList}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
-                  onGoToCatalogue={() => setSupplierScreen("catalogue")}
+                  onGoToCatalogue={goToCatalogueWithUncategorised}
                 />
               )}
 
-              {/* Catalogue — categorisation home + AI enrichment hand-off */}
-              {supplierScreen === "catalogue" && <ScreenSupplierCatalogue />}
+              {/* Catalogue — categorisation home + enrichment hand-off */}
+              {supplierScreen === "catalogue" && (
+                <ScreenSupplierCatalogue
+                  products={supplierProducts}
+                  initialSelectedIds={cataloguePreselect}
+                  onAssignCategory={handleAssignCategory}
+                />
+              )}
 
               {/* L2 — Selection Code List */}
               {supplierScreen === "selection-codes" && activePartner && (
@@ -279,6 +312,7 @@ export default function RetailerPortal() {
                     partnerName: activePartner.name,
                     selectionCode: activeCode.label,
                   }}
+                  products={supplierProducts}
                   onBack={handleBackToPartner}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
                 />

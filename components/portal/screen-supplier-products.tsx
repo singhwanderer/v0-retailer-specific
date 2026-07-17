@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { BadgeCheck, ChevronDown, Search, X } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
+import type { RetailerStatus, SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── Shared product leaf ───────────────────────────────────────────────────────
 // One product table, reached from two compliance targets:
@@ -23,114 +24,15 @@ type ProductsTarget =
 
 interface SupplierProductsProps {
   target: ProductsTarget
+  /** Shared supplier catalogue — the one source of truth */
+  products: SupplierProduct[]
   onBack: () => void
   onNavigateToGapDetail: (productName: string, retailer: string) => void
   /** GS1 target only — route uncategorised products to the Catalogue */
   onGoToCatalogue?: () => void
 }
 
-type RetailerStatus = {
-  retailer: string
-  gaps: number | "complete"
-}
-
-type ProductRow = {
-  id: string
-  description: string
-  state: "categorised" | "uncategorised" | "no-profile"
-  /** GS1 category brick — drives both the category label and GS1 assessment */
-  brickCode?: string
-  /** GS1 baseline gaps for this product (only when categorised) */
-  gs1Gaps?: number
-  retailers?: RetailerStatus[]
-}
-
-// Mock catalogue — in a real app this would be fetched. brickCode/gs1Gaps power
-// the GS1 target; retailers[] powers the retailer target.
-const ALL_PRODUCTS: ProductRow[] = [
-  {
-    id: "1TESTPROD1",
-    description: "Floral Wrap Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 2,
-    retailers: [
-      { retailer: "Dillard's", gaps: 3 },
-      { retailer: "Belk", gaps: "complete" },
-    ],
-  },
-  {
-    id: "B11442",
-    description: "Linen Shift Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 3,
-    retailers: [{ retailer: "Dillard's", gaps: 5 }],
-  },
-  {
-    id: "B11443",
-    description: "Printed Midi Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Dillard's", gaps: "complete" }],
-  },
-  {
-    id: "B11444",
-    description: "Velvet Evening Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 1,
-    retailers: [
-      { retailer: "Dillard's", gaps: 2 },
-      { retailer: "Belk", gaps: 1 },
-    ],
-  },
-  {
-    id: "B11445",
-    description: "Jersey Wrap Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Belk", gaps: "complete" }],
-  },
-  { id: "B11446", description: "Denim Shirtdress", state: "uncategorised" },
-  { id: "B11447", description: "Pleated Chiffon Gown", state: "uncategorised" },
-  {
-    id: "B11448",
-    description: "Satin Slip Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Dillard's", gaps: "complete" }],
-  },
-  { id: "B11449", description: "Broderie Anglaise Dress", state: "uncategorised" },
-  {
-    id: "B11450",
-    description: "Tiered Maxi Dress",
-    state: "categorised",
-    brickCode: "10005811",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Dillard's", gaps: 1 }],
-  },
-  { id: "B11451", description: "Cotton Sundress", state: "uncategorised" },
-  {
-    id: "B11452",
-    description: "Crepe Sheath Dress",
-    state: "categorised",
-    brickCode: "10005811",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Belk", gaps: "complete" }],
-  },
-  {
-    id: "B11453",
-    description: "Silk Maxi Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Belk", gaps: "complete" }],
-  },
-]
+type ProductRow = SupplierProduct
 
 const PAGE_SIZE = 8
 
@@ -353,6 +255,7 @@ function Pagination({
 // ── Main component ────────────────────────────────────────────────────────────
 export function ScreenSupplierProducts({
   target,
+  products,
   onBack,
   onNavigateToGapDetail,
   onGoToCatalogue,
@@ -366,7 +269,7 @@ export function ScreenSupplierProducts({
   const [modalProduct, setModalProduct] = useState<ProductRow | null>(null)
 
   // ── Filter logic (branches by target) ──────────────────────────────────────
-  const filtered = ALL_PRODUCTS.filter((row) => {
+  const filtered = products.filter((row) => {
     if (isGs1) {
       if (categoryFilter === "all") return true
       if (categoryFilter === "uncategorised") return row.state === "uncategorised"
@@ -392,7 +295,7 @@ export function ScreenSupplierProducts({
   const currentPage = Math.min(page, safePageSize)
   const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  const uncategorisedCount = ALL_PRODUCTS.filter((p) => p.state === "uncategorised").length
+  const uncategorisedCount = products.filter((p) => p.state === "uncategorised").length
 
   // GS1: attribute chips for a single selected category
   const activeBrick =
