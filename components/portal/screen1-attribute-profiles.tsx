@@ -10,46 +10,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { GS1_BRICKS, searchBricks, getSegments, type Gs1Brick } from "@/lib/gs1-standard-library"
+import { ATTRIBUTE_PROFILES } from "@/lib/retailer-requirements"
 
 interface Screen1Props {
   onNavigateToProfile: (brickCode?: string, brickName?: string, categoryName?: string) => void
 }
 
-const categories = [
-  {
-    name: "Footwear",
-    category: "Footwear",
-    attributes: "34 attributes · 1 image requirement",
-    status: "Active" as const,
-    lastUpdated: "Mar 8, 2026",
-    actions: ["Edit", "Deactivate"] as const,
-    isLink: true,
-    brickCode: "10005811",
-    brickName: "Footwear",
-  },
-  {
-    name: "Apparel",
-    category: "Women's Apparel",
-    attributes: "51 attributes",
-    status: "Active" as const,
-    lastUpdated: "Feb 14, 2026",
-    actions: ["Edit", "Deactivate"] as const,
-    isLink: true,
-    brickCode: "10001352",
-    brickName: "Shirts/Blouses/Polo Shirts/T-Shirts",
-  },
-  {
-    name: "Jewellery",
-    category: "Jewellery",
-    attributes: "22 attributes",
-    status: "Draft" as const,
-    lastUpdated: "Mar 11, 2026",
-    actions: ["Edit", "Activate"] as const,
-    isLink: true,
-    brickCode: "10006017",
-    brickName: "Necklaces/Chains/Pendants",
-  },
-]
+const categories = ATTRIBUTE_PROFILES
 
 type StatusType = "Active" | "Draft"
 

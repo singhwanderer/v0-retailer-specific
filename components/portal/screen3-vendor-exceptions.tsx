@@ -3,9 +3,14 @@
 import { useState } from "react"
 import { Plus, Search, X, ChevronDown } from "lucide-react"
 
+import {
+  VENDOR_EXCEPTIONS,
+  type ExceptionRow,
+  type ExceptionType,
+  type ExceptionStatus,
+} from "@/lib/retailer-requirements"
+
 // ── Pill components ───────────────────────────────────────────────────────────
-type ExceptionType = "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"
-type ExceptionStatus = "Active" | "Expired"
 
 function ExceptionTypePill({ type }: { type: ExceptionType }) {
   const cfg: Record<ExceptionType, { bg: string; text: string }> = {
@@ -53,63 +58,7 @@ function AttributeChip({ label }: { label: string }) {
 }
 
 // ── Table data ────────────────────────────────────────────────────────────────
-interface ExceptionRow {
-  vendor: string
-  profile: string
-  exceptionType: ExceptionType
-  attributes: string[]
-  validUntil: string
-  status: ExceptionStatus
-  actions: string[]
-}
-
-const exceptions: ExceptionRow[] = [
-  {
-    vendor: "J.Renée",
-    profile: "Footwear — Core Compliance",
-    exceptionType: "Attribute Waiver",
-    attributes: ["Heel Height", "Platform Height"],
-    validUntil: "Jun 30, 2026",
-    status: "Active",
-    actions: ["Edit", "Revoke"],
-  },
-  {
-    vendor: "Levi Strauss & Co.",
-    profile: "Apparel — Extended Sustainability",
-    exceptionType: "Extended Deadline",
-    attributes: ["Sustainable Materials Y/N", "Sustainable Materials Desc"],
-    validUntil: "Apr 15, 2026",
-    status: "Active",
-    actions: ["Edit", "Revoke"],
-  },
-  {
-    vendor: "Fossil Group",
-    profile: "Jewellery — Base Requirements",
-    exceptionType: "Attribute Waiver",
-    attributes: ["CPSIA Certified Y/N"],
-    validUntil: "Dec 31, 2026",
-    status: "Active",
-    actions: ["Edit", "Revoke"],
-  },
-  {
-    vendor: "Calvin Klein",
-    profile: "Apparel — Extended Sustainability",
-    exceptionType: "Extended Deadline",
-    attributes: ["Chemical Certifications", "Social Certifications"],
-    validUntil: "Mar 1, 2026",
-    status: "Expired",
-    actions: ["Renew", "Archive"],
-  },
-  {
-    vendor: "York and Jones",
-    profile: "Jewellery — Base Requirements",
-    exceptionType: "Reduced Scope",
-    attributes: ["Gold Karat", "Stone Details", "Stone"],
-    validUntil: "Permanent",
-    status: "Active",
-    actions: ["Edit", "Revoke"],
-  },
-]
+const exceptions: ExceptionRow[] = VENDOR_EXCEPTIONS
 
 // ── Add Exception Modal ────────────────────────────────────────────────────────
 function AddExceptionModal({ onClose }: { onClose: () => void }) {
