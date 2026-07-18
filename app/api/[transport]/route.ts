@@ -11,6 +11,7 @@ import {
   addAttributeRequirement,
   createAttributeProfile,
   createVendorException,
+  getCapabilities,
   getProfileDetail,
   getSupplierComplianceSummary,
   listAttributeProfiles,
@@ -26,6 +27,14 @@ function asText(data: unknown) {
 
 const handler = createMcpHandler(
   (server) => {
+    // ── Discoverability ──────────────────────────────────────────────────────
+    server.tool(
+      "get_capabilities",
+      "Return a plain-English catalog of what this TGC connector can do (read and write actions with example phrasings) plus a live snapshot of the demo data: the attribute profiles, retail partners, vendors, and categories that actually have data. Call this when the user asks 'what can I do?', 'what can you help with?', or seems unsure what to ask — and to ground answers in what data really exists before saying something is unavailable.",
+      {},
+      async () => asText(getCapabilities())
+    )
+
     // ── Reads ────────────────────────────────────────────────────────────────
     server.tool(
       "search_gs1_bricks",
@@ -128,11 +137,70 @@ const handler = createMcpHandler(
       },
       async (args) => asText(createVendorException(args))
     )
+
+    // ── Starter prompts ──────────────────────────────────────────────────────
+    // Surfaced by MCP clients (e.g. claude.ai's prompt picker) as clickable
+    // suggestions so a teammate opening the connector cold knows what to try.
+    const prompt = (text: string) => ({
+      messages: [{ role: "user" as const, content: { type: "text" as const, text } }],
+    })
+
+    server.prompt(
+      "review-supplier-compliance",
+      "See which retail partners are furthest behind on compliance and on which products.",
+      async () =>
+        prompt(
+          "Using the TGC connector, which of my retail partners are furthest behind on compliance, and on which products and attributes? Rank them by open gaps and cite the tool results."
+        )
+    )
+
+    server.prompt(
+      "set-up-category-requirements",
+      "Guided flow to create requirements for a new product category.",
+      async () =>
+        prompt(
+          "Help me set up requirements for a new product category in TGC. First ask me which category, then search the GS1 library for the right brick, create the attribute profile, and walk me through adding key attributes and an image requirement — confirming each change before you write it."
+        )
+    )
+
+    server.prompt(
+      "audit-a-vendor",
+      "Review one vendor's compliance gaps and any exceptions they hold.",
+      async () =>
+        prompt(
+          "I want to audit one vendor in TGC. Ask me which vendor, then show their open compliance gaps and any exceptions (waivers, extended deadlines, reduced scope) they currently hold. If the name doesn't match, tell me which vendors do have data."
+        )
+    )
+
+    server.prompt(
+      "explain-a-profile",
+      "Get the full requirement breakdown for a category profile.",
+      async () =>
+        prompt(
+          "Explain one of my TGC attribute profiles in full. Ask me which category, then break down its core attributes, extended attributes (standard GS1 vs. custom), per-attribute guidance, and image requirements."
+        )
+    )
+
+    server.prompt(
+      "grant-an-exception",
+      "Grant a vendor a waiver, extended deadline, or reduced-scope exception.",
+      async () =>
+        prompt(
+          "Help me grant a vendor exception in TGC. Ask me the vendor, the profile, the exception type (Attribute Waiver, Extended Deadline, or Reduced Scope), the attributes it covers, and the valid-until date — then restate the full exception and get my confirmation before creating it."
+        )
+    )
   },
   {
     serverInfo: { name: "tgc-demo", version: "0.1.0" },
     instructions:
-      "Trading Grid Catalogue (TGC) demo server — a B2B catalog data-sync network connecting retailer hubs and supplier spokes. All data is mock data from a watermarked prototype; write tools store changes in memory only. Answer questions strictly from tool results. Before any write tool, restate the change to the user and get their confirmation.",
+      "Trading Grid Catalogue (TGC) demo server — a B2B catalog data-sync network connecting retailer hubs and supplier spokes. " +
+      "SCOPE: this connector covers the retailer side only — authoring product requirements (attribute profiles, attributes, image requirements) and monitoring supplier compliance (gaps and exceptions). " +
+      "All data is mock data from a watermarked prototype; write tools store changes in an in-memory demo store that resets periodically. " +
+      "GROUNDING: answer questions about TGC data strictly from tool results — never invent profiles, vendors, categories, or numbers. " +
+      "When the user asks what they can do, is unsure, or asks something open-ended, call get_capabilities first to see what actions and data actually exist, then guide them. " +
+      "EMPTY RESULTS: some read tools return a note with knownVendors/availableStatuses when a filter matches nothing — relay those suggestions instead of just saying 'none found'. " +
+      "OUT OF SCOPE: supplier-side tools (a supplier asking about their own compliance), sales, logistics, pricing, or anything beyond retailer requirements and compliance are not in this demo — say so plainly and point to what IS available via get_capabilities, rather than answering from general knowledge as if it were TGC data. " +
+      "WRITES: before any write tool, restate the exact change to the user and get their explicit confirmation.",
   },
   { basePath: "/api" }
 )
