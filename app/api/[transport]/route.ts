@@ -75,7 +75,7 @@ const handler = createMcpHandler(
     // ── Writes (in-memory demo store) ───────────────────────────────────────
     server.tool(
       "create_attribute_profile",
-      "Create a new attribute profile (requirement set) for a product category, mapped to a GS1 brick. The profile starts as Draft and is seeded with the brick's standard extended attributes. Before calling, confirm the category name and brick choice with the user, and afterwards show them the created profile.",
+      "Create a new attribute profile (requirement set) for a product category, mapped to a GS1 brick. Both fields are mandatory. The profile starts as Draft and is seeded with the brick's standard extended attributes. Before calling, confirm the category name and brick choice with the user, and afterwards show them the created profile.",
       {
         categoryName: z.string().describe("The retailer's internal category name, e.g. 'Swimwear'"),
         brickCode: z.string().describe("GS1 brick code to map the category to (find via search_gs1_bricks)"),
@@ -98,12 +98,16 @@ const handler = createMcpHandler(
 
     server.tool(
       "set_image_requirement",
-      "Add or update an image requirement on a profile (matched by requirement name). Specify format, background, minimum dimensions, maximum file size, and shape/crop. Confirm the details with the user before calling.",
+      "Add or update an image requirement on a profile (matched by requirement name). All fields except guidanceNote are mandatory — collect every mandatory value from the user before calling, offering only the listed options for format and background. Confirm the details with the user before calling.",
       {
         brickCode: z.string().describe("GS1 brick code of the profile to modify"),
         requirementName: z.string().describe("e.g. 'Hero Shot' or 'Lifestyle Image'"),
-        format: z.string().describe("e.g. 'JPEG'"),
-        background: z.string().describe("e.g. 'Pure white (#FFFFFF)'"),
+        format: z
+          .enum(["JPEG", "PNG", "TIFF", "WebP"])
+          .describe("Image file format — must be one of the listed options"),
+        background: z
+          .enum(["Pure white (#FFFFFF)", "Light grey (#F5F5F5)", "Transparent", "Lifestyle/contextual"])
+          .describe("Background treatment — must be one of the listed options"),
         minDimensions: z.string().describe("e.g. '2000 × 2000 px'"),
         maxFileSize: z.string().describe("e.g. '10 MB'"),
         shapeCrop: z.string().describe("e.g. 'Square, product centered'"),
@@ -114,7 +118,7 @@ const handler = createMcpHandler(
 
     server.tool(
       "create_vendor_exception",
-      "Grant a vendor an exception on a profile: an Attribute Waiver, Extended Deadline, or Reduced Scope, covering specific attributes until a given date. Confirm vendor, type, attributes, and validity with the user before calling.",
+      "Grant a vendor an exception on a profile: an Attribute Waiver, Extended Deadline, or Reduced Scope, covering specific attributes until a given date. All fields are mandatory; exceptionType must be one of the listed options. Confirm vendor, type, attributes, and validity with the user before calling.",
       {
         vendor: z.string().describe("Vendor name, e.g. 'Acme Apparel'"),
         profile: z.string().describe("Profile the exception applies to, e.g. 'Footwear — Core Compliance'"),
