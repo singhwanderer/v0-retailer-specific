@@ -111,7 +111,7 @@ export function ScreenSupplierGapDetail({
           className="font-light hover:underline"
           style={{ color: "#0168B3" }}
         >
-          Trading Partners
+          Compliance
         </button>
         <span style={{ color: "#9CA3AF" }}>›</span>
         <button

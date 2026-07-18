@@ -137,7 +137,7 @@ export function ScreenSupplierSelectionCodes({
           className="font-light hover:underline"
           style={{ color: "#0168B3" }}
         >
-          Trading Partners
+          Compliance
         </button>
         <span style={{ color: "#9CA3AF" }}>›</span>
         <span className="font-light text-[#6B7280]">{partnerName}</span>
