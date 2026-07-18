@@ -28,17 +28,17 @@ need any API key of your own — you use the Claude or ChatGPT you already have.
 
 ## The connector URL
 
-Use whichever is live for you (if unsure, use the first one):
+**Use this one:**
 
 ```
-Branch preview (live now):
-https://v0-retailer-specific-git-1d56dd-geminicanadapro-8402s-projects.vercel.app/api/mcp
-
-Production (after this branch is merged to main):
 https://v0-retailer-specific.vercel.app/api/mcp
 ```
 
 Authentication: **None** — leave any API-key / auth field blank.
+
+<sub>(A branch-preview host also exists for pre-merge testing:
+`https://v0-retailer-specific-git-1d56dd-geminicanadapro-8402s-projects.vercel.app/api/mcp`
+— same `/api/mcp` endpoint, just a different host. Prefer the production URL above.)</sub>
 
 ---
 
@@ -136,8 +136,8 @@ preview URLs. Fix either way:
 - In Vercel: **Project → Settings → Deployment Protection →** turn **Vercel
   Authentication** off (or set it to "Only Production" and use the **production** URL).
 - Also check **Firewall / Bot Protection** isn't challenging non-browser clients.
-- Simplest: once the branch is merged to `main`, use the **production** URL, which is
-  normally public.
+- The **production** URL above is normally public; if it returns 401/403, disabling
+  Vercel Authentication for the project (as above) resolves it.
 
 **The connector isn't in the tools menu.**
 Make sure you added it in Settings first, then open a **new** chat — enable it there via
