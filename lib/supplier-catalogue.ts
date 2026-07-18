@@ -38,22 +38,8 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
       { retailer: "Belk", gaps: "complete" },
     ],
   },
-  {
-    id: "B11442",
-    description: "Linen Shift Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 3,
-    retailers: [{ retailer: "Dillard's", gaps: 5 }],
-  },
-  {
-    id: "B11443",
-    description: "Printed Midi Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Dillard's", gaps: "complete" }],
-  },
+  { id: "B11442", description: "Linen Shift Dress", state: "uncategorised" },
+  { id: "B11443", description: "Printed Midi Dress", state: "uncategorised" },
   {
     id: "B11444",
     description: "Velvet Evening Dress",
@@ -75,23 +61,9 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
   },
   { id: "B11446", description: "Denim Shirtdress", state: "uncategorised" },
   { id: "B11447", description: "Pleated Chiffon Gown", state: "uncategorised" },
-  {
-    id: "B11448",
-    description: "Satin Slip Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Dillard's", gaps: "complete" }],
-  },
+  { id: "B11448", description: "Satin Slip Dress", state: "uncategorised" },
   { id: "B11449", description: "Broderie Anglaise Dress", state: "uncategorised" },
-  {
-    id: "B11450",
-    description: "Tiered Maxi Dress",
-    state: "categorised",
-    brickCode: "10005811",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Dillard's", gaps: 1 }],
-  },
+  { id: "B11450", description: "Tiered Maxi Dress", state: "uncategorised" },
   { id: "B11451", description: "Cotton Sundress", state: "uncategorised" },
   {
     id: "B11452",
@@ -101,14 +73,7 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
     gs1Gaps: 0,
     retailers: [{ retailer: "Belk", gaps: "complete" }],
   },
-  {
-    id: "B11453",
-    description: "Silk Maxi Dress",
-    state: "categorised",
-    brickCode: "10001333",
-    gs1Gaps: 0,
-    retailers: [{ retailer: "Belk", gaps: "complete" }],
-  },
+  { id: "B11453", description: "Silk Maxi Dress", state: "uncategorised" },
 ]
 
 /** Products with no category assigned — cannot be assessed against any target. */
