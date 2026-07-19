@@ -5,7 +5,7 @@
 // external MCP endpoint (app/api/[transport]/route.ts) and, in a later phase,
 // by an embedded portal assistant.
 
-import { getBrickByCode, searchBricks } from "@/lib/gs1-standard-library"
+import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
   type AttributeProfile,
@@ -24,6 +24,16 @@ import {
 const DEMO_NOTE =
   "Demo prototype: this change is stored in the demo server's in-memory data (mock data only, resets periodically). In production this would persist to TGC."
 
+// Distinct retail-partner names present in the supplier catalogue seed. Used
+// both to filter gaps and to redirect a query that names an unknown partner.
+function knownRetailPartners(): string[] {
+  const set = new Set<string>()
+  for (const product of SUPPLIER_PRODUCTS_SEED) {
+    for (const r of product.retailers ?? []) set.add(r.retailer)
+  }
+  return [...set].sort()
+}
+
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 export function searchGs1Bricks(query: string) {
@@ -37,7 +47,16 @@ export function searchGs1Bricks(query: string) {
 
 export function listAttributeProfiles(status?: ProfileStatus) {
   const { profiles } = getStore()
-  return status ? profiles.filter((p) => p.status === status) : profiles
+  const matches = status ? profiles.filter((p) => p.status === status) : profiles
+  if (status && matches.length === 0) {
+    const available = [...new Set(profiles.map((p) => p.status))]
+    return {
+      matches: [],
+      availableStatuses: available,
+      note: `No attribute profiles with status "${status}". Available statuses: ${available.join(", ")}. Call list_attribute_profiles with no filter to see all ${profiles.length} profiles.`,
+    }
+  }
+  return matches
 }
 
 export function getProfileDetail(brickCode: string) {
@@ -93,9 +112,10 @@ export function getSupplierComplianceSummary() {
 }
 
 export function listVendorGaps(vendor?: string) {
+  const q = vendor?.toLowerCase().trim()
   const rows = SUPPLIER_PRODUCTS_SEED.flatMap((product) =>
     (product.retailers ?? [])
-      .filter((r) => r.gaps !== "complete" && (!vendor || r.retailer.toLowerCase().includes(vendor.toLowerCase())))
+      .filter((r) => r.gaps !== "complete" && (!q || r.retailer.toLowerCase().includes(q)))
       .map((r) => ({
         productId: product.id,
         product: product.description,
@@ -105,15 +125,108 @@ export function listVendorGaps(vendor?: string) {
         openGaps: r.gaps,
       }))
   )
-  return rows.sort((a, b) => (b.openGaps as number) - (a.openGaps as number))
+  const sorted = rows.sort((a, b) => (b.openGaps as number) - (a.openGaps as number))
+  if (q && sorted.length === 0) {
+    const known = knownRetailPartners()
+    return {
+      matches: [],
+      knownVendors: known,
+      note: `No retail partner matched "${vendor}". Known partners with compliance data: ${known.join(", ")}. (This demo tracks the supplier's catalogue as seen by each retail partner.)`,
+    }
+  }
+  return sorted
 }
 
 export function listVendorExceptions(status?: ExceptionRow["status"], vendor?: string) {
-  return getStore().exceptions.filter(
-    (e) =>
-      (!status || e.status === status) &&
-      (!vendor || e.vendor.toLowerCase().includes(vendor.toLowerCase()))
+  const q = vendor?.toLowerCase().trim()
+  const all = getStore().exceptions
+  const matches = all.filter(
+    (e) => (!status || e.status === status) && (!q || e.vendor.toLowerCase().includes(q))
   )
+  if (matches.length === 0 && (q || status)) {
+    const knownVendors = [...new Set(all.map((e) => e.vendor))].sort()
+    const availableStatuses = [...new Set(all.map((e) => e.status))]
+    const criteria = [q ? `vendor "${vendor}"` : "", status ? `status "${status}"` : ""]
+      .filter(Boolean)
+      .join(" and ")
+    return {
+      matches: [],
+      knownVendors,
+      availableStatuses,
+      note: `No exceptions matched ${criteria}. Vendors with exceptions on record: ${knownVendors.join(", ")}. Statuses in use: ${availableStatuses.join(", ")}.`,
+    }
+  }
+  return matches
+}
+
+// Plain-English catalog of what this connector can do, plus a live snapshot of
+// the demo data so the model can answer "what can I ask?" without guessing.
+// Built from the store, so it never drifts from the actual seeded data.
+export function getCapabilities() {
+  const store = getStore()
+  const categoriesWithData = [
+    ...new Set(
+      SUPPLIER_PRODUCTS_SEED.filter((p) => p.brickCode).map(
+        (p) => getBrickByCode(p.brickCode!)?.brickName ?? p.brickCode!
+      )
+    ),
+  ].sort()
+  return {
+    about:
+      "TGC demo connector — retailer-side requirement authoring and supplier compliance monitoring over mock Trading Grid Catalogue data. Ask in your own words; the examples below are illustrations, not a fixed command list.",
+    youCanAsk: {
+      understandRequirements: {
+        summary: "Look up what a product category requires (attributes, guidance, image rules).",
+        examples: [
+          "What does my Footwear profile require?",
+          "Show me the image rules for handbags.",
+          "List all my attribute profiles.",
+        ],
+      },
+      monitorSuppliers: {
+        summary: "See how retail partners are doing on compliance and where the gaps are.",
+        examples: [
+          "Which partners are furthest behind on compliance, and on what?",
+          "List the open gaps for Macy's.",
+          "How are my accessories categories doing?",
+        ],
+      },
+      authorRequirements: {
+        summary: "Create and extend requirement profiles conversationally (writes to the demo store).",
+        examples: [
+          "Set up requirements for a new Swimwear category.",
+          "Add a 'Care Instructions' attribute to the Apparel profile.",
+          "Require a lifestyle image on Handbags, JPEG, white background.",
+        ],
+      },
+      manageExceptions: {
+        summary: "Review and grant vendor exceptions (waivers, extended deadlines, reduced scope).",
+        examples: [
+          "Show all active vendor exceptions.",
+          "Give Nike a 60-day extension on Compression Level.",
+        ],
+      },
+    },
+    writeActions: [
+      "create_attribute_profile",
+      "add_attribute_requirement",
+      "set_image_requirement",
+      "create_vendor_exception",
+    ],
+    liveSnapshot: {
+      attributeProfiles: store.profiles.map((p) => ({
+        name: p.name,
+        category: p.category,
+        status: p.status,
+        brickCode: p.brickCode,
+      })),
+      retailPartnersWithComplianceData: knownRetailPartners(),
+      vendorsWithExceptions: [...new Set(store.exceptions.map((e) => e.vendor))].sort(),
+      categoriesWithSupplierData: categoriesWithData,
+      gs1Segments: getSegments(),
+    },
+    note: "All data is mock/demo and watermarked; write tools store changes in memory only and reset periodically. Out of scope in this demo: supplier-side tools, sales/logistics, and anything outside retailer requirements + supplier compliance.",
+  }
 }
 
 // ── Writes (in-memory demo store) ────────────────────────────────────────────

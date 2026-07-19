@@ -109,6 +109,85 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
     gs1Gaps: 0,
     retailers: [{ retailer: "Belk", gaps: "complete" }],
   },
+  {
+    id: "B11460",
+    description: "Leather Ankle Boot",
+    state: "categorised",
+    brickCode: "10005811",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Macy's", gaps: 2 },
+      { retailer: "Dillard's", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11461",
+    description: "Structured Leather Tote",
+    state: "categorised",
+    brickCode: "10006030",
+    gs1Gaps: 2,
+    retailers: [
+      { retailer: "Macy's", gaps: 4 },
+      { retailer: "Nordstrom", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11462",
+    description: "Quilted Crossbody Bag",
+    state: "categorised",
+    brickCode: "10006030",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Nordstrom", gaps: 1 }],
+  },
+  {
+    id: "B11463",
+    description: "Performance Running Tee",
+    state: "categorised",
+    brickCode: "10001400",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Macy's", gaps: 2 },
+      { retailer: "Dillard's", gaps: 3 },
+    ],
+  },
+  {
+    id: "B11464",
+    description: "Compression Training Tights",
+    state: "categorised",
+    brickCode: "10001401",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Macy's", gaps: "complete" }],
+  },
+  {
+    id: "B11465",
+    description: "Wool Tailored Blazer",
+    state: "categorised",
+    brickCode: "10001350",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Nordstrom", gaps: 3 },
+      { retailer: "Dillard's", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11466",
+    description: "Cotton Pyjama Set",
+    state: "categorised",
+    brickCode: "10002100",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Nordstrom", gaps: 1 }],
+  },
+  {
+    id: "B11467",
+    description: "Gold Chain Necklace",
+    state: "categorised",
+    brickCode: "10006017",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Belk", gaps: 2 },
+      { retailer: "Macy's", gaps: "complete" },
+    ],
+  },
 ]
 
 /** Products with no category assigned — cannot be assessed against any target. */

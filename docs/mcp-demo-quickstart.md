@@ -1,6 +1,6 @@
 # TGC Demo MCP Server — Quickstart
 
-The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployment. It exposes the retailer's requirement and compliance data (mock, in-memory) as 10 MCP tools — see `docs/mcp-concept.md` for the concept and `app/api/[transport]/route.ts` for the implementation.
+The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployment. It exposes the retailer's requirement and compliance data (mock, in-memory) as 11 MCP tools — see `docs/mcp-concept.md` for the concept and `app/api/[transport]/route.ts` for the implementation.
 
 ## Endpoint URLs
 
@@ -25,7 +25,9 @@ The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployme
 > Authentication to off (or "Only Production" and use the production URL),
 > and check Firewall/Bot Protection isn't challenging non-browser clients.
 
-## Demo prompts to try
+## Ask anything — these are just examples
+
+The prompts below are illustrations, **not** a fixed command list. The connected LLM interprets free language and picks the right tool, so ask in your own words about any requirement or supplier-compliance question. Not sure where to start? Ask **"What can you help me with?"** and the assistant calls the `get_capabilities` tool to list its actions and the data that actually exists in the demo. In claude.ai the connector also contributes clickable **starter prompts** (review compliance, set up a category, audit a vendor, explain a profile, grant an exception) in the prompt picker.
 
 1. **Query compliance:** "Which of my vendors are furthest behind on compliance, and on which products?"
 2. **Understand requirements:** "What does my Footwear profile require, including image requirements?"
