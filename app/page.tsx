@@ -18,7 +18,12 @@ import {
   assignCategory,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
-import { ATTRIBUTE_PROFILES, type AttributeProfile } from "@/lib/retailer-requirements"
+import {
+  ATTRIBUTE_PROFILES,
+  getProfileBricks,
+  type AttributeProfile,
+  type ProfileBrick,
+} from "@/lib/retailer-requirements"
 
 type Perspective = "retailer" | "supplier"
 
@@ -216,14 +221,40 @@ export default function RetailerPortal() {
     setGapProduct(null)
   }
 
-  // Pre-compute extended rows for Screen 2 from the selected brick's standard attributes
-  const activeBrickExtendedRows = activeBrick
-    ? getBrickByCode(activeBrick.code)?.extendedAttributes.map((attr) => ({
-        retailerName: attr.name,
-        tgcGs1Name: `${attr.name} (${attr.code})`,
-        guidance: "",
-        source: "standard" as const,
-      }))
+  // The active profile's full brick set — from the shared list when we can match
+  // it by name, otherwise the single brick we navigated in with.
+  const activeProfile = profiles.find((p) => p.name === activeCategoryName)
+  const activeBricks: ProfileBrick[] = activeProfile
+    ? getProfileBricks(activeProfile)
+    : activeBrick
+    ? [{ code: activeBrick.code, name: activeBrick.name }]
+    : []
+
+  // Pre-compute extended rows for Screen 2 as the union of every mapped brick's
+  // standard attributes, deduped by attribute code.
+  const activeBrickExtendedRows = activeBricks.length
+    ? (() => {
+        const seen = new Set<string>()
+        const rows: {
+          retailerName: string
+          tgcGs1Name: string
+          guidance: string
+          source: "standard"
+        }[] = []
+        for (const b of activeBricks) {
+          for (const attr of getBrickByCode(b.code)?.extendedAttributes ?? []) {
+            if (seen.has(attr.code)) continue
+            seen.add(attr.code)
+            rows.push({
+              retailerName: attr.name,
+              tgcGs1Name: `${attr.name} (${attr.code})`,
+              guidance: "",
+              source: "standard",
+            })
+          }
+        }
+        return rows
+      })()
     : undefined
 
   // ── Active sidebar item ─────────────────────────────────────────────────────
@@ -264,15 +295,7 @@ export default function RetailerPortal() {
       </div>
 
       {/* Welcome / orientation overlay */}
-      <WelcomeOverlay
-        open={welcomeOpen}
-        onClose={dismissWelcome}
-        onStart={() => {
-          setPerspective("retailer")
-          setRetailerScreen("attribute-profiles")
-          dismissWelcome()
-        }}
-      />
+      <WelcomeOverlay open={welcomeOpen} onClose={dismissWelcome} />
 
       {/* Top nav */}
       <TopNav
@@ -320,6 +343,7 @@ export default function RetailerPortal() {
                     setActiveStatus(undefined)
                   }}
                   brickMapping={activeBrick ? { code: activeBrick.code, name: activeBrick.name } : null}
+                  initialBricks={activeBricks}
                   initialCategoryName={activeCategoryName}
                   initialBrickExtendedRows={activeBrickExtendedRows}
                   initialStatus={activeStatus}

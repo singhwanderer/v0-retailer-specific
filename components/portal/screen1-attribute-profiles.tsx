@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Info, Upload, Plus, X, CheckCircle, Search, Check } from "lucide-react"
+import { Info, Upload, Plus, X, CheckCircle, Check } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -9,8 +9,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { GS1_BRICKS, searchBricks, getSegments, getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
-import { type AttributeProfile } from "@/lib/retailer-requirements"
+import { getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
+import { getProfileBricks, type AttributeProfile } from "@/lib/retailer-requirements"
+import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
 
 interface Screen1Props {
   /** Shared profile list — the one source of truth (also read/written by Screen 2) */
@@ -191,23 +192,13 @@ function CreateRequirementModal({
   const [initialStatus, setInitialStatus] = useState<"Draft" | "Active">("Draft")
 
   // Step 2 state
-  const [query, setQuery] = useState("")
-  const [selectedSegment, setSelectedSegment] = useState<string>("All")
   const [selectedBrick, setSelectedBrick] = useState<Gs1Brick | null>(null)
   const [skipped, setSkipped] = useState(false)
-
-  const segments = ["All", ...getSegments()]
-
-  const filteredBricks = searchBricks(query).filter(
-    (b) => selectedSegment === "All" || b.segment === selectedSegment
-  )
 
   function reset() {
     setStep(1)
     setReqName("")
     setInitialStatus("Draft")
-    setQuery("")
-    setSelectedSegment("All")
     setSelectedBrick(null)
     setSkipped(false)
   }
@@ -305,90 +296,7 @@ function CreateRequirementModal({
               Map <span className="font-medium text-[#111827]">{reqName}</span> to a GS1 standard category. The standard extended attributes for that category will be pre-loaded into your requirement.
             </p>
 
-            {/* Search + segment filter */}
-            <div className="flex gap-2">
-              <div
-                className="flex items-center gap-2 flex-1 px-3 py-2 rounded-md border"
-                style={{ borderColor: "#E0E4E8" }}
-              >
-                <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "#9CA3AF" }} />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search category name or code…"
-                  className="flex-1 text-sm outline-none bg-transparent text-[#111827] placeholder:text-[#9CA3AF]"
-                />
-              </div>
-              <select
-                value={selectedSegment}
-                onChange={(e) => setSelectedSegment(e.target.value)}
-                className="px-2.5 py-2 rounded-md text-xs border outline-none bg-white text-[#374151]"
-                style={{ borderColor: "#E0E4E8" }}
-              >
-                {segments.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Brick list */}
-            <div
-              className="rounded-md border overflow-y-auto"
-              style={{ borderColor: "#E0E4E8", maxHeight: 240 }}
-            >
-              {filteredBricks.length === 0 ? (
-                <p className="px-4 py-3 text-sm" style={{ color: "#9CA3AF" }}>No categories match your search.</p>
-              ) : (
-                filteredBricks.map((brick) => {
-                  const isSelected = selectedBrick?.brickCode === brick.brickCode
-                  return (
-                    <button
-                      key={brick.brickCode}
-                      onClick={() => handleSelectBrick(brick)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
-                      style={{
-                        borderBottom: "1px solid #F3F4F6",
-                        backgroundColor: isSelected ? "#EFF6FF" : undefined,
-                      }}
-                    >
-                      {/* Checkmark column */}
-                      <div
-                        className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center"
-                        style={{
-                          backgroundColor: isSelected ? "#0168B3" : "#E0E4E8",
-                        }}
-                      >
-                        {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
-                      </div>
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-sm font-medium text-[#111827] truncate">{brick.brickName}</span>
-                          <span
-                            className="text-[10px] font-mono shrink-0"
-                            style={{ color: "#9CA3AF" }}
-                          >
-                            {brick.brickCode}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded"
-                            style={{ backgroundColor: "#F4F6F8", color: "#6B7280" }}
-                          >
-                            {brick.segment}
-                          </span>
-                          <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
-                            {brick.extendedAttributes.length} standard attributes
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })
-              )}
-            </div>
+            <Gs1BrickPicker selected={selectedBrick} onSelect={handleSelectBrick} />
 
             {/* Skip option */}
             <div className="flex items-center justify-between pt-1">
@@ -671,6 +579,9 @@ export function Screen1AttributeProfiles({
       isLink: true,
       brickCode: result.brickCode ?? "",
       brickName: result.brickName ?? "",
+      bricks: result.brickCode && result.brickName
+        ? [{ code: result.brickCode, name: result.brickName }]
+        : [],
     }
     onCreateProfile(newProfile)
     // Navigate immediately into the new requirement's profile, passing the retailer's category name
@@ -741,10 +652,31 @@ export function Screen1AttributeProfiles({
                 </td>
                 <td className="px-4 py-3.5 text-[#111827]">{cat.category}</td>
                 <td className="px-4 py-3.5">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[#111827] text-xs font-medium">{cat.brickName}</span>
-                    <span className="text-[10px] font-mono" style={{ color: "#9CA3AF" }}>{cat.brickCode}</span>
-                  </div>
+                  {(() => {
+                    const bricks = getProfileBricks(cat)
+                    const primary = bricks[0]
+                    return (
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#111827] text-xs font-medium">
+                            {primary ? primary.name : cat.brickName || "—"}
+                          </span>
+                          {bricks.length > 1 && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
+                              style={{ backgroundColor: "#EFF6FF", color: "#0168B3" }}
+                              title={bricks.map((b) => b.name).join(", ")}
+                            >
+                              +{bricks.length - 1} more
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-mono" style={{ color: "#9CA3AF" }}>
+                          {primary ? primary.code : cat.brickCode}
+                        </span>
+                      </div>
+                    )
+                  })()}
                 </td>
                 <td className="px-4 py-3.5 text-[#111827]">{cat.attributes}</td>
                 <td className="px-4 py-3.5">

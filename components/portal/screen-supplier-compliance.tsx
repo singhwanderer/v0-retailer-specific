@@ -5,6 +5,8 @@ import {
   countBaselineGaps,
   countUncategorised,
   getPartnerSummary,
+  getTargetCompletion,
+  type TargetCompletion,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
 
@@ -59,6 +61,42 @@ function ComplianceSummary({ gaps, complete, total }: { gaps: number; complete: 
   )
 }
 
+// Product-completion readiness for a target: a headline % ready, a slim progress
+// bar, and the per-category breakdown (each category aggregates its GS1 bricks).
+function ReadinessCell({ completion }: { completion: TargetCompletion }) {
+  const { pct, complete, total, byCategory } = completion
+  const tone = pct === 100 ? "#16A34A" : pct >= 50 ? "#0168B3" : "#F59E0B"
+
+  if (total === 0) {
+    return <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>Not yet assessed</span>
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 min-w-[9rem]">
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-sm font-semibold tabular-nums" style={{ color: tone }}>
+          {pct}%
+        </span>
+        <span className="text-[11px] font-light" style={{ color: "#9CA3AF" }}>
+          ready · {complete}/{total} products
+        </span>
+      </div>
+      <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ backgroundColor: "#F1F5F9" }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: tone }} />
+      </div>
+      {byCategory.length > 0 && (
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-light" style={{ color: "#6B7280" }}>
+          {byCategory.map((c) => (
+            <span key={c.category} className="whitespace-nowrap tabular-nums">
+              {c.category} {c.pct}%
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Pill({ tone, label }: { tone: "green" | "amber" | "red"; label: string }) {
   const cfg = {
     green: { bg: "#DCFCE7", text: "#15803D", dot: "#16A34A" },
@@ -86,6 +124,7 @@ export function ScreenSupplierCompliance({
     uncategorised: countUncategorised(products),
     baselineGaps: countBaselineGaps(products),
   }
+  const gs1Completion = getTargetCompletion(products, "gs1")
 
   return (
     <div className="p-8 flex flex-col gap-6">
@@ -106,7 +145,7 @@ export function ScreenSupplierCompliance({
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
-              {["Compliance Target", "Requirements", "Status"].map(
+              {["Compliance Target", "Requirements", "% Ready", "Status"].map(
                 (h) => (
                   <th
                     key={h}
@@ -146,6 +185,9 @@ export function ScreenSupplierCompliance({
                 Standard attributes per category
               </td>
               <td className="px-4 py-3 align-middle">
+                <ReadinessCell completion={gs1Completion} />
+              </td>
+              <td className="px-4 py-3 align-middle">
                 <div className="flex items-center gap-2 flex-wrap">
                   {gs1Stats.uncategorised > 0 && (
                     <button onClick={onSelectGs1} className="hover:opacity-80 transition-opacity">
@@ -172,6 +214,7 @@ export function ScreenSupplierCompliance({
             {/* ── Retailer rows ── */}
             {PARTNERS.map((partner, idx) => {
               const summary = getPartnerSummary(products, partner.name)
+              const completion = getTargetCompletion(products, partner.name)
               return (
                 <tr
                   key={partner.id}
@@ -196,6 +239,9 @@ export function ScreenSupplierCompliance({
                   </td>
                   <td className="px-4 py-3 font-light text-[#6B7280] align-middle tabular-nums">
                     {summary.codes} Product/Selection Code{summary.codes !== 1 ? "s" : ""}
+                  </td>
+                  <td className="px-4 py-3 align-middle">
+                    <ReadinessCell completion={completion} />
                   </td>
                   <td className="px-4 py-3 align-middle">
                     <button
