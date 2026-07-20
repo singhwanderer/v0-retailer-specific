@@ -18,6 +18,7 @@ import {
   assignCategory,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
+import { ATTRIBUTE_PROFILES, type AttributeProfile } from "@/lib/retailer-requirements"
 
 type Perspective = "retailer" | "supplier"
 
@@ -79,6 +80,19 @@ export default function RetailerPortal() {
 
   // ── Retailer state ──────────────────────────────────────────────────────────
   const [retailerScreen, setRetailerScreen] = useState<RetailerScreen>("attribute-profiles")
+
+  // Shared attribute-profile list — one source of truth for both Screen 1 (the
+  // list) and Screen 2 (the detail view), so create/activate/deactivate/rename
+  // from either screen show up everywhere.
+  const [profiles, setProfiles] = useState<AttributeProfile[]>(ATTRIBUTE_PROFILES)
+
+  function handleCreateProfile(profile: AttributeProfile) {
+    setProfiles((prev) => [...prev, profile])
+  }
+
+  function handleUpdateProfile(name: string, updates: Partial<AttributeProfile>) {
+    setProfiles((prev) => prev.map((p) => (p.name === name ? { ...p, ...updates } : p)))
+  }
 
   // Context passed from Screen 1 into Screen 2
   const [activeBrick, setActiveBrick] = useState<{ code: string; name: string } | null>(null)
@@ -286,6 +300,9 @@ export default function RetailerPortal() {
               {retailerScreen === "dashboard" && <DashboardPlaceholder />}
               {retailerScreen === "attribute-profiles" && (
                 <Screen1AttributeProfiles
+                  profiles={profiles}
+                  onCreateProfile={handleCreateProfile}
+                  onUpdateProfile={handleUpdateProfile}
                   onNavigateToProfile={(brickCode, brickName, categoryName, status) => {
                     setActiveBrick(brickCode && brickName ? { code: brickCode, name: brickName } : null)
                     setActiveCategoryName(categoryName)
@@ -306,6 +323,7 @@ export default function RetailerPortal() {
                   initialCategoryName={activeCategoryName}
                   initialBrickExtendedRows={activeBrickExtendedRows}
                   initialStatus={activeStatus}
+                  onUpdateProfile={handleUpdateProfile}
                 />
               )}
               

@@ -10,9 +10,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { GS1_BRICKS, searchBricks, getSegments, getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
-import { ATTRIBUTE_PROFILES, type AttributeProfile } from "@/lib/retailer-requirements"
+import { type AttributeProfile } from "@/lib/retailer-requirements"
 
 interface Screen1Props {
+  /** Shared profile list — the one source of truth (also read/written by Screen 2) */
+  profiles: AttributeProfile[]
+  onCreateProfile: (profile: AttributeProfile) => void
+  onUpdateProfile: (name: string, updates: Partial<AttributeProfile>) => void
   onNavigateToProfile: (
     brickCode?: string,
     brickName?: string,
@@ -607,8 +611,12 @@ function ConfirmActionModal({
 }
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
-export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) {
-  const [categories, setCategories] = useState<AttributeProfile[]>(ATTRIBUTE_PROFILES)
+export function Screen1AttributeProfiles({
+  profiles: categories,
+  onCreateProfile,
+  onUpdateProfile,
+  onNavigateToProfile,
+}: Screen1Props) {
   const [importOpen, setImportOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -644,11 +652,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
     if (!action) return
     const newStatus: StatusType = action === "Activate" ? "Active" : "Draft"
     const newActions = action === "Activate" ? ["Edit", "Deactivate"] : ["Edit", "Activate"]
-    setCategories((prev) =>
-      prev.map((c) =>
-        c.name === name ? { ...c, status: newStatus, actions: newActions, lastUpdated: today() } : c
-      )
-    )
+    onUpdateProfile(name, { status: newStatus, actions: newActions, lastUpdated: today() })
     if (action === "Deactivate") showToast(`"${name}" has been deactivated.`)
     if (action === "Activate") showToast(`"${name}" is now active.`)
   }
@@ -668,7 +672,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
       brickCode: result.brickCode ?? "",
       brickName: result.brickName ?? "",
     }
-    setCategories((prev) => [...prev, newProfile])
+    onCreateProfile(newProfile)
     // Navigate immediately into the new requirement's profile, passing the retailer's category name
     onNavigateToProfile(result.brickCode ?? undefined, result.brickName ?? undefined, result.name, result.initialStatus)
   }

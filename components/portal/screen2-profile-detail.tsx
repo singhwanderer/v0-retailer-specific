@@ -17,6 +17,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import type { AttributeProfile } from "@/lib/retailer-requirements"
+
+function today(): string {
+  return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AttributeRow {
@@ -103,30 +108,46 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
   )
 }
 
-// ── Confirm Deactivate Modal ──────────────────────────────────────────────────
-function ConfirmDeactivateModal({
+// ── Confirm Status Modal (Deactivate / Activate) ──────────────────────────────
+function ConfirmStatusModal({
   open,
   onClose,
   onConfirm,
+  action,
   categoryName,
 }: {
   open: boolean
   onClose: () => void
   onConfirm: () => void
+  action: "Deactivate" | "Activate" | null
   categoryName: string
 }) {
+  if (!action) return null
+
+  const config = {
+    Deactivate: {
+      title: "Deactivate Category Requirements",
+      body: `Suppliers will no longer see the requirements for "${categoryName}" until it is reactivated. No attribute data will be deleted.`,
+      confirm: "Deactivate",
+      danger: true,
+    },
+    Activate: {
+      title: "Activate Category Requirements",
+      body: `"${categoryName}" will become visible to all suppliers trading under your retailer account.`,
+      confirm: "Activate",
+      danger: false,
+    },
+  }
+
+  const { title, body, confirm, danger } = config[action]
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-[#111827]">
-            Deactivate Category Requirements
-          </DialogTitle>
+          <DialogTitle className="text-base font-semibold text-[#111827]">{title}</DialogTitle>
         </DialogHeader>
-        <p className="text-sm leading-relaxed py-2" style={{ color: "#6B7280" }}>
-          Suppliers will no longer see the requirements for &ldquo;{categoryName}&rdquo; until
-          it is reactivated. No attribute data will be deleted.
-        </p>
+        <p className="text-sm leading-relaxed py-2" style={{ color: "#6B7280" }}>{body}</p>
         <DialogFooter>
           <button
             onClick={onClose}
@@ -138,9 +159,9 @@ function ConfirmDeactivateModal({
           <button
             onClick={() => { onConfirm(); onClose() }}
             className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: "#DC2626" }}
+            style={{ backgroundColor: danger ? "#DC2626" : "#0168B3" }}
           >
-            Deactivate
+            {confirm}
           </button>
         </DialogFooter>
       </DialogContent>
@@ -941,6 +962,8 @@ interface Screen2Props {
   initialBrickExtendedRows?: AttributeRow[]
   /** The profile's status when opened — drives the status pill shown here */
   initialStatus?: ProfileStatus
+  /** Persist a status/name/actions change back to the shared profile list (Screen 1) */
+  onUpdateProfile?: (name: string, updates: Partial<AttributeProfile>) => void
 }
 
 export function Screen2ProfileDetail({
@@ -949,6 +972,7 @@ export function Screen2ProfileDetail({
   initialCategoryName,
   initialBrickExtendedRows,
   initialStatus,
+  onUpdateProfile,
 }: Screen2Props) {
   const isFootwear = brickMapping?.code === FOOTWEAR_BRICK_CODE
   const [coreRows, setCoreRows] = useState<AttributeRow[]>(
@@ -961,12 +985,15 @@ export function Screen2ProfileDetail({
 
   const [addAttrTarget, setAddAttrTarget] = useState<AddAttrTarget>(null)
   const [addImageOpen, setAddImageOpen] = useState(false)
-  const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [confirmStatusAction, setConfirmStatusAction] = useState<"Deactivate" | "Activate" | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
-  const [categoryName, setCategoryName] = useState(
-    initialCategoryName ?? brickMapping?.name ?? "New Category"
-  )
-  const [status] = useState<ProfileStatus>(initialStatus ?? "Active")
+  const initialName = initialCategoryName ?? brickMapping?.name ?? "New Category"
+  const [categoryName, setCategoryName] = useState(initialName)
+  // The key used to find this profile in the shared list (Screen 1). Captured
+  // once at mount and updated on rename, so status/name changes always land
+  // on the right row even after the display name has changed.
+  const [profileKey, setProfileKey] = useState(initialName)
+  const [status, setStatus] = useState<ProfileStatus>(initialStatus ?? "Active")
   const [toast, setToast] = useState<string | null>(null)
 
   // Edit attribute row state
@@ -1121,11 +1148,11 @@ export function Screen2ProfileDetail({
               Cancel
             </button>
             <button
-              onClick={() => setDeactivateOpen(true)}
+              onClick={() => setConfirmStatusAction(status === "Active" ? "Deactivate" : "Activate")}
               className="ml-auto text-sm font-medium hover:underline cursor-pointer transition-colors"
-              style={{ color: "#DC2626" }}
+              style={{ color: status === "Active" ? "#DC2626" : "#0168B3" }}
             >
-              Deactivate Category
+              {status === "Active" ? "Deactivate Category" : "Activate Category"}
             </button>
           </div>
         </div>
@@ -1172,16 +1199,33 @@ export function Screen2ProfileDetail({
         onClose={() => setEditImageState({ open: false, idx: -1 })}
         onSave={handleSaveImageRow}
       />
-      <ConfirmDeactivateModal
-        open={deactivateOpen}
-        onClose={() => setDeactivateOpen(false)}
-        onConfirm={() => { onBack() }}
+      <ConfirmStatusModal
+        open={confirmStatusAction !== null}
+        onClose={() => setConfirmStatusAction(null)}
+        onConfirm={() => {
+          const newStatus: ProfileStatus = confirmStatusAction === "Activate" ? "Active" : "Draft"
+          const newActions = confirmStatusAction === "Activate" ? ["Edit", "Deactivate"] : ["Edit", "Activate"]
+          onUpdateProfile?.(profileKey, { status: newStatus, actions: newActions, lastUpdated: today() })
+          setStatus(newStatus)
+          if (confirmStatusAction === "Deactivate") {
+            showToast(`"${categoryName}" has been deactivated.`)
+            onBack()
+          } else {
+            showToast(`"${categoryName}" is now active.`)
+          }
+        }}
+        action={confirmStatusAction}
         categoryName={categoryName}
       />
       <RenameCategoryModal
         open={renameOpen}
         onClose={() => setRenameOpen(false)}
-        onSave={(name) => { setCategoryName(name); showToast(`Renamed to "${name}".`) }}
+        onSave={(name) => {
+          onUpdateProfile?.(profileKey, { name, lastUpdated: today() })
+          setProfileKey(name)
+          setCategoryName(name)
+          showToast(`Renamed to "${name}".`)
+        }}
         currentName={categoryName}
       />
 
