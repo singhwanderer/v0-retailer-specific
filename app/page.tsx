@@ -6,7 +6,6 @@ import { WelcomeOverlay } from "@/components/portal/welcome-overlay"
 import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
-import { getBrickByCode } from "@/lib/gs1-standard-library"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
 import { ScreenSupplierCompliance } from "@/components/portal/screen-supplier-compliance"
 import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-catalogue"
@@ -222,40 +221,14 @@ export default function RetailerPortal() {
   }
 
   // The active profile's full brick set — from the shared list when we can match
-  // it by name, otherwise the single brick we navigated in with.
+  // it by name, otherwise the single brick we navigated in with. Screen 2 reads
+  // each brick's attributes itself (they're brick-scoped, not merged here).
   const activeProfile = profiles.find((p) => p.name === activeCategoryName)
   const activeBricks: ProfileBrick[] = activeProfile
     ? getProfileBricks(activeProfile)
     : activeBrick
     ? [{ code: activeBrick.code, name: activeBrick.name }]
     : []
-
-  // Pre-compute extended rows for Screen 2 as the union of every mapped brick's
-  // standard attributes, deduped by attribute code.
-  const activeBrickExtendedRows = activeBricks.length
-    ? (() => {
-        const seen = new Set<string>()
-        const rows: {
-          retailerName: string
-          tgcGs1Name: string
-          guidance: string
-          source: "standard"
-        }[] = []
-        for (const b of activeBricks) {
-          for (const attr of getBrickByCode(b.code)?.extendedAttributes ?? []) {
-            if (seen.has(attr.code)) continue
-            seen.add(attr.code)
-            rows.push({
-              retailerName: attr.name,
-              tgcGs1Name: `${attr.name} (${attr.code})`,
-              guidance: "",
-              source: "standard",
-            })
-          }
-        }
-        return rows
-      })()
-    : undefined
 
   // ── Active sidebar item ─────────────────────────────────────────────────────
   const retailerActiveScreen =
@@ -345,7 +318,6 @@ export default function RetailerPortal() {
                   brickMapping={activeBrick ? { code: activeBrick.code, name: activeBrick.name } : null}
                   initialBricks={activeBricks}
                   initialCategoryName={activeCategoryName}
-                  initialBrickExtendedRows={activeBrickExtendedRows}
                   initialStatus={activeStatus}
                   onUpdateProfile={handleUpdateProfile}
                 />
@@ -364,6 +336,7 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   onSelectGs1={handleSelectGs1}
                   onSelectPartner={handleSelectPartner}
+                  onGoToCatalogue={goToCatalogueWithUncategorised}
                 />
               )}
 
@@ -394,6 +367,7 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   onBack={handleBackToPartnerList}
                   onSelectCode={handleSelectCode}
+                  onGoToCatalogue={goToCatalogueWithUncategorised}
                 />
               )}
 

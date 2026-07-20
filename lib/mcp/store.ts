@@ -29,9 +29,16 @@ export interface ImageRequirement {
   guidanceNote?: string
 }
 
-interface ProfileExtras {
+export interface ProfileExtras {
   customAttributes: AttributeRequirement[]
   imageRequirements: ImageRequirement[]
+  /**
+   * Edits to a standard (GS1-inherited or baseline) row — keyed by gs1Name.
+   * Standard rows aren't stored themselves (they're derived live from the GS1
+   * brick / BASELINE_CORE_ATTRIBUTES), so an edit to one is recorded here
+   * instead of mutating a row that doesn't otherwise exist in the store.
+   */
+  overrides: Record<string, { name?: string; guidance?: string }>
 }
 
 export interface DemoStore {
@@ -69,6 +76,7 @@ function seed(): DemoStore {
             guidanceNote: "No mannequin, no props.",
           },
         ],
+        overrides: {},
       },
     },
   }
@@ -83,13 +91,13 @@ export function getStore(): DemoStore {
 
 /** Read-only view of a profile's extras — never persists a new entry. */
 export function readProfileExtras(brickCode: string): ProfileExtras {
-  return getStore().profileExtras[brickCode] ?? { customAttributes: [], imageRequirements: [] }
+  return getStore().profileExtras[brickCode] ?? { customAttributes: [], imageRequirements: [], overrides: {} }
 }
 
 /** Mutable extras for a brick — creates and persists an entry if none exists.
  *  Only call from write paths that have already confirmed a profile exists. */
 export function getProfileExtras(brickCode: string): ProfileExtras {
   const store = getStore()
-  store.profileExtras[brickCode] ??= { customAttributes: [], imageRequirements: [] }
+  store.profileExtras[brickCode] ??= { customAttributes: [], imageRequirements: [], overrides: {} }
   return store.profileExtras[brickCode]
 }

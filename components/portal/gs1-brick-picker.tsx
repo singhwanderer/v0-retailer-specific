@@ -7,20 +7,32 @@ import { getSegments, searchBricks, type Gs1Brick } from "@/lib/gs1-standard-lib
 // ── Shared GS1 brick picker ───────────────────────────────────────────────────
 // The searchable, segment-filterable brick list used both in the Create
 // Requirement wizard (Screen 1) and the "Add GS1 Category" flow on a profile
-// (Screen 2). Single-select; already-mapped bricks can be excluded so they read
-// as "Added" and can't be picked twice.
+// (Screen 2). Two modes:
+//  - Single-select (default): `selected`/`onSelect` — used by Screen 2's
+//    "Add GS1 Category" dialog, one brick at a time.
+//  - Multi-select (`multiSelect`): `selectedCodes`/`onToggle` — used by Screen
+//    1's create wizard, letting a new requirement map to several bricks at
+//    creation.
+// Already-mapped bricks can be excluded so they read as "Added" and can't be
+// picked twice, in either mode.
 
 interface Gs1BrickPickerProps {
-  selected: Gs1Brick | null
-  onSelect: (brick: Gs1Brick) => void
+  selected?: Gs1Brick | null
+  onSelect?: (brick: Gs1Brick) => void
+  multiSelect?: boolean
+  selectedCodes?: string[]
+  onToggle?: (brick: Gs1Brick) => void
   /** Brick codes already mapped — shown as disabled "Added" rows. */
   excludeCodes?: string[]
   maxHeight?: number
 }
 
 export function Gs1BrickPicker({
-  selected,
+  selected = null,
   onSelect,
+  multiSelect = false,
+  selectedCodes = [],
+  onToggle,
   excludeCodes = [],
   maxHeight = 240,
 }: Gs1BrickPickerProps) {
@@ -32,6 +44,11 @@ export function Gs1BrickPicker({
     (b) => selectedSegment === "All" || b.segment === selectedSegment
   )
   const excluded = new Set(excludeCodes)
+
+  function handleClick(brick: Gs1Brick) {
+    if (multiSelect) onToggle?.(brick)
+    else onSelect?.(brick)
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -73,12 +90,14 @@ export function Gs1BrickPicker({
           </p>
         ) : (
           filteredBricks.map((brick) => {
-            const isSelected = selected?.brickCode === brick.brickCode
+            const isSelected = multiSelect
+              ? selectedCodes.includes(brick.brickCode)
+              : selected?.brickCode === brick.brickCode
             const isExcluded = excluded.has(brick.brickCode)
             return (
               <button
                 key={brick.brickCode}
-                onClick={() => !isExcluded && onSelect(brick)}
+                onClick={() => !isExcluded && handleClick(brick)}
                 disabled={isExcluded}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors disabled:cursor-not-allowed"
                 style={{
@@ -89,7 +108,7 @@ export function Gs1BrickPicker({
               >
                 {/* Checkmark column */}
                 <div
-                  className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center"
+                  className={multiSelect ? "w-4 h-4 rounded shrink-0 flex items-center justify-center" : "w-4 h-4 rounded-full shrink-0 flex items-center justify-center"}
                   style={{ backgroundColor: isSelected ? "#0168B3" : "#E0E4E8" }}
                 >
                   {isSelected && <Check className="w-2.5 h-2.5 text-white" />}

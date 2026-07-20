@@ -1,6 +1,6 @@
 # TGC Demo MCP Server — Quickstart
 
-The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployment. It exposes the retailer's requirement and compliance data (mock, in-memory) as 9 MCP tools — see `docs/mcp-concept.md` for the concept and `app/api/[transport]/route.ts` for the implementation. This connector is built for the retailer side (e.g. Dillard's) — it answers questions about the retailer's own suppliers, not other retail partners.
+The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployment. It exposes the retailer's requirement and compliance data (mock, in-memory) as MCP tools — see the README's "Requirement authoring model" and "Conversational access (MCP)" sections for the concept, and `app/api/[transport]/route.ts` for the implementation. This connector is built for the retailer side (e.g. Dillard's) — it answers questions about the retailer's own suppliers, not other retail partners.
 
 ## Endpoint URLs
 
