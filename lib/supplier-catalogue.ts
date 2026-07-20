@@ -190,6 +190,344 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
       { retailer: "Macy's", gaps: "complete" },
     ],
   },
+
+  // ── Saks Fifth Avenue coverage ──────────────────────────────────────────────
+  {
+    id: "B11468",
+    description: "Sequin Cocktail Dress",
+    state: "categorised",
+    brickCode: "10001333",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Saks Fifth Avenue", gaps: 3 },
+      { retailer: "Nordstrom", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11469",
+    description: "Double-Breasted Blazer",
+    state: "categorised",
+    brickCode: "10001350",
+    gs1Gaps: 2,
+    retailers: [{ retailer: "Saks Fifth Avenue", gaps: 4 }],
+  },
+  {
+    id: "B11470",
+    description: "Patent Pointed Pump",
+    state: "categorised",
+    brickCode: "10005811",
+    gs1Gaps: 0,
+    retailers: [
+      { retailer: "Saks Fifth Avenue", gaps: "complete" },
+      { retailer: "Dillard's", gaps: 2 },
+    ],
+  },
+  {
+    id: "B11471",
+    description: "Top-Handle Satchel",
+    state: "categorised",
+    brickCode: "10006030",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Saks Fifth Avenue", gaps: 2 },
+      { retailer: "Bloomingdale's", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11472",
+    description: "Signet Ring",
+    state: "categorised",
+    brickCode: "10006018",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Saks Fifth Avenue", gaps: 1 }],
+  },
+  {
+    id: "B11473",
+    description: "Cashmere Crew Sweater",
+    state: "categorised",
+    brickCode: "10001351",
+    gs1Gaps: 0,
+    retailers: [
+      { retailer: "Saks Fifth Avenue", gaps: "complete" },
+      { retailer: "Belk", gaps: 3 },
+    ],
+  },
+
+  // ── Bloomingdale's coverage ─────────────────────────────────────────────────
+  {
+    id: "B11474",
+    description: "Pleated Midi Skirt",
+    state: "categorised",
+    brickCode: "10001334",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Bloomingdale's", gaps: 2 },
+      { retailer: "Macy's", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11475",
+    description: "Silk Button Blouse",
+    state: "categorised",
+    brickCode: "10001352",
+    gs1Gaps: 2,
+    retailers: [{ retailer: "Bloomingdale's", gaps: 5 }],
+  },
+  {
+    id: "B11476",
+    description: "Cable-Knit Cardigan",
+    state: "categorised",
+    brickCode: "10001351",
+    gs1Gaps: 0,
+    retailers: [
+      { retailer: "Bloomingdale's", gaps: "complete" },
+      { retailer: "Nordstrom", gaps: 2 },
+    ],
+  },
+  {
+    id: "B11477",
+    description: "Mesh Running Trainer",
+    state: "categorised",
+    brickCode: "10005812",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Bloomingdale's", gaps: 3 },
+      { retailer: "Macy's", gaps: 1 },
+    ],
+  },
+  {
+    id: "B11478",
+    description: "Layered Pendant Necklace",
+    state: "categorised",
+    brickCode: "10006017",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Bloomingdale's", gaps: "complete" }],
+  },
+  {
+    id: "B11479",
+    description: "A-Line Denim Skirt",
+    state: "categorised",
+    brickCode: "10001334",
+    gs1Gaps: 2,
+    retailers: [
+      { retailer: "Bloomingdale's", gaps: 1 },
+      { retailer: "Dillard's", gaps: "complete" },
+    ],
+  },
+
+  // ── Deeper Dillard's coverage ───────────────────────────────────────────────
+  {
+    id: "B11480",
+    description: "Belted Shirt Dress",
+    state: "categorised",
+    brickCode: "10001333",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Dillard's", gaps: 2 }],
+  },
+  {
+    id: "B11481",
+    description: "Suede Block Heel",
+    state: "categorised",
+    brickCode: "10005811",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Dillard's", gaps: 4 },
+      { retailer: "Belk", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11482",
+    description: "Oxford Cotton Shirt",
+    state: "categorised",
+    brickCode: "10001352",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Dillard's", gaps: 3 }],
+  },
+  {
+    id: "B11483",
+    description: "Tailored Wide-Leg Trouser",
+    state: "categorised",
+    brickCode: "10001335",
+    gs1Gaps: 2,
+    retailers: [
+      { retailer: "Dillard's", gaps: 5 },
+      { retailer: "Macy's", gaps: 2 },
+    ],
+  },
+  {
+    id: "B11484",
+    description: "Reversible Leather Belt",
+    state: "categorised",
+    brickCode: "10006031",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Dillard's", gaps: "complete" }],
+  },
+
+  // ── Deeper Nordstrom coverage ───────────────────────────────────────────────
+  {
+    id: "B11485",
+    description: "Quilted Puffer Jacket",
+    state: "categorised",
+    brickCode: "10001350",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Nordstrom", gaps: 3 }],
+  },
+  {
+    id: "B11486",
+    description: "Chain Shoulder Bag",
+    state: "categorised",
+    brickCode: "10006030",
+    gs1Gaps: 2,
+    retailers: [
+      { retailer: "Nordstrom", gaps: 1 },
+      { retailer: "Saks Fifth Avenue", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11487",
+    description: "Merino Turtleneck",
+    state: "categorised",
+    brickCode: "10001351",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Nordstrom", gaps: "complete" }],
+  },
+  {
+    id: "B11488",
+    description: "Stackable Band Set",
+    state: "categorised",
+    brickCode: "10006018",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Nordstrom", gaps: 2 },
+      { retailer: "Bloomingdale's", gaps: 1 },
+    ],
+  },
+  {
+    id: "B11489",
+    description: "Seamless Training Top",
+    state: "categorised",
+    brickCode: "10001400",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Nordstrom", gaps: 2 }],
+  },
+
+  // ── Deeper Belk coverage ────────────────────────────────────────────────────
+  {
+    id: "B11490",
+    description: "Cowl Neck Slip Dress",
+    state: "categorised",
+    brickCode: "10001333",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Belk", gaps: "complete" }],
+  },
+  {
+    id: "B11491",
+    description: "Satin Bias Skirt",
+    state: "categorised",
+    brickCode: "10001334",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Belk", gaps: 2 }],
+  },
+  {
+    id: "B11492",
+    description: "Piped Cotton Pyjama Set",
+    state: "categorised",
+    brickCode: "10002100",
+    gs1Gaps: 0,
+    retailers: [
+      { retailer: "Belk", gaps: "complete" },
+      { retailer: "Macy's", gaps: 1 },
+    ],
+  },
+  {
+    id: "B11493",
+    description: "Pearl Strand Necklace",
+    state: "categorised",
+    brickCode: "10006017",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Belk", gaps: 3 }],
+  },
+
+  // ── Deeper Macy's coverage ──────────────────────────────────────────────────
+  {
+    id: "B11494",
+    description: "High-Rise Legging",
+    state: "categorised",
+    brickCode: "10001401",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Macy's", gaps: 2 }],
+  },
+  {
+    id: "B11495",
+    description: "Court Sneaker",
+    state: "categorised",
+    brickCode: "10005812",
+    gs1Gaps: 0,
+    retailers: [
+      { retailer: "Macy's", gaps: "complete" },
+      { retailer: "Dillard's", gaps: 3 },
+    ],
+  },
+  {
+    id: "B11496",
+    description: "Pleated Cigarette Trouser",
+    state: "categorised",
+    brickCode: "10001335",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Macy's", gaps: 4 }],
+  },
+  {
+    id: "B11497",
+    description: "Satin Cami Set",
+    state: "categorised",
+    brickCode: "10002100",
+    gs1Gaps: 0,
+    retailers: [{ retailer: "Macy's", gaps: 1 }],
+  },
+
+  // ── Cross-partner fill ──────────────────────────────────────────────────────
+  {
+    id: "B11498",
+    description: "Running Short",
+    state: "categorised",
+    brickCode: "10001401",
+    gs1Gaps: 1,
+    retailers: [
+      { retailer: "Nordstrom", gaps: 1 },
+      { retailer: "Macy's", gaps: "complete" },
+    ],
+  },
+  {
+    id: "B11499",
+    description: "Trail Running Shoe",
+    state: "categorised",
+    brickCode: "10005812",
+    gs1Gaps: 2,
+    retailers: [{ retailer: "Saks Fifth Avenue", gaps: 3 }],
+  },
+  {
+    id: "B11500",
+    description: "Woven Waist Belt",
+    state: "categorised",
+    brickCode: "10006031",
+    gs1Gaps: 0,
+    retailers: [
+      { retailer: "Bloomingdale's", gaps: "complete" },
+      { retailer: "Nordstrom", gaps: 1 },
+    ],
+  },
+  {
+    id: "B11501",
+    description: "Longline Sports Bra",
+    state: "categorised",
+    brickCode: "10001400",
+    gs1Gaps: 1,
+    retailers: [{ retailer: "Bloomingdale's", gaps: 2 }],
+  },
+
+  // ── Uncategorised (keep the assign-category story alive) ─────────────────────
+  { id: "B11502", description: "Colour-Block Windbreaker", state: "uncategorised" },
+  { id: "B11503", description: "Embroidered Kaftan", state: "uncategorised" },
 ]
 
 /** Products with no category assigned — cannot be assessed against any target. */

@@ -31,6 +31,9 @@ const PARTNERS: Partner[] = [
   { id: "dillards", name: "Dillard's", extras: 3 },
   { id: "belk", name: "Belk", extras: 1 },
   { id: "nordstrom", name: "Nordstrom", extras: 5 },
+  { id: "macys", name: "Macy's", extras: 2 },
+  { id: "saks", name: "Saks Fifth Avenue", extras: 6 },
+  { id: "bloomingdales", name: "Bloomingdale's", extras: 4 },
 ]
 
 // Reused from the former Trading Partners screen — the retailer-row status pill.
