@@ -12,9 +12,9 @@ import {
   createAttributeProfile,
   getCapabilities,
   getProfileDetail,
-  getSupplierComplianceSummary,
+  getSupplierCompliance,
   listAttributeProfiles,
-  listVendorGaps,
+  listMySuppliers,
   searchGs1Bricks,
   setImageRequirement,
 } from "@/lib/mcp/tools"
@@ -56,17 +56,17 @@ const handler = createMcpHandler(
     )
 
     server.tool(
-      "get_supplier_compliance_summary",
-      "Summarize supplier compliance across the network: per retail partner, the number of open attribute gaps, products with gaps, and fully compliant products, plus how many products are still uncategorised (no GS1 brick assigned). Vendors are ranked by open gaps.",
+      "list_my_suppliers",
+      "List the suppliers trading under your retailer account, each with their category, open attribute gaps, products with gaps, and fully compliant products. Ranked by open gaps. This only covers your own suppliers — other retail partners' or peer accounts' data is not available through this connector.",
       {},
-      async () => asText(getSupplierComplianceSummary())
+      async () => asText(listMySuppliers())
     )
 
     server.tool(
-      "list_vendor_gaps",
-      "List product-level compliance gaps: which products have open attribute gaps against which retail partner, with the product's GS1 category. Optionally filter by partner name.",
-      { vendor: z.string().optional().describe("Filter by retail partner name, e.g. 'Dillard's'") },
-      async ({ vendor }) => asText(listVendorGaps(vendor))
+      "get_supplier_compliance",
+      "Get compliance detail for one of your suppliers by name: category, product counts, and open gaps. If the name doesn't match a known supplier (including if it's actually another retail partner's name), returns the list of suppliers that do have data.",
+      { supplier: z.string().describe("Supplier name, e.g. 'J.Renée' or 'Nike'") },
+      async ({ supplier }) => asText(getSupplierCompliance(supplier))
     )
 
     // ── Writes (in-memory demo store) ───────────────────────────────────────
@@ -122,10 +122,10 @@ const handler = createMcpHandler(
 
     server.prompt(
       "review-supplier-compliance",
-      "See which retail partners are furthest behind on compliance and on which products.",
+      "See which of your suppliers are furthest behind on compliance and on what.",
       async () =>
         prompt(
-          "Using the TGC connector, which of my retail partners are furthest behind on compliance, and on which products and attributes? Rank them by open gaps and cite the tool results."
+          "Using the TGC connector, which of my suppliers are furthest behind on compliance, and on what categories? Rank them by open gaps and cite the tool results."
         )
     )
 
@@ -140,10 +140,10 @@ const handler = createMcpHandler(
 
     server.prompt(
       "audit-a-vendor",
-      "Review one retail partner's open compliance gaps.",
+      "Review one of your suppliers' open compliance gaps.",
       async () =>
         prompt(
-          "I want to audit one retail partner in TGC. Ask me which partner, then show their open compliance gaps by product and attribute. If the name doesn't match, tell me which partners do have data."
+          "I want to audit one of my suppliers in TGC. Ask me which supplier, then show their compliance — category, product counts, and open gaps. If the name doesn't match one of my suppliers, tell me which suppliers do have data."
         )
     )
 
@@ -160,12 +160,13 @@ const handler = createMcpHandler(
     serverInfo: { name: "tgc-demo", version: "0.1.0" },
     instructions:
       "Trading Grid Catalogue (TGC) demo server — a B2B catalog data-sync network connecting retailer hubs and supplier spokes. " +
-      "SCOPE: this connector covers the retailer side only — authoring product requirements (attribute profiles, attributes, image requirements) and monitoring supplier compliance gaps. " +
+      "This connector is built for the RETAILER side (e.g. Dillard's), not suppliers. " +
+      "SCOPE: authoring product requirements (attribute profiles, attributes, image requirements) and monitoring the compliance of the retailer's OWN suppliers (e.g. J.Renée, Nike) against those requirements. " +
       "All data is mock data from a watermarked prototype; write tools store changes in an in-memory demo store that resets periodically. " +
-      "GROUNDING: answer questions about TGC data strictly from tool results — never invent profiles, partners, categories, or numbers. " +
+      "GROUNDING: answer questions about TGC data strictly from tool results — never invent profiles, suppliers, categories, or numbers. " +
       "When the user asks what they can do, is unsure, or asks something open-ended, call get_capabilities first to see what actions and data actually exist, then guide them. " +
-      "EMPTY RESULTS: some read tools return a note with known partners/statuses when a filter matches nothing — relay those suggestions instead of just saying 'none found'. " +
-      "OUT OF SCOPE: vendor exceptions (waivers, extended deadlines, reduced scope), supplier-side tools (a supplier asking about their own compliance), sales, logistics, pricing, or anything beyond retailer requirements and compliance-gap monitoring are not in this demo — say so plainly and point to what IS available via get_capabilities, rather than answering from general knowledge as if it were TGC data. " +
+      "EMPTY RESULTS: some read tools return a note with known suppliers/statuses when a filter matches nothing — relay those suggestions instead of just saying 'none found'. " +
+      "OUT OF SCOPE: other retail partners' or peer accounts' data (e.g. asking how Macy's or Belk is doing is not answerable here — this connector only knows the retailer's own suppliers), vendor exceptions (waivers, extended deadlines, reduced scope), supplier-side tools (a supplier asking about their own compliance), sales, logistics, pricing, or anything beyond retailer requirements and supplier compliance-gap monitoring are not in this demo — say so plainly and point to what IS available via get_capabilities, rather than answering from general knowledge as if it were TGC data. " +
       "WRITES: before any write tool, restate the exact change to the user and get their explicit confirmation.",
   },
   { basePath: "/api" }

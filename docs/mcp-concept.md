@@ -54,8 +54,8 @@ flowchart TB
 
     subgraph TGC
         M["TGC MCP endpoint<br/>(Streamable HTTP + OAuth 2.1)"]
-        T["Shared tool layer<br/>get_profile_detail · set_image_requirement ·<br/>get_supplier_compliance_summary · create_vendor_exception …"]
-        D["TGC data<br/>attribute profiles · GS1 brick library ·<br/>vendor exceptions · supplier catalogues & gaps"]
+        T["Shared tool layer<br/>get_profile_detail · set_image_requirement ·<br/>list_my_suppliers · get_supplier_compliance …"]
+        D["TGC data<br/>attribute profiles · GS1 brick library ·<br/>the retailer's own suppliers & their compliance"]
     end
 
     A -->|internal calls| T
@@ -83,14 +83,18 @@ Grounded in the entities this prototype already models. Names are illustrative b
 | `add_attribute_requirement(profile, attribute, guidance, target)` | Screen 2 "Add Attribute" dialog (core or extended) | W |
 | `set_image_requirement(profile, name, format, background, min_dimensions, max_file_size, shape_crop)` | Screen 2 image requirement rows | W |
 
-### Retailer — compliance monitoring & exceptions
+### Retailer — compliance monitoring
+
+Scoped to the retailer's own suppliers only (e.g. J.Renée, Nike) — not other
+retail partners' or peer accounts' data, which this connector can't answer.
 
 | Tool | Backed by (in prototype) | R/W |
 |---|---|---|
-| `get_supplier_compliance_summary(category?)` | Supplier gap data in `lib/supplier-catalogue.ts`, aggregated to the retailer's view | R |
-| `list_vendor_gaps(vendor, profile?)` | Product-level gap lists (supplier screens L3/L4, inverted to hub perspective) | R |
-| `list_vendor_exceptions(vendor?, status?)` | Screen 3 — waivers, extended deadlines, reduced scope; Active/Expired | R |
-| `create_vendor_exception(vendor, profile, type, attributes, valid_until)` | Screen 3 row shape | W |
+| `list_my_suppliers()` | The retailer's suppliers, ranked by open gaps (`lib/retailer-requirements.ts`) | R |
+| `get_supplier_compliance(supplier)` | Category, product counts, and open gaps for one named supplier | R |
+
+Vendor exceptions (waivers, extended deadlines, reduced scope — Screen 3) exist
+in the prototype UI but are explicitly out of scope for this connector.
 
 ### Supplier-side (Phase 2)
 
@@ -113,9 +117,9 @@ Reads are free. **Every write tool returns a structured preview and requires exp
 > *"For all Dresses, require two lifestyle images, minimum 2000×2000, white background, JPEG."*
 → `search_gs1_bricks("dresses")` → `get_profile_detail("10001333")` → staged `set_image_requirement` × 2 → confirmation card → done. What was a six-field form across two screens becomes one sentence.
 
-**Understand the vendor base at a glance.**
-> *"Which vendors are furthest behind on my Footwear profile, and on which attributes?"*
-→ `get_supplier_compliance_summary(category="Footwear")` + `list_vendor_gaps` → ranked answer with per-attribute gap counts, every number traceable to a tool result.
+**Understand your supplier base at a glance.**
+> *"Which of my suppliers are furthest behind on compliance, and on what?"*
+→ `list_my_suppliers()` + `get_supplier_compliance(supplier)` → ranked answer with per-supplier gap counts, every number traceable to a tool result.
 
 **Grant a targeted exception without leaving the conversation.**
 > *"Give Acme Apparel a 60-day extension on Fur Treatment for the Dresses profile."*

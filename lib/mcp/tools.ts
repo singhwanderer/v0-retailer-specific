@@ -8,6 +8,7 @@
 import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
+  RETAILER_SUPPLIERS,
   type AttributeProfile,
   type ProfileStatus,
 } from "@/lib/retailer-requirements"
@@ -23,14 +24,10 @@ import {
 const DEMO_NOTE =
   "Demo prototype: this change is stored in the demo server's in-memory data (mock data only, resets periodically). In production this would persist to TGC."
 
-// Distinct retail-partner names present in the supplier catalogue seed. Used
-// both to filter gaps and to redirect a query that names an unknown partner.
-function knownRetailPartners(): string[] {
-  const set = new Set<string>()
-  for (const product of SUPPLIER_PRODUCTS_SEED) {
-    for (const r of product.retailers ?? []) set.add(r.retailer)
-  }
-  return [...set].sort()
+// Distinct supplier names trading under this retailer account. Used both to
+// redirect a query that names an unknown supplier and in get_capabilities.
+function knownSuppliers(): string[] {
+  return [...new Set(RETAILER_SUPPLIERS.map((s) => s.supplier))].sort()
 }
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
@@ -87,54 +84,34 @@ export function getProfileDetail(brickCode: string) {
   }
 }
 
-export function getSupplierComplianceSummary() {
-  // Invert the supplier catalogue's per-retailer gaps into the hub view
-  const byVendor = new Map<string, { openGaps: number; productsWithGaps: number; productsComplete: number }>()
-  for (const product of SUPPLIER_PRODUCTS_SEED) {
-    for (const r of product.retailers ?? []) {
-      const row = byVendor.get(r.retailer) ?? { openGaps: 0, productsWithGaps: 0, productsComplete: 0 }
-      if (r.gaps === "complete") row.productsComplete += 1
-      else {
-        row.openGaps += r.gaps
-        row.productsWithGaps += 1
-      }
-      byVendor.set(r.retailer, row)
-    }
-  }
-  const uncategorised = SUPPLIER_PRODUCTS_SEED.filter((p) => p.state === "uncategorised").length
+export function listMySuppliers() {
   return {
-    note: "Demo data covers one supplier's catalogue as seen by each retail partner.",
-    vendors: [...byVendor.entries()]
-      .map(([vendor, stats]) => ({ vendor, ...stats }))
-      .sort((a, b) => b.openGaps - a.openGaps),
-    uncategorisedProducts: uncategorised,
+    note: "Compliance for the suppliers trading under your retailer account, ranked by open gaps.",
+    suppliers: [...RETAILER_SUPPLIERS]
+      .sort((a, b) => b.openGaps - a.openGaps)
+      .map(({ supplier, category, brickCode, openGaps, productsWithGaps, productsComplete }) => ({
+        supplier,
+        category,
+        brickCode,
+        openGaps,
+        productsWithGaps,
+        productsComplete,
+      })),
   }
 }
 
-export function listVendorGaps(vendor?: string) {
-  const q = vendor?.toLowerCase().trim()
-  const rows = SUPPLIER_PRODUCTS_SEED.flatMap((product) =>
-    (product.retailers ?? [])
-      .filter((r) => r.gaps !== "complete" && (!q || r.retailer.toLowerCase().includes(q)))
-      .map((r) => ({
-        productId: product.id,
-        product: product.description,
-        brickCode: product.brickCode,
-        category: product.brickCode ? getBrickByCode(product.brickCode)?.brickName : undefined,
-        retailer: r.retailer,
-        openGaps: r.gaps,
-      }))
-  )
-  const sorted = rows.sort((a, b) => (b.openGaps as number) - (a.openGaps as number))
-  if (q && sorted.length === 0) {
-    const known = knownRetailPartners()
+export function getSupplierCompliance(supplier: string) {
+  const q = supplier.toLowerCase().trim()
+  const matches = RETAILER_SUPPLIERS.filter((s) => s.supplier.toLowerCase().includes(q))
+  if (matches.length === 0) {
+    const known = knownSuppliers()
     return {
       matches: [],
-      knownVendors: known,
-      note: `No retail partner matched "${vendor}". Known partners with compliance data: ${known.join(", ")}. (This demo tracks the supplier's catalogue as seen by each retail partner.)`,
+      knownSuppliers: known,
+      note: `No supplier matched "${supplier}". Suppliers trading under your retailer account: ${known.join(", ")}. (Other retail partners' data is not available through this connector.)`,
     }
   }
-  return sorted
+  return matches
 }
 
 // Plain-English catalog of what this connector can do, plus a live snapshot of
@@ -162,11 +139,11 @@ export function getCapabilities() {
         ],
       },
       monitorSuppliers: {
-        summary: "See how retail partners are doing on compliance and where the gaps are.",
+        summary: "See how your suppliers are doing on compliance and where the gaps are.",
         examples: [
-          "Which partners are furthest behind on compliance, and on what?",
-          "List the open gaps for Macy's.",
-          "How are my accessories categories doing?",
+          "Which of my suppliers is furthest behind on compliance, and on what?",
+          "How is J.Renée doing on Footwear?",
+          "List all my suppliers and their compliance status.",
         ],
       },
       authorRequirements: {
@@ -190,7 +167,7 @@ export function getCapabilities() {
         status: p.status,
         brickCode: p.brickCode,
       })),
-      retailPartnersWithComplianceData: knownRetailPartners(),
+      mySuppliers: knownSuppliers(),
       categoriesWithSupplierData: categoriesWithData,
       gs1Segments: getSegments(),
     },
