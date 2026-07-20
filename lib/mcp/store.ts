@@ -8,9 +8,7 @@
 
 import {
   ATTRIBUTE_PROFILES,
-  VENDOR_EXCEPTIONS,
   type AttributeProfile,
-  type ExceptionRow,
 } from "@/lib/retailer-requirements"
 
 export interface AttributeRequirement {
@@ -38,8 +36,7 @@ interface ProfileExtras {
 
 export interface DemoStore {
   profiles: AttributeProfile[]
-  exceptions: ExceptionRow[]
-  /** Keyed by GS1 brick code */
+  /** Keyed by GS1 category (brick) code */
   profileExtras: Record<string, ProfileExtras>
 }
 
@@ -54,7 +51,6 @@ export const BASELINE_CORE_ATTRIBUTES: AttributeRequirement[] = [
 function seed(): DemoStore {
   return {
     profiles: ATTRIBUTE_PROFILES.map((p) => ({ ...p })),
-    exceptions: VENDOR_EXCEPTIONS.map((e) => ({ ...e, attributes: [...e.attributes] })),
     profileExtras: {
       // Footwear ships with the custom rows Screen 2 displays
       "10005811": {
@@ -85,6 +81,13 @@ export function getStore(): DemoStore {
   return globalScope.__tgcDemoStore
 }
 
+/** Read-only view of a profile's extras — never persists a new entry. */
+export function readProfileExtras(brickCode: string): ProfileExtras {
+  return getStore().profileExtras[brickCode] ?? { customAttributes: [], imageRequirements: [] }
+}
+
+/** Mutable extras for a brick — creates and persists an entry if none exists.
+ *  Only call from write paths that have already confirmed a profile exists. */
 export function getProfileExtras(brickCode: string): ProfileExtras {
   const store = getStore()
   store.profileExtras[brickCode] ??= { customAttributes: [], imageRequirements: [] }

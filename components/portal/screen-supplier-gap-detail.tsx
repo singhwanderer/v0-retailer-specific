@@ -1,9 +1,14 @@
 "use client"
 
+import { getBrickByCode } from "@/lib/gs1-standard-library"
+import type { SupplierProduct } from "@/lib/supplier-catalogue"
+
 interface GapDetailProps {
   productName: string
   retailer: string
   selectionCode: string
+  /** Shared supplier catalogue — the one source of truth */
+  products: SupplierProduct[]
   onBackToProducts: () => void
   onBackToPartner: () => void
   onBackToPartnerList: () => void
@@ -23,32 +28,47 @@ type ImageRow = {
   guidanceSpec?: string
 }
 
-// ── Mock data per retailer ────────────────────────────────────────────────────
+// ── Derivation ────────────────────────────────────────────────────────────────
+// The gap detail is built from the shared product store, so it always matches
+// the gap count the product list showed for this product + retailer. The
+// retailer's open-gap number is allocated first to missing attributes (drawn
+// from the product's GS1 category), then to image requirements — so a product
+// with 3 gaps here shows exactly 3, whichever retailer sent you.
 
-const DILLARDS_MISSING_ATTRS: MissingAttribute[] = [
-  { retailerLabel: "Boot Heel Type", tgcName: "Heel Type", tgcCode: "GM03HLTY" },
-  { retailerLabel: "Outsole Type", tgcName: "Outsole Type", tgcCode: "GM03OUTS" },
-  { retailerLabel: "Closure", tgcName: "Closure", tgcCode: "GM03CLOS" },
+const IMAGE_POOL: { name: string; spec: string }[] = [
+  { name: "Hero Shot", spec: "pure white background, 2000 × 2000 px, square" },
+  { name: "Detail Shot", spec: "close-up of material/texture" },
 ]
 
-const DILLARDS_IMAGES: ImageRow[] = [
-  {
-    name: "Hero Shot",
-    provided: false,
-    guidanceSpec: "Dillard\u2019s spec: pure white background, 2000 \u00d7 2000 px, square. Guidance only \u2014 not verified by the system.",
-  },
-  {
-    name: "Detail Shot",
-    provided: true,
-    guidanceSpec: "Dillard\u2019s spec: close-up of material/texture. Guidance only \u2014 not verified by the system.",
-  },
-]
+function deriveGapData(product: SupplierProduct | undefined, retailer: string) {
+  const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
+  const attrPool = brick?.extendedAttributes ?? []
+  const rs = product?.retailers?.find((r) => r.retailer === retailer)
+  const gapCount = !rs || rs.gaps === "complete" ? 0 : rs.gaps
 
-// For Belk (Complete) — no missing attrs, all images provided
-const BELK_IMAGES: ImageRow[] = [
-  { name: "Hero Shot", provided: true },
-  { name: "Detail Shot", provided: true },
-]
+  const missingCount = Math.min(gapCount, attrPool.length)
+  const missingAttrs: MissingAttribute[] = attrPool.slice(0, missingCount).map((a) => ({
+    retailerLabel: a.name,
+    tgcName: a.name,
+    tgcCode: a.code,
+  }))
+
+  // Any gaps beyond the attribute pool fall to image requirements.
+  const imageGaps = Math.min(gapCount - missingCount, IMAGE_POOL.length)
+  const imageRows: ImageRow[] = IMAGE_POOL.map((img, i) => ({
+    name: img.name,
+    provided: i >= imageGaps,
+    guidanceSpec: `${retailer} spec: ${img.spec}. Guidance only — not verified by the system.`,
+  }))
+
+  return {
+    productDescription: product?.description ?? "",
+    categoryLabel: brick?.brickName ?? "Uncategorised",
+    missingAttrs,
+    imageRows,
+    totalAttrCount: attrPool.length,
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -86,19 +106,20 @@ export function ScreenSupplierGapDetail({
   productName,
   retailer,
   selectionCode,
+  products,
   onBackToProducts,
   onBackToPartner,
   onBackToPartnerList,
 }: GapDetailProps) {
-  const isDillards = retailer === "Dillard's"
-  const missingAttrs = isDillards ? DILLARDS_MISSING_ATTRS : []
-  const imageRows = isDillards ? DILLARDS_IMAGES : BELK_IMAGES
+  // productName is the product ID passed from the product leaf.
+  const product = products.find((p) => p.id === productName)
+  const { productDescription, categoryLabel, missingAttrs, imageRows, totalAttrCount } =
+    deriveGapData(product, retailer)
 
-  const providedAttrCount = isDillards ? 4 : 7
-  const totalAttrCount = 7
+  const providedAttrCount = totalAttrCount - missingAttrs.length
   const providedImageCount = imageRows.filter((r) => r.provided).length
   const totalImageCount = imageRows.length
-  const gapCount = (totalAttrCount - providedAttrCount) + (totalImageCount - providedImageCount)
+  const gapCount = missingAttrs.length + (totalImageCount - providedImageCount)
   const isComplete = gapCount === 0
 
   return (
@@ -130,7 +151,7 @@ export function ScreenSupplierGapDetail({
           Code {selectionCode}
         </button>
         <span style={{ color: "#9CA3AF" }}>›</span>
-        <span className="font-light text-[#6B7280]">{productName}</span>
+        <span className="font-light text-[#6B7280]">{productDescription || productName}</span>
       </nav>
 
       {/* Header */}
@@ -139,7 +160,7 @@ export function ScreenSupplierGapDetail({
           Requirements Status &mdash; {retailer}
         </h1>
         <p className="text-sm font-light text-[#6B7280]">
-          {productName} &middot; Women&apos;s Dresses
+          {productDescription || productName} &middot; {categoryLabel}
         </p>
 
         {/* Summary strip */}
@@ -175,7 +196,7 @@ export function ScreenSupplierGapDetail({
           className="rounded-lg overflow-hidden"
           style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
         >
-          {isComplete || missingAttrs.length === 0 ? (
+          {missingAttrs.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-3">
               <Dot color="#16A34A" />
               <span className="text-sm font-light" style={{ color: "#15803D" }}>
@@ -263,9 +284,9 @@ export function ScreenSupplierGapDetail({
                     <td className="px-4 py-3 text-right align-top">
                       {!img.provided && (
                         <button
-                          className="px-3 py-1.5 rounded-md text-xs font-medium text-white transition-opacity hover:opacity-80 cursor-not-allowed opacity-60"
+                          className="px-3 py-1.5 rounded-md text-xs font-medium text-white cursor-not-allowed opacity-60"
                           style={{ backgroundColor: "#0168B3" }}
-                          onClick={() => {}}
+                          title="Out of scope for this prototype"
                           disabled
                         >
                           Upload Image

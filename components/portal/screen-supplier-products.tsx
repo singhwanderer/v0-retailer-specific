@@ -1,32 +1,29 @@
 "use client"
 
 import { useState } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { BadgeCheck, ChevronDown, Search, X } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import type { RetailerStatus, SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── Shared product leaf ───────────────────────────────────────────────────────
 // One product table, reached from two compliance targets:
-//   • retailer target — filtered by selection code, showing per-retailer gaps
+//   • retailer target — filtered by selection code, showing this partner's gaps
 //   • gs1 target       — filtered by category, showing GS1 baseline gaps
 // Both land here because the leaf ("a product + its compliance → gap detail")
 // is identical; only the filter axis and the compliance column differ.
 
 type ProductsTarget =
-  | { kind: "retailer"; partnerName: string; selectionCode: string }
+  | { kind: "retailer"; partnerName: string; selectionCode: string; brickCode: string }
   | { kind: "gs1" }
 
 interface SupplierProductsProps {
   target: ProductsTarget
   /** Shared supplier catalogue — the one source of truth */
   products: SupplierProduct[]
+  /** "Compliance" breadcrumb — back to the compliance list (L1) */
   onBack: () => void
+  /** Partner breadcrumb — back to this partner's selection codes (L2). Retailer target only. */
+  onBackToPartner?: () => void
   onNavigateToGapDetail: (productName: string, retailer: string) => void
   /** GS1 target only — route uncategorised products to the Catalogue */
   onGoToCatalogue?: () => void
@@ -36,7 +33,7 @@ type ProductRow = SupplierProduct
 
 const PAGE_SIZE = 8
 
-type StatusFilter = "all" | "gaps" | "complete" | "uncategorised"
+type StatusFilter = "all" | "gaps" | "complete"
 
 const CATEGORY_FILTERS = [
   { value: "all", label: "All categories" },
@@ -45,119 +42,34 @@ const CATEGORY_FILTERS = [
   { value: "uncategorised", label: "Uncategorised" },
 ]
 
-// ── Compliance summary modal (retailer target) ────────────────────────────────
-function ComplianceModal({
-  open,
-  onClose,
-  productId,
-  retailers,
-  onViewGap,
-}: {
-  open: boolean
-  onClose: () => void
-  productId: string
-  retailers: RetailerStatus[]
-  onViewGap: (retailer: string) => void
-}) {
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-[#111827]">
-            Compliance — {productId}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col divide-y" style={{ borderColor: "#F3F4F6" }}>
-          {retailers.map((rs) => {
-            const isComplete = rs.gaps === "complete"
-            return (
-              <div key={rs.retailer} className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: isComplete ? "#16A34A" : "#F59E0B" }}
-                  />
-                  <span className="text-sm font-medium text-[#111827]">{rs.retailer}</span>
-                  <span
-                    className="text-xs font-light"
-                    style={{ color: isComplete ? "#15803D" : "#92400E" }}
-                  >
-                    {isComplete ? "Complete" : `${rs.gaps} gaps`}
-                  </span>
-                </div>
-                {!isComplete && (
-                  <button
-                    onClick={() => { onViewGap(rs.retailer); onClose() }}
-                    className="text-xs font-medium hover:underline"
-                    style={{ color: "#0168B3" }}
-                  >
-                    View gaps
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 // ── Compliance trigger cell (retailer target) ─────────────────────────────────
+// The view is scoped to a single partner, so this shows only that partner's
+// status for the product — a gap count that drills into gap detail, or Complete.
 function ComplianceTrigger({
-  row,
-  onOpenModal,
+  status,
   onNavigateToGapDetail,
 }: {
-  row: ProductRow
-  onOpenModal: () => void
-  onNavigateToGapDetail: (retailer: string) => void
+  status?: RetailerStatus
+  onNavigateToGapDetail: () => void
 }) {
-  if (row.state === "uncategorised") return <span className="text-[#6B7280]">&mdash;</span>
-  if (!row.retailers || row.retailers.length === 0)
-    return <span className="text-sm font-light text-[#6B7280]">No requirements set</span>
+  if (!status) return <span className="text-sm font-light text-[#6B7280]">No requirements set</span>
 
-  const totalRetailers = row.retailers.length
-  const withGaps = row.retailers.filter((r) => r.gaps !== "complete").length
-  const allComplete = withGaps === 0
-
-  if (totalRetailers === 1) {
-    const rs = row.retailers[0]
-    const isComplete = rs.gaps === "complete"
-    return (
-      <button
-        onClick={() => !isComplete && onNavigateToGapDetail(rs.retailer)}
-        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-opacity ${!isComplete ? "hover:opacity-80 cursor-pointer" : "cursor-default"}`}
-        style={
-          isComplete
-            ? { backgroundColor: "#DCFCE7", color: "#15803D" }
-            : { backgroundColor: "#FEF3C7", color: "#92400E" }
-        }
-      >
-        <span
-          className="w-1.5 h-1.5 rounded-full shrink-0"
-          style={{ backgroundColor: isComplete ? "#16A34A" : "#F59E0B" }}
-        />
-        {rs.retailer} &mdash; {isComplete ? "Complete" : `${rs.gaps} gaps`}
-      </button>
-    )
-  }
-
+  const isComplete = status.gaps === "complete"
   return (
     <button
-      onClick={onOpenModal}
-      className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full hover:opacity-80 transition-opacity cursor-pointer"
+      onClick={() => !isComplete && onNavigateToGapDetail()}
+      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-opacity ${!isComplete ? "hover:opacity-80 cursor-pointer" : "cursor-default"}`}
       style={
-        allComplete
+        isComplete
           ? { backgroundColor: "#DCFCE7", color: "#15803D" }
           : { backgroundColor: "#FEF3C7", color: "#92400E" }
       }
     >
       <span
         className="w-1.5 h-1.5 rounded-full shrink-0"
-        style={{ backgroundColor: allComplete ? "#16A34A" : "#F59E0B" }}
+        style={{ backgroundColor: isComplete ? "#16A34A" : "#F59E0B" }}
       />
-      {totalRetailers} retailers &mdash; {allComplete ? "all complete" : `${withGaps} with gaps`}
+      {isComplete ? "Complete" : `${status.gaps} gap${status.gaps !== 1 ? "s" : ""}`}
     </button>
   )
 }
@@ -257,16 +169,24 @@ export function ScreenSupplierProducts({
   target,
   products,
   onBack,
+  onBackToPartner,
   onNavigateToGapDetail,
   onGoToCatalogue,
 }: SupplierProductsProps) {
   const isGs1 = target.kind === "gs1"
+  const partnerName = target.kind === "retailer" ? target.partnerName : ""
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [page, setPage] = useState(1)
-  const [modalProduct, setModalProduct] = useState<ProductRow | null>(null)
+
+  // In retailer mode, a product's compliance is only what THIS partner requires.
+  // Narrow each row's retailers to the target partner so badges, filters, and
+  // gap detail never surface another retailer's status inside this view.
+  function partnerStatus(row: ProductRow) {
+    return row.retailers?.find((r) => r.retailer === partnerName)
+  }
 
   // ── Filter logic (branches by target) ──────────────────────────────────────
   const filtered = products.filter((row) => {
@@ -275,19 +195,21 @@ export function ScreenSupplierProducts({
       if (categoryFilter === "uncategorised") return row.state === "uncategorised"
       return row.brickCode === categoryFilter
     }
+    // Retailer mode: only products in this selection code's category that this
+    // partner actually requires.
+    if (target.kind !== "retailer") return false
+    if (row.state !== "categorised") return false
+    if (row.brickCode !== target.brickCode) return false
+    const rs = partnerStatus(row)
+    if (!rs) return false
     const matchesSearch =
       search.trim() === "" ||
       row.id.toLowerCase().includes(search.toLowerCase()) ||
       row.description.toLowerCase().includes(search.toLowerCase())
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "uncategorised" && row.state === "uncategorised") ||
-      (statusFilter === "gaps" &&
-        row.state === "categorised" &&
-        row.retailers?.some((r) => r.gaps !== "complete")) ||
-      (statusFilter === "complete" &&
-        row.state === "categorised" &&
-        row.retailers?.every((r) => r.gaps === "complete"))
+      (statusFilter === "gaps" && rs.gaps !== "complete") ||
+      (statusFilter === "complete" && rs.gaps === "complete")
     return matchesSearch && matchesStatus
   })
 
@@ -295,7 +217,9 @@ export function ScreenSupplierProducts({
   const currentPage = Math.min(page, safePageSize)
   const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  const uncategorisedCount = products.filter((p) => p.state === "uncategorised").length
+  // Uncategorised products are only surfaced in the GS1 view — the retailer
+  // view is scoped to categorised products this partner requires.
+  const uncategorisedCount = isGs1 ? products.filter((p) => p.state === "uncategorised").length : 0
 
   // GS1: attribute chips for a single selected category
   const activeBrick =
@@ -320,7 +244,7 @@ export function ScreenSupplierProducts({
         ) : (
           <>
             <span style={{ color: "#9CA3AF" }}>›</span>
-            <button onClick={onBack} className="font-light hover:underline" style={{ color: "#0168B3" }}>
+            <button onClick={onBackToPartner} className="font-light hover:underline" style={{ color: "#0168B3" }}>
               {target.partnerName}
             </button>
             <span style={{ color: "#9CA3AF" }}>›</span>
@@ -354,7 +278,7 @@ export function ScreenSupplierProducts({
               {target.partnerName} &mdash; Code {target.selectionCode}
             </h1>
             <p className="text-sm font-light text-[#6B7280]">
-              {filtered.length} product{filtered.length !== 1 ? "s" : ""} in this selection code.
+              {filtered.length} product{filtered.length !== 1 ? "s" : ""} you supply {target.partnerName} under this code.
             </p>
           </>
         )}
@@ -409,7 +333,6 @@ export function ScreenSupplierProducts({
               { value: "all", label: "All" },
               { value: "gaps", label: "Has gaps" },
               { value: "complete", label: "Complete" },
-              { value: "uncategorised", label: "Uncategorised" },
             ] as { value: StatusFilter; label: string }[]).map((opt) => (
               <button
                 key={opt.value}
@@ -559,22 +482,10 @@ export function ScreenSupplierProducts({
                     <td className="px-4 py-3 align-top">
                       {isGs1 ? (
                         <Gs1Status row={row} />
-                      ) : isUncategorised ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-                          style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
-                        >
-                          <span
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: "#DC2626" }}
-                          />
-                          No category — unmet
-                        </span>
                       ) : (
                         <ComplianceTrigger
-                          row={row}
-                          onOpenModal={() => setModalProduct(row)}
-                          onNavigateToGapDetail={(retailer) => onNavigateToGapDetail(row.id, retailer)}
+                          status={partnerStatus(row)}
+                          onNavigateToGapDetail={() => onNavigateToGapDetail(row.id, partnerName)}
                         />
                       )}
                     </td>
@@ -598,16 +509,6 @@ export function ScreenSupplierProducts({
         </p>
       </div>
 
-      {/* Compliance modal (retailer target) */}
-      {modalProduct && (
-        <ComplianceModal
-          open={!!modalProduct}
-          onClose={() => setModalProduct(null)}
-          productId={modalProduct.id}
-          retailers={modalProduct.retailers ?? []}
-          onViewGap={(retailer) => onNavigateToGapDetail(modalProduct.id, retailer)}
-        />
-      )}
     </div>
   )
 }

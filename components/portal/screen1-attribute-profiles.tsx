@@ -9,16 +9,28 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { GS1_BRICKS, searchBricks, getSegments, type Gs1Brick } from "@/lib/gs1-standard-library"
-import { ATTRIBUTE_PROFILES } from "@/lib/retailer-requirements"
+import { GS1_BRICKS, searchBricks, getSegments, getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
+import { ATTRIBUTE_PROFILES, type AttributeProfile } from "@/lib/retailer-requirements"
 
 interface Screen1Props {
-  onNavigateToProfile: (brickCode?: string, brickName?: string, categoryName?: string) => void
+  onNavigateToProfile: (
+    brickCode?: string,
+    brickName?: string,
+    categoryName?: string,
+    status?: StatusType
+  ) => void
 }
 
-const categories = ATTRIBUTE_PROFILES
-
 type StatusType = "Active" | "Draft"
+
+// Core attributes every profile starts with, regardless of category (mirrors
+// the MCP demo store's BASELINE_CORE_ATTRIBUTES: GTIN code/description, NRF
+// color/size code). Used to estimate a new profile's attribute count.
+const BASELINE_CORE_COUNT = 4
+
+function today(): string {
+  return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
 
 const statusConfig: Record<StatusType, { bg: string; text: string; dot: string }> = {
   Active: { bg: "#DCFCE7", text: "#15803D", dot: "#16A34A" },
@@ -110,7 +122,7 @@ function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () => void 
 function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
   const steps = [
     { n: 1, label: "Name" },
-    { n: 2, label: "GS1 Brick" },
+    { n: 2, label: "GS1 Category" },
     { n: 3, label: "Preview" },
   ] as const
 
@@ -156,6 +168,7 @@ interface CreateRequirementResult {
   name: string
   brickCode: string | null
   brickName: string | null
+  initialStatus: StatusType
 }
 
 function CreateRequirementModal({
@@ -221,6 +234,7 @@ function CreateRequirementModal({
       name: reqName.trim(),
       brickCode: selectedBrick?.brickCode ?? null,
       brickName: selectedBrick?.brickName ?? null,
+      initialStatus,
     })
     reset()
     onClose()
@@ -280,11 +294,11 @@ function CreateRequirementModal({
           </div>
         )}
 
-        {/* ── Step 2: GS1 Brick Mapping ── */}
+        {/* ── Step 2: GS1 Category Mapping ── */}
         {step === 2 && (
           <div className="flex flex-col gap-3 py-1">
             <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>
-              Map <span className="font-medium text-[#111827]">{reqName}</span> to a GS1 standard brick. The standard extended attributes for that brick will be pre-loaded into your requirement.
+              Map <span className="font-medium text-[#111827]">{reqName}</span> to a GS1 standard category. The standard extended attributes for that category will be pre-loaded into your requirement.
             </p>
 
             {/* Search + segment filter */}
@@ -298,7 +312,7 @@ function CreateRequirementModal({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search brick name or code…"
+                  placeholder="Search category name or code…"
                   className="flex-1 text-sm outline-none bg-transparent text-[#111827] placeholder:text-[#9CA3AF]"
                 />
               </div>
@@ -320,7 +334,7 @@ function CreateRequirementModal({
               style={{ borderColor: "#E0E4E8", maxHeight: 240 }}
             >
               {filteredBricks.length === 0 ? (
-                <p className="px-4 py-3 text-sm" style={{ color: "#9CA3AF" }}>No bricks match your search.</p>
+                <p className="px-4 py-3 text-sm" style={{ color: "#9CA3AF" }}>No categories match your search.</p>
               ) : (
                 filteredBricks.map((brick) => {
                   const isSelected = selectedBrick?.brickCode === brick.brickCode
@@ -377,7 +391,7 @@ function CreateRequirementModal({
               <p className="text-xs" style={{ color: "#9CA3AF" }}>
                 {selectedBrick
                   ? <>Selected: <span className="font-medium text-[#0168B3]">{selectedBrick.brickName}</span></>
-                  : "No brick selected"}
+                  : "No category selected"}
               </p>
               <button
                 onClick={handleSkip}
@@ -401,7 +415,7 @@ function CreateRequirementModal({
                   style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
                 >
                   <div className="flex-1">
-                    <p className="text-xs font-medium text-[#0168B3]">GS1 Brick Mapping</p>
+                    <p className="text-xs font-medium text-[#0168B3]">GS1 Category Mapping</p>
                     <p className="text-sm font-semibold text-[#111827] mt-0.5">
                       {selectedBrick.brickName}
                     </p>
@@ -466,7 +480,7 @@ function CreateRequirementModal({
                 <div className="text-center">
                   <p className="text-sm font-medium text-[#111827]">No standard attributes pre-loaded</p>
                   <p className="text-xs mt-1 leading-relaxed" style={{ color: "#6B7280" }}>
-                    You skipped the GS1 brick mapping. You can add attributes manually after the requirement is created.
+                    You skipped the GS1 category mapping. You can add attributes manually after the requirement is created.
                   </p>
                 </div>
               </div>
@@ -594,6 +608,7 @@ function ConfirmActionModal({
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) {
+  const [categories, setCategories] = useState<AttributeProfile[]>(ATTRIBUTE_PROFILES)
   const [importOpen, setImportOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -608,9 +623,15 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
     setTimeout(() => setToast(null), 3500)
   }
 
-  function handleAction(action: string, name: string, brickCode?: string, brickName?: string) {
+  function handleAction(
+    action: string,
+    name: string,
+    brickCode?: string,
+    brickName?: string,
+    status?: StatusType
+  ) {
     if (action === "Edit") {
-      onNavigateToProfile(brickCode, brickName, name)
+      onNavigateToProfile(brickCode, brickName, name, status)
       return
     }
     if (action === "Deactivate" || action === "Activate") {
@@ -620,15 +641,36 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
 
   function handleConfirm() {
     const { action, name } = confirmState
+    if (!action) return
+    const newStatus: StatusType = action === "Activate" ? "Active" : "Draft"
+    const newActions = action === "Activate" ? ["Edit", "Deactivate"] : ["Edit", "Activate"]
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.name === name ? { ...c, status: newStatus, actions: newActions, lastUpdated: today() } : c
+      )
+    )
     if (action === "Deactivate") showToast(`"${name}" has been deactivated.`)
     if (action === "Activate") showToast(`"${name}" is now active.`)
   }
 
-  function handleCreated(result: { name: string; brickCode: string | null; brickName: string | null }) {
+  function handleCreated(result: CreateRequirementResult) {
     const brickLabel = result.brickName ? ` mapped to ${result.brickName}` : ""
-    showToast(`"${result.name}" created as Draft${brickLabel}.`)
+    showToast(`"${result.name}" created as ${result.initialStatus}${brickLabel}.`)
+    const extendedCount = result.brickCode ? getBrickByCode(result.brickCode)?.extendedAttributes.length ?? 0 : 0
+    const newProfile: AttributeProfile = {
+      name: result.name,
+      category: result.brickName ?? result.name,
+      attributes: `${BASELINE_CORE_COUNT + extendedCount} attributes`,
+      status: result.initialStatus,
+      lastUpdated: today(),
+      actions: result.initialStatus === "Active" ? ["Edit", "Deactivate"] : ["Edit", "Activate"],
+      isLink: true,
+      brickCode: result.brickCode ?? "",
+      brickName: result.brickName ?? "",
+    }
+    setCategories((prev) => [...prev, newProfile])
     // Navigate immediately into the new requirement's profile, passing the retailer's category name
-    onNavigateToProfile(result.brickCode ?? undefined, result.brickName ?? undefined, result.name)
+    onNavigateToProfile(result.brickCode ?? undefined, result.brickName ?? undefined, result.name, result.initialStatus)
   }
 
   return (
@@ -670,7 +712,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F4F6F8" }}>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[22%]">Category</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[18%]">Product Type</th>
-              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[20%]">GS1 Brick</th>
+              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[20%]">GS1 Category</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[16%]">Requirements</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[10%]">Status</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[10%]">Last Updated</th>
@@ -686,7 +728,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
               >
                 <td className="px-4 py-3.5">
                   <button
-                    onClick={() => onNavigateToProfile(cat.brickCode, cat.brickName, cat.name)}
+                    onClick={() => onNavigateToProfile(cat.brickCode, cat.brickName, cat.name, cat.status)}
                     className="font-medium hover:underline text-left cursor-pointer"
                     style={{ color: "#0168B3" }}
                   >
@@ -710,7 +752,7 @@ export function Screen1AttributeProfiles({ onNavigateToProfile }: Screen1Props) 
                     {cat.actions.map((action, i) => (
                       <span key={action} className="flex items-center gap-3">
                         <button
-                          onClick={() => handleAction(action, cat.name, cat.brickCode, cat.brickName)}
+                          onClick={() => handleAction(action, cat.name, cat.brickCode, cat.brickName, cat.status)}
                           className="transition-colors cursor-pointer"
                           style={{ color: action === "Deactivate" ? "#DC2626" : "#6B7280" }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = action === "Deactivate" ? "#991B1B" : "#111827")}

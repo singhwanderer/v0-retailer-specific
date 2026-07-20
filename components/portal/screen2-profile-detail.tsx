@@ -53,24 +53,26 @@ const gs1Catalogue = [
 ]
 
 // ── Seeded data ───────────────────────────────────────────────────────────────
-const initialCoreRows: AttributeRow[] = [
+// Baseline core attributes every profile starts with, regardless of category
+// (mirrors the MCP demo store's BASELINE_CORE_ATTRIBUTES).
+const BASELINE_CORE_ROWS: AttributeRow[] = [
   { retailerName: "GTIN code", tgcGs1Name: "GTIN code", guidance: "", source: "standard" },
   { retailerName: "GTIN Description", tgcGs1Name: "GTIN Description", guidance: "Max 35 characters. Plain language product name.", source: "standard" },
   { retailerName: "NRF Color Code", tgcGs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide.", source: "standard" },
   { retailerName: "NRF Size Code", tgcGs1Name: "NRF Size Code", guidance: "Primary and secondary codes both required.", source: "standard" },
+]
+
+// Footwear (GS1 brick 10005811) ships with two retailer-added custom core
+// rows on top of the baseline, plus a Hero Shot image requirement — matching
+// the seeded data in lib/mcp/store.ts's profileExtras for that brick. Every
+// other category starts from the baseline only.
+const FOOTWEAR_CORE_ROWS: AttributeRow[] = [
+  ...BASELINE_CORE_ROWS,
   { retailerName: "Color Description", tgcGs1Name: "Color Description", guidance: "Max 10 characters. All caps.", source: "custom" },
   { retailerName: "Size Description", tgcGs1Name: "Size Description", guidance: "", source: "custom" },
 ]
 
-const initialExtendedRows: AttributeRow[] = [
-  { retailerName: "Heel Type", tgcGs1Name: "Heel Type (GM03HLTY)", guidance: "", source: "standard" },
-  { retailerName: "Toe Shape", tgcGs1Name: "Toe Shape (GM03TOES)", guidance: "", source: "standard" },
-  { retailerName: "Outsole Type", tgcGs1Name: "Outsole Type (GM03OUTS)", guidance: "", source: "standard" },
-  { retailerName: "Lining Material", tgcGs1Name: "Lining Material (GM03LIMT)", guidance: "", source: "standard" },
-  { retailerName: "Closure", tgcGs1Name: "Closure (GM03CLOS)", guidance: "", source: "standard" },
-]
-
-const initialImageRows: ImageRequirementRow[] = [
+const FOOTWEAR_IMAGE_ROWS: ImageRequirementRow[] = [
   {
     requirementName: "Hero Shot",
     format: "JPEG",
@@ -81,6 +83,9 @@ const initialImageRows: ImageRequirementRow[] = [
     guidanceNote: "No mannequin, no props.",
   },
 ]
+
+const FOOTWEAR_BRICK_CODE = "10005811"
+type ProfileStatus = "Active" | "Draft"
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
@@ -216,17 +221,6 @@ function EditAttributeDialog({
   const [retailerName, setRetailerName] = useState(row?.retailerName ?? "")
   const [guidance, setGuidance] = useState(row?.guidance ?? "")
 
-  // Sync form when row changes (different row opened)
-  if (row && retailerName === "" && row.retailerName !== "") {
-    setRetailerName(row.retailerName)
-    setGuidance(row.guidance)
-  }
-
-  function handleOpen() {
-    setRetailerName(row?.retailerName ?? "")
-    setGuidance(row?.guidance ?? "")
-  }
-
   function handleSave() {
     if (!row || !retailerName.trim()) return
     onSave({ ...row, retailerName: retailerName.trim(), guidance: guidance.trim() })
@@ -234,13 +228,7 @@ function EditAttributeDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (o) handleOpen()
-        else onClose()
-      }}
-    >
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold text-[#111827]">
@@ -873,11 +861,13 @@ function CategorySummaryCard({
   extendedCount,
   imageCount,
   brickMapping,
+  categoryName,
 }: {
   coreCount: number
   extendedCount: number
   imageCount: number
   brickMapping?: { code: string; name: string } | null
+  categoryName: string
 }) {
   return (
     <div
@@ -893,7 +883,7 @@ function CategorySummaryCard({
           style={{ backgroundColor: brickMapping ? "#EFF6FF" : "#F4F6F8" }}
         >
           <span className="text-[10px] font-medium leading-tight" style={{ color: brickMapping ? "#0168B3" : "#9CA3AF" }}>
-            GS1 Brick Mapping
+            GS1 Category Mapping
           </span>
           {brickMapping ? (
             <>
@@ -933,7 +923,7 @@ function CategorySummaryCard({
               className="w-2 h-2 rounded-full mt-0.5 shrink-0"
               style={{ backgroundColor: "#16A34A" }}
             />
-            Visible to all Dillard&apos;s suppliers in the Footwear category.
+            Visible to all Dillard&apos;s suppliers in the {categoryName} category.
           </div>
         </div>
       </div>
@@ -949,6 +939,8 @@ interface Screen2Props {
   initialCategoryName?: string
   /** Standard extended attributes seeded from the GS1 brick, if one was selected */
   initialBrickExtendedRows?: AttributeRow[]
+  /** The profile's status when opened — drives the status pill shown here */
+  initialStatus?: ProfileStatus
 }
 
 export function Screen2ProfileDetail({
@@ -956,18 +948,25 @@ export function Screen2ProfileDetail({
   brickMapping,
   initialCategoryName,
   initialBrickExtendedRows,
+  initialStatus,
 }: Screen2Props) {
-  const [coreRows, setCoreRows] = useState<AttributeRow[]>(initialCoreRows)
-  const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(
-    initialBrickExtendedRows ?? initialExtendedRows
+  const isFootwear = brickMapping?.code === FOOTWEAR_BRICK_CODE
+  const [coreRows, setCoreRows] = useState<AttributeRow[]>(
+    isFootwear ? FOOTWEAR_CORE_ROWS : BASELINE_CORE_ROWS
   )
-  const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(initialImageRows)
+  const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(initialBrickExtendedRows ?? [])
+  const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(
+    isFootwear ? FOOTWEAR_IMAGE_ROWS : []
+  )
 
   const [addAttrTarget, setAddAttrTarget] = useState<AddAttrTarget>(null)
   const [addImageOpen, setAddImageOpen] = useState(false)
   const [deactivateOpen, setDeactivateOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
-  const [categoryName, setCategoryName] = useState(initialCategoryName ?? "Footwear")
+  const [categoryName, setCategoryName] = useState(
+    initialCategoryName ?? brickMapping?.name ?? "New Category"
+  )
+  const [status] = useState<ProfileStatus>(initialStatus ?? "Active")
   const [toast, setToast] = useState<string | null>(null)
 
   // Edit attribute row state
@@ -1035,10 +1034,17 @@ export function Screen2ProfileDetail({
               </h1>
               <span
                 className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{ backgroundColor: "#DCFCE7", color: "#15803D" }}
+                style={
+                  status === "Active"
+                    ? { backgroundColor: "#DCFCE7", color: "#15803D" }
+                    : { backgroundColor: "#FEF3C7", color: "#92400E" }
+                }
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                Active
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: status === "Active" ? "#16A34A" : "#F59E0B" }}
+                />
+                {status}
               </span>
               <button
                 onClick={() => setRenameOpen(true)}
@@ -1049,7 +1055,8 @@ export function Screen2ProfileDetail({
               </button>
             </div>
             <p className="text-xs" style={{ color: "#6B7280" }}>
-              Category: Footwear · {coreRows.length + extendedRows.length} attributes required
+              {brickMapping ? `GS1 Category: ${brickMapping.name} · ` : ""}
+              {coreRows.length + extendedRows.length} attributes required
             </p>
           </div>
 
@@ -1130,6 +1137,7 @@ export function Screen2ProfileDetail({
             extendedCount={extendedRows.length}
             imageCount={imageRows.length}
             brickMapping={brickMapping}
+            categoryName={categoryName}
           />
         </div>
       </div>
@@ -1146,6 +1154,7 @@ export function Screen2ProfileDetail({
         onAdd={(row) => setImageRows((r) => [...r, row])}
       />
       <EditAttributeDialog
+        key={editAttrState.open ? `edit-attr-${editAttrState.target}-${editAttrState.idx}` : "edit-attr-closed"}
         open={editAttrState.open}
         row={
           editAttrState.target === "core"

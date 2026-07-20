@@ -6,6 +6,8 @@
 // updates the compliance counts and product lists everywhere, instead of each
 // screen keeping its own copy that can drift out of agreement.
 
+import { getBrickByCode } from "@/lib/gs1-standard-library"
+
 export type RetailerStatus = {
   retailer: string
   gaps: number | "complete"
@@ -222,4 +224,63 @@ export function assignCategory(
         }
       : p
   )
+}
+
+// ── Selection codes ───────────────────────────────────────────────────────────
+// A "Product/Selection Code" groups the supplier's products under one retailer
+// by GS1 category. Derived live from the shared product store — rather than a
+// separately hardcoded list — so the code's product count and gap totals can
+// never drift from what the product leaf and gap detail actually show.
+
+export type SelectionCodeSummary = {
+  id: string
+  brickCode: string
+  label: string
+  products: number
+  gaps: number
+  complete: number
+}
+
+/** All selection codes (one per GS1 category) this partner has products under. */
+export function getSelectionCodesForPartner(
+  products: SupplierProduct[],
+  partnerName: string
+): SelectionCodeSummary[] {
+  const byBrick = new Map<string, SupplierProduct[]>()
+  for (const p of products) {
+    if (p.state !== "categorised" || !p.brickCode) continue
+    if (!p.retailers?.some((r) => r.retailer === partnerName)) continue
+    const list = byBrick.get(p.brickCode) ?? []
+    list.push(p)
+    byBrick.set(p.brickCode, list)
+  }
+  return [...byBrick.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([brickCode, rows], i) => {
+      let gaps = 0
+      let complete = 0
+      for (const p of rows) {
+        const rs = p.retailers!.find((r) => r.retailer === partnerName)!
+        if (rs.gaps === "complete") complete += 1
+        else gaps += rs.gaps
+      }
+      return {
+        id: String(i + 1).padStart(3, "0"),
+        brickCode,
+        label: getBrickByCode(brickCode)?.brickName ?? brickCode,
+        products: rows.length,
+        gaps,
+        complete,
+      }
+    })
+}
+
+/** Aggregate code/gap/complete totals for a partner, for the Compliance list. */
+export function getPartnerSummary(products: SupplierProduct[], partnerName: string) {
+  const codes = getSelectionCodesForPartner(products, partnerName)
+  return {
+    codes: codes.length,
+    gaps: codes.reduce((sum, c) => sum + c.gaps, 0),
+    complete: codes.reduce((sum, c) => sum + c.complete, 0),
+  }
 }

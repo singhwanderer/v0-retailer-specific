@@ -9,14 +9,13 @@ import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-li
 import { SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
   type AttributeProfile,
-  type ExceptionRow,
-  type ExceptionType,
   type ProfileStatus,
 } from "@/lib/retailer-requirements"
 import {
   BASELINE_CORE_ATTRIBUTES,
   getProfileExtras,
   getStore,
+  readProfileExtras,
   type AttributeRequirement,
   type ImageRequirement,
 } from "@/lib/mcp/store"
@@ -63,9 +62,10 @@ export function getProfileDetail(brickCode: string) {
   const profile = getStore().profiles.find((p) => p.brickCode === brickCode)
   const brick = getBrickByCode(brickCode)
   if (!profile && !brick) {
-    return { error: `No attribute profile or GS1 brick found for brick code ${brickCode}. Use search_gs1_bricks or list_attribute_profiles to find valid codes.` }
+    return { error: `No attribute profile or GS1 category found for category code ${brickCode}. Use search_gs1_bricks or list_attribute_profiles to find valid codes.` }
   }
-  const extras = getProfileExtras(brickCode)
+  // Read-only: inspecting a profile must never create store state.
+  const extras = readProfileExtras(brickCode)
   const standardExtended: AttributeRequirement[] = (brick?.extendedAttributes ?? []).map((a) => ({
     name: a.name,
     gs1Name: `${a.name} (${a.code})`,
@@ -74,7 +74,7 @@ export function getProfileDetail(brickCode: string) {
     target: "extended",
   }))
   return {
-    profile: profile ?? { note: "No retailer profile created yet for this brick", brickCode, brickName: brick?.brickName },
+    profile: profile ?? { note: "No retailer profile created yet for this GS1 category", brickCode, brickName: brick?.brickName },
     coreAttributes: [
       ...BASELINE_CORE_ATTRIBUTES,
       ...extras.customAttributes.filter((a) => a.target === "core"),
@@ -137,28 +137,6 @@ export function listVendorGaps(vendor?: string) {
   return sorted
 }
 
-export function listVendorExceptions(status?: ExceptionRow["status"], vendor?: string) {
-  const q = vendor?.toLowerCase().trim()
-  const all = getStore().exceptions
-  const matches = all.filter(
-    (e) => (!status || e.status === status) && (!q || e.vendor.toLowerCase().includes(q))
-  )
-  if (matches.length === 0 && (q || status)) {
-    const knownVendors = [...new Set(all.map((e) => e.vendor))].sort()
-    const availableStatuses = [...new Set(all.map((e) => e.status))]
-    const criteria = [q ? `vendor "${vendor}"` : "", status ? `status "${status}"` : ""]
-      .filter(Boolean)
-      .join(" and ")
-    return {
-      matches: [],
-      knownVendors,
-      availableStatuses,
-      note: `No exceptions matched ${criteria}. Vendors with exceptions on record: ${knownVendors.join(", ")}. Statuses in use: ${availableStatuses.join(", ")}.`,
-    }
-  }
-  return matches
-}
-
 // Plain-English catalog of what this connector can do, plus a live snapshot of
 // the demo data so the model can answer "what can I ask?" without guessing.
 // Built from the store, so it never drifts from the actual seeded data.
@@ -199,19 +177,11 @@ export function getCapabilities() {
           "Require a lifestyle image on Handbags, JPEG, white background.",
         ],
       },
-      manageExceptions: {
-        summary: "Review and grant vendor exceptions (waivers, extended deadlines, reduced scope).",
-        examples: [
-          "Show all active vendor exceptions.",
-          "Give Nike a 60-day extension on Compression Level.",
-        ],
-      },
     },
     writeActions: [
       "create_attribute_profile",
       "add_attribute_requirement",
       "set_image_requirement",
-      "create_vendor_exception",
     ],
     liveSnapshot: {
       attributeProfiles: store.profiles.map((p) => ({
@@ -221,7 +191,6 @@ export function getCapabilities() {
         brickCode: p.brickCode,
       })),
       retailPartnersWithComplianceData: knownRetailPartners(),
-      vendorsWithExceptions: [...new Set(store.exceptions.map((e) => e.vendor))].sort(),
       categoriesWithSupplierData: categoriesWithData,
       gs1Segments: getSegments(),
     },
@@ -234,12 +203,12 @@ export function getCapabilities() {
 export function createAttributeProfile(categoryName: string, brickCode: string) {
   const brick = getBrickByCode(brickCode)
   if (!brick) {
-    return { error: `Unknown GS1 brick code ${brickCode}. Use search_gs1_bricks to find the right brick first.` }
+    return { error: `Unknown GS1 category code ${brickCode}. Use search_gs1_bricks to find the right category first.` }
   }
   const store = getStore()
   const existing = store.profiles.find((p) => p.brickCode === brickCode)
   if (existing) {
-    return { error: `A profile for brick ${brickCode} (${existing.name}) already exists. Use add_attribute_requirement or set_image_requirement to extend it.` }
+    return { error: `A profile for GS1 category ${brickCode} (${existing.name}) already exists. Use add_attribute_requirement or set_image_requirement to extend it.` }
   }
   const profile: AttributeProfile = {
     name: categoryName,
@@ -260,14 +229,26 @@ export function createAttributeProfile(categoryName: string, brickCode: string) 
   }
 }
 
+// A write may only extend a profile that actually exists — otherwise the store
+// silently grows extras for a category the retailer never set up.
+function requireProfile(brickCode: string) {
+  const profile = getStore().profiles.find((p) => p.brickCode === brickCode)
+  if (!profile) {
+    return {
+      error: `No attribute profile exists for GS1 category ${brickCode}. Create one first with create_attribute_profile, then add requirements to it.`,
+    }
+  }
+  return null
+}
+
 export function addAttributeRequirement(
   brickCode: string,
   attributeName: string,
   target: "core" | "extended",
   guidance?: string
 ) {
-  const detail = getProfileDetail(brickCode)
-  if ("error" in detail) return detail
+  const missing = requireProfile(brickCode)
+  if (missing) return missing
   const extras = getProfileExtras(brickCode)
   const requirement: AttributeRequirement = {
     name: attributeName,
@@ -281,8 +262,8 @@ export function addAttributeRequirement(
 }
 
 export function setImageRequirement(brickCode: string, requirement: ImageRequirement) {
-  const detail = getProfileDetail(brickCode)
-  if ("error" in detail) return detail
+  const missing = requireProfile(brickCode)
+  if (missing) return missing
   const extras = getProfileExtras(brickCode)
   const idx = extras.imageRequirements.findIndex(
     (r) => r.requirementName.toLowerCase() === requirement.requirementName.toLowerCase()
@@ -295,22 +276,6 @@ export function setImageRequirement(brickCode: string, requirement: ImageRequire
     profileBrickCode: brickCode,
     demo_note: DEMO_NOTE,
   }
-}
-
-export function createVendorException(args: {
-  vendor: string
-  profile: string
-  exceptionType: ExceptionType
-  attributes: string[]
-  validUntil: string
-}) {
-  const exception: ExceptionRow = {
-    ...args,
-    status: "Active",
-    actions: ["Edit", "Revoke"],
-  }
-  getStore().exceptions.push(exception)
-  return { created: exception, demo_note: DEMO_NOTE }
 }
 
 function today(): string {
