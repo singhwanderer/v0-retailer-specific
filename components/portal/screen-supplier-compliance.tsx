@@ -20,7 +20,6 @@ interface SupplierComplianceProps {
   products: SupplierProduct[]
   onSelectGs1: () => void
   onSelectPartner: (partnerId: string, partnerName: string) => void
-  onGoToCatalogue?: () => void
 }
 
 type Partner = {
@@ -119,7 +118,6 @@ export function ScreenSupplierCompliance({
   products,
   onSelectGs1,
   onSelectPartner,
-  onGoToCatalogue,
 }: SupplierComplianceProps) {
   // GS1 row-zero status derived live from the shared catalogue
   const gs1Stats = {
@@ -246,26 +244,16 @@ export function ScreenSupplierCompliance({
                     <ReadinessCell completion={completion} />
                   </td>
                   <td className="px-4 py-3 align-middle">
-                    <div className="flex flex-col items-start gap-1.5">
-                      <button
-                        onClick={() => onSelectPartner(partner.id, partner.name)}
-                        className="text-left"
-                      >
-                        <ComplianceSummary
-                          gaps={summary.gaps}
-                          complete={summary.complete}
-                          total={summary.codes}
-                        />
-                      </button>
-                      {gs1Stats.uncategorised > 0 && onGoToCatalogue && (
-                        <button onClick={onGoToCatalogue} className="hover:opacity-80 transition-opacity">
-                          <Pill
-                            tone="amber"
-                            label={`${gs1Stats.uncategorised} uncategorised (account-wide)`}
-                          />
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => onSelectPartner(partner.id, partner.name)}
+                      className="text-left"
+                    >
+                      <ComplianceSummary
+                        gaps={summary.gaps}
+                        complete={summary.complete}
+                        total={summary.codes}
+                      />
+                    </button>
                   </td>
                 </tr>
               )

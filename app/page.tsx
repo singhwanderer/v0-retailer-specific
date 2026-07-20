@@ -336,7 +336,6 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   onSelectGs1={handleSelectGs1}
                   onSelectPartner={handleSelectPartner}
-                  onGoToCatalogue={goToCatalogueWithUncategorised}
                 />
               )}
 
@@ -367,7 +366,6 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   onBack={handleBackToPartnerList}
                   onSelectCode={handleSelectCode}
-                  onGoToCatalogue={goToCatalogueWithUncategorised}
                 />
               )}
 

@@ -28,13 +28,13 @@ Entry: the **Supplier** persona → *Compliance*. A drill-down:
 1. **Compliance list** — `components/portal/screen-supplier-compliance.tsx`. A table of
    targets: **row zero = GS1 Standard (Baseline)**, then one row per retailer (Dillard's,
    Belk, Nordstrom, Macy's, Saks, Bloomingdale's). Each row shows requirements summary,
-   the **% Ready** cell, and a status pill (raw gaps / complete counts). Every retailer row
-   also shows an amber "N uncategorised (account-wide)" pill whenever any product lacks a
-   category, linking to the Catalogue's assign/enrich actions — not just the GS1 row.
+   the **% Ready** cell, and a status pill (raw gaps / complete counts). The row-zero pill
+   also flags uncategorised products (see §5) — retailer rows don't repeat it, since it's
+   not a fact about any one retailer.
 2. **Selection codes** — `screen-supplier-selection-codes.tsx`. Per-retailer, the
-   supplier's products grouped by GS1 category (one code per brick). A red banner surfaces
-   the account-wide uncategorised count here too (see §4a) — until this release, a product
-   missing a category was invisible one level above the Product screen.
+   supplier's products grouped by GS1 category (one code per brick). Scoped entirely to
+   categorised products under that retailer — deliberately has no uncategorised messaging
+   of its own (see §5).
 3. **Product leaf** — `screen-supplier-products.tsx`. Products under a code/target with a
    per-product compliance badge. Also the **categorisation** on-ramp (assign a GS1 brick;
    hands off to the external AI enrichment flow, which is out of scope here).
@@ -66,27 +66,28 @@ Implementation: `getTargetCompletion(products, target)` and `getCategory(product
 `lib/supplier-catalogue.ts`; rendered by `ReadinessCell` in the compliance screen. The
 existing raw gap/complete pills are kept — the % is additive.
 
-## 5. Uncategorised visibility, one level above Products (this release)
+## 5. Uncategorised visibility — deliberately not shown inside a retailer's screens
 
 Products without a category are **account-wide** (they have no `brickCode` and no
 `retailers[]` entries yet, so they can't be attributed to a specific retailer or selection
-code). Previously this was only surfaced on the GS1 row of the Compliance list and inside
-the GS1 product leaf — invisible from the Selection Codes screen, one level above the
-Product screen, and invisible on retailer rows.
+code). An earlier pass tried surfacing this inside a specific retailer's Selection Codes
+screen and as a repeated pill on every retailer row in the Compliance list — both were
+reverted: burying an account-wide fact inside one retailer's drill-down means a supplier
+who never opens that particular retailer never sees it, and it misrepresents the fact as
+if it belonged to that retailer specifically.
 
-This release adds:
-- A red banner on `screen-supplier-selection-codes.tsx` (same visual pattern as the
-  existing GS1-mode banner in `screen-supplier-products.tsx`) whenever
-  `countUncategorised(products) > 0`: *"N products without a category. This is
-  account-wide, not specific to {partner}. Click here to use AI to enrich your selection
-  codes, or manually add a category to the classification fields in GTIN attributes."*
-- An amber "N uncategorised (account-wide)" pill on every retailer row in the Compliance
-  list, not just the GS1 row.
+The fact has two correct, already-global homes instead, both untouched by that revert:
+- The **GS1 row-zero pill** on the Compliance list (`screen-supplier-compliance.tsx`) —
+  the first row rendered on the supplier persona's **default landing screen**
+  (`app/page.tsx`'s `supplierScreen` state initializes to `"compliance"`), so it's seen
+  regardless of which retailer someone opens, or whether they open one at all.
+- The **Catalogue screen** (`screen-supplier-catalogue.tsx`) — explicitly retailer-agnostic
+  ("Your products, independent of any retailer"), always reachable via the sidebar's
+  "Products" item, already showing "X of Y products categorised" and "Select all
+  uncategorised (N)."
 
-Both link to the same `goToCatalogueWithUncategorised()` handler (`app/page.tsx`) already
-used by the GS1 leaf — it pre-selects every uncategorised product and opens the Catalogue
-screen, where the existing "Assign Category" (manual) and "Send to AI Attributes
-Enrichment" (hand-off) actions both apply.
+Both route to the same categorisation actions (manual "Assign Category" / "Send to AI
+Attributes Enrichment" hand-off) that live on the Catalogue screen.
 
 ## 6. Data model
 
@@ -111,8 +112,8 @@ denominator (a future extension).
 - **complete(product, target)** = `target === "gs1" ? gs1Gaps === 0 : retailerEntry.gaps === "complete"`.
 - **category(product)** = `getBrickByCode(product.brickCode).segment`.
 - **pct(target)** = complete products / assessable products, and the same per category.
-- **uncategorised(products)** = `countUncategorised(products)` — account-wide, shown
-  identically on every retailer row and on the Selection Codes screen (§5).
+- **uncategorised(products)** = `countUncategorised(products)` — account-wide, shown on
+  the Compliance list's GS1 row and on the Catalogue screen only (§5), not per retailer.
 
 ## 8. Design intent
 
@@ -120,9 +121,9 @@ The compliance view is built around one idea: **the GS1 brick code is the pivot 
 many retailers assess one product.** GS1 Standard is "row zero" — the baseline every
 product is assessed against before any retailer relationship even exists — with each
 retailer's requirements framed as "GS1 baseline + N extras." Categorisation is the gateway
-task (nothing else works until a product has a GS1 brick), which is why this release
-extends uncategorised visibility further up the funnel (§5) instead of leaving it a dead
-end below the Product screen. Progress-oriented framing (a headline **% ready** alongside
+task (nothing else works until a product has a GS1 brick), which is why its visibility is
+kept to the two account-wide touchpoints (§5) rather than scattered into every retailer's
+own screens. Progress-oriented framing (a headline **% ready** alongside
 raw counts) is deliberate: it reads as forward motion, and filling a GS1-baseline gap
 visibly advances every retailer at once — the concrete payoff of "comply once, benefit
 everywhere." (See the README's "Supplier view design intent" section for the fuller

@@ -1,7 +1,7 @@
 "use client"
 
 import { Download } from "lucide-react"
-import { countUncategorised, getSelectionCodesForPartner, type SupplierProduct } from "@/lib/supplier-catalogue"
+import { getSelectionCodesForPartner, type SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── CSV generation ────────────────────────────────────────────────────────────
 // Columns: Product ID, Description, Category, Category Brick Code (GS1),
@@ -66,7 +66,6 @@ interface SelectionCodeListProps {
   products: SupplierProduct[]
   onBack: () => void
   onSelectCode: (codeId: string, codeLabel: string, brickCode: string) => void
-  onGoToCatalogue?: () => void
 }
 
 function GapBadge({ gaps, complete, total }: { gaps: number; complete: number; total: number }) {
@@ -94,10 +93,8 @@ export function ScreenSupplierSelectionCodes({
   products,
   onBack,
   onSelectCode,
-  onGoToCatalogue,
 }: SelectionCodeListProps) {
   const codes = getSelectionCodesForPartner(products, partnerName)
-  const uncategorisedCount = countUncategorised(products)
 
   return (
     <div className="p-8 flex flex-col gap-6">
@@ -122,41 +119,6 @@ export function ScreenSupplierSelectionCodes({
           view and manage compliance for those products.
         </p>
       </div>
-
-      {/* Uncategorised banner — account-wide, since products without a category
-          aren't tied to any retailer (or selection code) yet */}
-      {uncategorisedCount > 0 && (
-        <div
-          className="flex items-start gap-3 px-4 py-3 rounded-lg justify-between flex-wrap"
-          style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA" }}
-        >
-          <div className="flex items-start gap-3">
-            <span
-              className="mt-0.5 w-2 h-2 rounded-full shrink-0 animate-pulse"
-              style={{ backgroundColor: "#DC2626" }}
-            />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-semibold" style={{ color: "#991B1B" }}>
-                {uncategorisedCount} product{uncategorisedCount !== 1 ? "s" : ""} without a category
-              </span>
-              <span className="text-xs font-light leading-relaxed" style={{ color: "#B91C1C" }}>
-                This is account-wide, not specific to {partnerName}. Click here to use AI to enrich
-                your selection codes, or manually add a category to the classification fields in
-                GTIN attributes.
-              </span>
-            </div>
-          </div>
-          {onGoToCatalogue && (
-            <button
-              onClick={onGoToCatalogue}
-              className="px-3 py-1.5 rounded-md text-xs font-medium text-white hover:opacity-90 transition-opacity self-center"
-              style={{ backgroundColor: "#DC2626" }}
-            >
-              Enrich or assign categories in Catalogue
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Table */}
       <div
