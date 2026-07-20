@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { TopNav } from "@/components/portal/top-nav"
+import { WelcomeOverlay } from "@/components/portal/welcome-overlay"
 import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
@@ -17,6 +18,7 @@ import {
   assignCategory,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
+import { ATTRIBUTE_PROFILES, type AttributeProfile } from "@/lib/retailer-requirements"
 
 type Perspective = "retailer" | "supplier"
 
@@ -45,18 +47,57 @@ function DashboardPlaceholder() {
   )
 }
 
+const WELCOME_DISMISSED_KEY = "tgc-proto-welcome-dismissed"
+const TOGGLE_HINT_DISMISSED_KEY = "tgc-proto-toggle-hint-dismissed"
+
 export default function RetailerPortal() {
   const [perspective, setPerspective] = useState<Perspective>("retailer")
+
+  // ── Orientation: welcome overlay + one-time persona-toggle hint ─────────────
+  // Both persist their dismissal in localStorage so the prototype orients a
+  // cold viewer once, then gets out of the way on return visits.
+  const [welcomeOpen, setWelcomeOpen] = useState(false)
+  const [showToggleHint, setShowToggleHint] = useState(false)
+
+  useEffect(() => {
+    const welcomeDismissed = localStorage.getItem(WELCOME_DISMISSED_KEY) === "1"
+    const hintDismissed = localStorage.getItem(TOGGLE_HINT_DISMISSED_KEY) === "1"
+    if (!welcomeDismissed) setWelcomeOpen(true)
+    else if (!hintDismissed) setShowToggleHint(true)
+  }, [])
+
+  function dismissWelcome() {
+    localStorage.setItem(WELCOME_DISMISSED_KEY, "1")
+    setWelcomeOpen(false)
+    // Surface the toggle hint next, unless it's already been dismissed.
+    if (localStorage.getItem(TOGGLE_HINT_DISMISSED_KEY) !== "1") setShowToggleHint(true)
+  }
+
+  function dismissToggleHint() {
+    localStorage.setItem(TOGGLE_HINT_DISMISSED_KEY, "1")
+    setShowToggleHint(false)
+  }
 
   // ── Retailer state ──────────────────────────────────────────────────────────
   const [retailerScreen, setRetailerScreen] = useState<RetailerScreen>("attribute-profiles")
 
+  // Shared attribute-profile list — one source of truth for both Screen 1 (the
+  // list) and Screen 2 (the detail view), so create/activate/deactivate/rename
+  // from either screen show up everywhere.
+  const [profiles, setProfiles] = useState<AttributeProfile[]>(ATTRIBUTE_PROFILES)
+
+  function handleCreateProfile(profile: AttributeProfile) {
+    setProfiles((prev) => [...prev, profile])
+  }
+
+  function handleUpdateProfile(name: string, updates: Partial<AttributeProfile>) {
+    setProfiles((prev) => prev.map((p) => (p.name === name ? { ...p, ...updates } : p)))
+  }
+
   // Context passed from Screen 1 into Screen 2
-  const [activeBrick, setActiveBrick] = useState<{
-    code: string
-    name: string
-    categoryName: string
-  } | null>(null)
+  const [activeBrick, setActiveBrick] = useState<{ code: string; name: string } | null>(null)
+  const [activeCategoryName, setActiveCategoryName] = useState<string | undefined>(undefined)
+  const [activeStatus, setActiveStatus] = useState<"Active" | "Draft" | undefined>(undefined)
 
   // ── Supplier state ──────────────────────────────────────────────────────────
   const [supplierScreen, setSupplierScreen] = useState<SupplierScreen>("compliance")
@@ -71,7 +112,7 @@ export default function RetailerPortal() {
   const [activePartner, setActivePartner] = useState<{ id: string; name: string } | null>(null)
 
   // L3 context
-  const [activeCode, setActiveCode] = useState<{ id: string; label: string } | null>(null)
+  const [activeCode, setActiveCode] = useState<{ id: string; label: string; brickCode: string } | null>(null)
 
   // L4 context
   const [gapProduct, setGapProduct] = useState<{ productName: string; retailer: string } | null>(null)
@@ -92,6 +133,7 @@ export default function RetailerPortal() {
   // ── Perspective switch ──────────────────────────────────────────────────────
   function handlePerspectiveChange(p: Perspective) {
     setPerspective(p)
+    if (showToggleHint) dismissToggleHint()
   }
 
   // ── Retailer navigation ─────────────────────────────────────────────────────
@@ -134,9 +176,17 @@ export default function RetailerPortal() {
   }
 
   // ── L2 → L3 ────────────────────────────────────────────────────────────────
-  function handleSelectCode(codeId: string, codeLabel: string) {
-    setActiveCode({ id: codeId, label: codeLabel })
+  function handleSelectCode(codeId: string, codeLabel: string, brickCode: string) {
+    setActiveCode({ id: codeId, label: codeLabel, brickCode })
     setSupplierScreen("supplier-products")
+  }
+
+  // ── Product leaf / gap detail → back to Compliance list ────────────────────
+  function handleBackToCompliance() {
+    setSupplierScreen("compliance")
+    setActivePartner(null)
+    setActiveCode(null)
+    setGapProduct(null)
   }
 
   // ── L3 → L4 ────────────────────────────────────────────────────────────────
@@ -213,12 +263,25 @@ export default function RetailerPortal() {
         </div>
       </div>
 
+      {/* Welcome / orientation overlay */}
+      <WelcomeOverlay
+        open={welcomeOpen}
+        onClose={dismissWelcome}
+        onStart={() => {
+          setPerspective("retailer")
+          setRetailerScreen("attribute-profiles")
+          dismissWelcome()
+        }}
+      />
+
       {/* Top nav */}
       <TopNav
         activeScreen={activeScreen}
         onNavigate={handleNavigate}
         perspective={perspective}
         onPerspectiveChange={handlePerspectiveChange}
+        showToggleHint={showToggleHint}
+        onShowAbout={() => setWelcomeOpen(true)}
       />
 
       {/* Body */}
@@ -237,12 +300,13 @@ export default function RetailerPortal() {
               {retailerScreen === "dashboard" && <DashboardPlaceholder />}
               {retailerScreen === "attribute-profiles" && (
                 <Screen1AttributeProfiles
-                  onNavigateToProfile={(brickCode, brickName, categoryName) => {
-                    setActiveBrick(
-                      brickCode && brickName
-                        ? { code: brickCode, name: brickName, categoryName: categoryName ?? brickName }
-                        : null
-                    )
+                  profiles={profiles}
+                  onCreateProfile={handleCreateProfile}
+                  onUpdateProfile={handleUpdateProfile}
+                  onNavigateToProfile={(brickCode, brickName, categoryName, status) => {
+                    setActiveBrick(brickCode && brickName ? { code: brickCode, name: brickName } : null)
+                    setActiveCategoryName(categoryName)
+                    setActiveStatus(status)
                     setRetailerScreen("profile-detail")
                   }}
                 />
@@ -252,10 +316,14 @@ export default function RetailerPortal() {
                   onBack={() => {
                     setRetailerScreen("attribute-profiles")
                     setActiveBrick(null)
+                    setActiveCategoryName(undefined)
+                    setActiveStatus(undefined)
                   }}
                   brickMapping={activeBrick ? { code: activeBrick.code, name: activeBrick.name } : null}
-                  initialCategoryName={activeBrick?.categoryName}
+                  initialCategoryName={activeCategoryName}
                   initialBrickExtendedRows={activeBrickExtendedRows}
+                  initialStatus={activeStatus}
+                  onUpdateProfile={handleUpdateProfile}
                 />
               )}
               
@@ -299,6 +367,7 @@ export default function RetailerPortal() {
               {supplierScreen === "selection-codes" && activePartner && (
                 <ScreenSupplierSelectionCodes
                   partnerName={activePartner.name}
+                  products={supplierProducts}
                   onBack={handleBackToPartnerList}
                   onSelectCode={handleSelectCode}
                 />
@@ -311,9 +380,11 @@ export default function RetailerPortal() {
                     kind: "retailer",
                     partnerName: activePartner.name,
                     selectionCode: activeCode.label,
+                    brickCode: activeCode.brickCode,
                   }}
                   products={supplierProducts}
-                  onBack={handleBackToPartner}
+                  onBack={handleBackToCompliance}
+                  onBackToPartner={handleBackToPartner}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
                 />
               )}
@@ -327,6 +398,7 @@ export default function RetailerPortal() {
                     productName={gapProduct.productName}
                     retailer={gapProduct.retailer}
                     selectionCode={activeCode.label}
+                    products={supplierProducts}
                     onBackToProducts={handleBackToProducts}
                     onBackToPartner={handleBackToPartner}
                     onBackToPartnerList={handleBackToPartnerList}

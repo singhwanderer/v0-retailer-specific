@@ -1,43 +1,35 @@
 "use client"
 
 import { Download } from "lucide-react"
+import { getSelectionCodesForPartner, type SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── CSV generation ────────────────────────────────────────────────────────────
 // Columns: Product ID, Description, Category, Category Brick Code (GS1),
-// then one column per required attribute. Existing values are pre-populated;
-// missing values are left blank for the supplier to fill in.
-type AttributeTemplate = {
-  name: string
-  existingValue?: string
-}
-
-const ATTRIBUTE_TEMPLATE: AttributeTemplate[] = [
-  { name: "Colour", existingValue: "" },
-  { name: "Size", existingValue: "" },
-  { name: "Material Composition", existingValue: "" },
-  { name: "Care Instructions", existingValue: "" },
-  { name: "Country of Origin", existingValue: "" },
-  { name: "Brand", existingValue: "" },
+// then one column per required attribute. Rows are the actual products under
+// this partner + selection code, so the file matches whatever code was
+// clicked instead of a fixed mock sample. Attribute values are left blank —
+// the product store doesn't track per-attribute values, only gap counts.
+const ATTRIBUTE_TEMPLATE_HEADERS = [
+  "Colour",
+  "Size",
+  "Material Composition",
+  "Care Instructions",
+  "Country of Origin",
+  "Brand",
 ]
 
-function generateCsv(partnerName: string, codeId: string, codeDescription: string): string {
-  const attrHeaders = ATTRIBUTE_TEMPLATE.map((a) => a.name)
+function generateCsv(products: SupplierProduct[], brickCode: string, categoryLabel: string): string {
   const headers = [
     "Product ID",
     "Description",
     "Category",
     "Category Brick Code (GS1)",
-    ...attrHeaders,
+    ...ATTRIBUTE_TEMPLATE_HEADERS,
   ]
 
-  // Mock product rows — in a real app these would come from the product store
-  const rows = [
-    ["1TESTPROD1", "Floral Wrap Dress", "Women's Dresses", "10001234", "", "", "", "", "", ""],
-    ["B11442", "Linen Shift Dress", "Women's Dresses", "10001234", "Beige", "10", "100% Linen", "", "China", "J.Renée"],
-    ["B11443", "Printed Midi Dress", "Women's Dresses", "10001234", "Multi", "12", "95% Cotton 5% Elastane", "Machine wash cold", "India", "J.Renée"],
-    ["B11446", "Denim Shirtdress", "", "", "", "", "", "", "", ""],
-    ["B11447", "Pleated Chiffon Gown", "", "", "", "", "", "", "", ""],
-  ]
+  const rows = products
+    .filter((p) => p.brickCode === brickCode)
+    .map((p) => [p.id, p.description, categoryLabel, brickCode, ...ATTRIBUTE_TEMPLATE_HEADERS.map(() => "")])
 
   const escape = (val: string) =>
     val.includes(",") || val.includes('"') || val.includes("\n")
@@ -53,11 +45,13 @@ function generateCsv(partnerName: string, codeId: string, codeDescription: strin
 }
 
 function downloadCsv(
+  products: SupplierProduct[],
   partnerName: string,
   codeId: string,
-  codeDescription: string
+  brickCode: string,
+  categoryLabel: string
 ) {
-  const csv = generateCsv(partnerName, codeId, codeDescription)
+  const csv = generateCsv(products, brickCode, categoryLabel)
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
@@ -69,36 +63,9 @@ function downloadCsv(
 
 interface SelectionCodeListProps {
   partnerName: string
+  products: SupplierProduct[]
   onBack: () => void
-  onSelectCode: (codeId: string, codeLabel: string) => void
-}
-
-type SelectionCode = {
-  id: string
-  code: string
-  description: string
-  products: number
-  gaps: number
-  complete: number
-}
-
-// Mock data keyed by partner — in a real app this would be fetched
-const CODES_BY_PARTNER: Record<string, SelectionCode[]> = {
-  "Dillard's": [
-    { id: "001", code: "001", description: "Dresses", products: 48, gaps: 5, complete: 43 },
-    { id: "002", code: "002", description: "Footwear", products: 31, gaps: 3, complete: 28 },
-    { id: "003", code: "003", description: "Accessories", products: 12, gaps: 0, complete: 12 },
-  ],
-  Belk: [
-    { id: "001", code: "001", description: "Dresses", products: 48, gaps: 0, complete: 48 },
-    { id: "004", code: "004", description: "Tops", products: 22, gaps: 0, complete: 22 },
-  ],
-  Nordstrom: [
-    { id: "001", code: "001", description: "Dresses", products: 48, gaps: 8, complete: 40 },
-    { id: "002", code: "002", description: "Footwear", products: 31, gaps: 4, complete: 27 },
-    { id: "005", code: "005", description: "Swimwear", products: 18, gaps: 2, complete: 16 },
-    { id: "006", code: "006", description: "Denim", products: 9, gaps: 0, complete: 9 },
-  ],
+  onSelectCode: (codeId: string, codeLabel: string, brickCode: string) => void
 }
 
 function GapBadge({ gaps, complete, total }: { gaps: number; complete: number; total: number }) {
@@ -123,10 +90,11 @@ function GapBadge({ gaps, complete, total }: { gaps: number; complete: number; t
 
 export function ScreenSupplierSelectionCodes({
   partnerName,
+  products,
   onBack,
   onSelectCode,
 }: SelectionCodeListProps) {
-  const codes = CODES_BY_PARTNER[partnerName] ?? []
+  const codes = getSelectionCodesForPartner(products, partnerName)
 
   return (
     <div className="p-8 flex flex-col gap-6">
@@ -171,47 +139,53 @@ export function ScreenSupplierSelectionCodes({
             </tr>
           </thead>
           <tbody>
-            {codes.map((sc, idx) => (
-              <tr
-                key={sc.id}
-                style={{
-                  borderBottom: idx < codes.length - 1 ? "1px solid #F3F4F6" : undefined,
-                }}
-                className="hover:bg-[#F4F6F8]/40 transition-colors"
-              >
-                <td className="px-4 py-3 align-middle">
-                  <button
-                    onClick={() =>
-                      onSelectCode(sc.id, `${sc.code} — ${sc.description}`)
-                    }
-                    className="font-medium tabular-nums hover:underline"
-                    style={{ color: "#0168B3" }}
-                  >
-                    {sc.code}
-                  </button>
-                </td>
-                <td className="px-4 py-3 font-light text-[#6B7280] align-middle">
-                  {sc.description}
-                </td>
-                <td className="px-4 py-3 font-light text-[#6B7280] align-middle tabular-nums">
-                  {sc.products}
-                </td>
-                <td className="px-4 py-3 align-middle">
-                  <GapBadge gaps={sc.gaps} complete={sc.complete} total={sc.products} />
-                </td>
-                <td className="px-4 py-3 align-middle text-right">
-                  <button
-                    onClick={() => downloadCsv(partnerName, sc.code, sc.description)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border hover:bg-[#F4F6F8] transition-colors"
-                    style={{ borderColor: "#E0E4E8", color: "#374151" }}
-                    title="Download attribute template CSV"
-                  >
-                    <Download className="w-3 h-3" />
-                    CSV
-                  </button>
+            {codes.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-sm font-light text-[#9CA3AF]">
+                  No categorised products under {partnerName} yet.
                 </td>
               </tr>
-            ))}
+            ) : (
+              codes.map((sc, idx) => (
+                <tr
+                  key={sc.id}
+                  style={{
+                    borderBottom: idx < codes.length - 1 ? "1px solid #F3F4F6" : undefined,
+                  }}
+                  className="hover:bg-[#F4F6F8]/40 transition-colors"
+                >
+                  <td className="px-4 py-3 align-middle">
+                    <button
+                      onClick={() => onSelectCode(sc.id, `${sc.id} — ${sc.label}`, sc.brickCode)}
+                      className="font-medium tabular-nums hover:underline"
+                      style={{ color: "#0168B3" }}
+                    >
+                      {sc.id}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 font-light text-[#6B7280] align-middle">
+                    {sc.label}
+                  </td>
+                  <td className="px-4 py-3 font-light text-[#6B7280] align-middle tabular-nums">
+                    {sc.products}
+                  </td>
+                  <td className="px-4 py-3 align-middle">
+                    <GapBadge gaps={sc.gaps} complete={sc.complete} total={sc.products} />
+                  </td>
+                  <td className="px-4 py-3 align-middle text-right">
+                    <button
+                      onClick={() => downloadCsv(products, partnerName, sc.id, sc.brickCode, sc.label)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border hover:bg-[#F4F6F8] transition-colors"
+                      style={{ borderColor: "#E0E4E8", color: "#374151" }}
+                      title="Download attribute template CSV"
+                    >
+                      <Download className="w-3 h-3" />
+                      CSV
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
         {/* CSV caption */}

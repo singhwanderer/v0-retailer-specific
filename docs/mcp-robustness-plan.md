@@ -36,14 +36,14 @@ across Dillard's + Belk). Expand it modestly, keeping the "MOCK DATA" honesty:
 - 3–4 more attribute profiles across GS1 segments already present in
   `lib/gs1-standard-library.ts` (Accessories, Sportswear, Homewear).
 - A broader vendor roster + a few products in the new categories so
-  `get_supplier_compliance_summary` and `list_vendor_gaps` show real spread.
+  `list_my_suppliers` and `get_supplier_compliance` show real spread.
 - 2–3 more vendor exceptions covering the new vendors/profiles.
 The UI screens read the same modules, so they benefit too (same shapes, no regressions).
 
 ### 3. Self-explaining empty results — so a miss redirects instead of dead-ends
 When a read finds nothing, return a helpful envelope instead of bare `[]`:
-`list_vendor_gaps` for an unknown vendor → `{ matches: [], knownVendors: [...], note: "No
-vendor matched 'X'. Known vendors: …" }`. Extend the pattern `getProfileDetail` already
+`get_supplier_compliance` for an unknown supplier → `{ matches: [], knownSuppliers: [...], note: "No
+supplier matched 'X'. Known suppliers: …" }`. Extend the pattern `getProfileDetail` already
 uses to the other filtered reads; keep fuzzy matching and add case/whitespace tolerance.
 
 ## Files touched
@@ -55,8 +55,8 @@ uses to the other filtered reads; keep fuzzy matching and add case/whitespace to
 ## Verification
 - `pnpm exec tsc --noEmit` + `pnpm build`
 - Local curl: `prompts/list` returns the starter prompts; `get_capabilities` returns the
-  live catalog; `list_vendor_gaps` for an unknown vendor returns the redirect envelope;
-  `/` still renders with the enlarged data.
+  live catalog; `get_supplier_compliance` for an unknown supplier returns the redirect
+  envelope; `/` still renders with the enlarged data.
 - Manual: reconnect in claude.ai, confirm starter prompts appear, try off-script prompts
   ("what can you do?", "how are my accessories vendors doing?").
 

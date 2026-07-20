@@ -8,15 +8,15 @@
 import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
+  RETAILER_SUPPLIERS,
   type AttributeProfile,
-  type ExceptionRow,
-  type ExceptionType,
   type ProfileStatus,
 } from "@/lib/retailer-requirements"
 import {
   BASELINE_CORE_ATTRIBUTES,
   getProfileExtras,
   getStore,
+  readProfileExtras,
   type AttributeRequirement,
   type ImageRequirement,
 } from "@/lib/mcp/store"
@@ -24,14 +24,10 @@ import {
 const DEMO_NOTE =
   "Demo prototype: this change is stored in the demo server's in-memory data (mock data only, resets periodically). In production this would persist to TGC."
 
-// Distinct retail-partner names present in the supplier catalogue seed. Used
-// both to filter gaps and to redirect a query that names an unknown partner.
-function knownRetailPartners(): string[] {
-  const set = new Set<string>()
-  for (const product of SUPPLIER_PRODUCTS_SEED) {
-    for (const r of product.retailers ?? []) set.add(r.retailer)
-  }
-  return [...set].sort()
+// Distinct supplier names trading under this retailer account. Used both to
+// redirect a query that names an unknown supplier and in get_capabilities.
+function knownSuppliers(): string[] {
+  return [...new Set(RETAILER_SUPPLIERS.map((s) => s.supplier))].sort()
 }
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
@@ -63,9 +59,10 @@ export function getProfileDetail(brickCode: string) {
   const profile = getStore().profiles.find((p) => p.brickCode === brickCode)
   const brick = getBrickByCode(brickCode)
   if (!profile && !brick) {
-    return { error: `No attribute profile or GS1 brick found for brick code ${brickCode}. Use search_gs1_bricks or list_attribute_profiles to find valid codes.` }
+    return { error: `No attribute profile or GS1 category found for category code ${brickCode}. Use search_gs1_bricks or list_attribute_profiles to find valid codes.` }
   }
-  const extras = getProfileExtras(brickCode)
+  // Read-only: inspecting a profile must never create store state.
+  const extras = readProfileExtras(brickCode)
   const standardExtended: AttributeRequirement[] = (brick?.extendedAttributes ?? []).map((a) => ({
     name: a.name,
     gs1Name: `${a.name} (${a.code})`,
@@ -74,7 +71,7 @@ export function getProfileDetail(brickCode: string) {
     target: "extended",
   }))
   return {
-    profile: profile ?? { note: "No retailer profile created yet for this brick", brickCode, brickName: brick?.brickName },
+    profile: profile ?? { note: "No retailer profile created yet for this GS1 category", brickCode, brickName: brick?.brickName },
     coreAttributes: [
       ...BASELINE_CORE_ATTRIBUTES,
       ...extras.customAttributes.filter((a) => a.target === "core"),
@@ -87,73 +84,31 @@ export function getProfileDetail(brickCode: string) {
   }
 }
 
-export function getSupplierComplianceSummary() {
-  // Invert the supplier catalogue's per-retailer gaps into the hub view
-  const byVendor = new Map<string, { openGaps: number; productsWithGaps: number; productsComplete: number }>()
-  for (const product of SUPPLIER_PRODUCTS_SEED) {
-    for (const r of product.retailers ?? []) {
-      const row = byVendor.get(r.retailer) ?? { openGaps: 0, productsWithGaps: 0, productsComplete: 0 }
-      if (r.gaps === "complete") row.productsComplete += 1
-      else {
-        row.openGaps += r.gaps
-        row.productsWithGaps += 1
-      }
-      byVendor.set(r.retailer, row)
-    }
-  }
-  const uncategorised = SUPPLIER_PRODUCTS_SEED.filter((p) => p.state === "uncategorised").length
+export function listMySuppliers() {
   return {
-    note: "Demo data covers one supplier's catalogue as seen by each retail partner.",
-    vendors: [...byVendor.entries()]
-      .map(([vendor, stats]) => ({ vendor, ...stats }))
-      .sort((a, b) => b.openGaps - a.openGaps),
-    uncategorisedProducts: uncategorised,
+    note: "Compliance for the suppliers trading under your retailer account, ranked by open gaps.",
+    suppliers: [...RETAILER_SUPPLIERS]
+      .sort((a, b) => b.openGaps - a.openGaps)
+      .map(({ supplier, category, brickCode, openGaps, productsWithGaps, productsComplete }) => ({
+        supplier,
+        category,
+        brickCode,
+        openGaps,
+        productsWithGaps,
+        productsComplete,
+      })),
   }
 }
 
-export function listVendorGaps(vendor?: string) {
-  const q = vendor?.toLowerCase().trim()
-  const rows = SUPPLIER_PRODUCTS_SEED.flatMap((product) =>
-    (product.retailers ?? [])
-      .filter((r) => r.gaps !== "complete" && (!q || r.retailer.toLowerCase().includes(q)))
-      .map((r) => ({
-        productId: product.id,
-        product: product.description,
-        brickCode: product.brickCode,
-        category: product.brickCode ? getBrickByCode(product.brickCode)?.brickName : undefined,
-        retailer: r.retailer,
-        openGaps: r.gaps,
-      }))
-  )
-  const sorted = rows.sort((a, b) => (b.openGaps as number) - (a.openGaps as number))
-  if (q && sorted.length === 0) {
-    const known = knownRetailPartners()
+export function getSupplierCompliance(supplier: string) {
+  const q = supplier.toLowerCase().trim()
+  const matches = RETAILER_SUPPLIERS.filter((s) => s.supplier.toLowerCase().includes(q))
+  if (matches.length === 0) {
+    const known = knownSuppliers()
     return {
       matches: [],
-      knownVendors: known,
-      note: `No retail partner matched "${vendor}". Known partners with compliance data: ${known.join(", ")}. (This demo tracks the supplier's catalogue as seen by each retail partner.)`,
-    }
-  }
-  return sorted
-}
-
-export function listVendorExceptions(status?: ExceptionRow["status"], vendor?: string) {
-  const q = vendor?.toLowerCase().trim()
-  const all = getStore().exceptions
-  const matches = all.filter(
-    (e) => (!status || e.status === status) && (!q || e.vendor.toLowerCase().includes(q))
-  )
-  if (matches.length === 0 && (q || status)) {
-    const knownVendors = [...new Set(all.map((e) => e.vendor))].sort()
-    const availableStatuses = [...new Set(all.map((e) => e.status))]
-    const criteria = [q ? `vendor "${vendor}"` : "", status ? `status "${status}"` : ""]
-      .filter(Boolean)
-      .join(" and ")
-    return {
-      matches: [],
-      knownVendors,
-      availableStatuses,
-      note: `No exceptions matched ${criteria}. Vendors with exceptions on record: ${knownVendors.join(", ")}. Statuses in use: ${availableStatuses.join(", ")}.`,
+      knownSuppliers: known,
+      note: `No supplier matched "${supplier}". Suppliers trading under your retailer account: ${known.join(", ")}. (Other retail partners' data is not available through this connector.)`,
     }
   }
   return matches
@@ -184,11 +139,11 @@ export function getCapabilities() {
         ],
       },
       monitorSuppliers: {
-        summary: "See how retail partners are doing on compliance and where the gaps are.",
+        summary: "See how your suppliers are doing on compliance and where the gaps are.",
         examples: [
-          "Which partners are furthest behind on compliance, and on what?",
-          "List the open gaps for Macy's.",
-          "How are my accessories categories doing?",
+          "Which of my suppliers is furthest behind on compliance, and on what?",
+          "How is J.Renée doing on Footwear?",
+          "List all my suppliers and their compliance status.",
         ],
       },
       authorRequirements: {
@@ -199,19 +154,11 @@ export function getCapabilities() {
           "Require a lifestyle image on Handbags, JPEG, white background.",
         ],
       },
-      manageExceptions: {
-        summary: "Review and grant vendor exceptions (waivers, extended deadlines, reduced scope).",
-        examples: [
-          "Show all active vendor exceptions.",
-          "Give Nike a 60-day extension on Compression Level.",
-        ],
-      },
     },
     writeActions: [
       "create_attribute_profile",
       "add_attribute_requirement",
       "set_image_requirement",
-      "create_vendor_exception",
     ],
     liveSnapshot: {
       attributeProfiles: store.profiles.map((p) => ({
@@ -220,8 +167,7 @@ export function getCapabilities() {
         status: p.status,
         brickCode: p.brickCode,
       })),
-      retailPartnersWithComplianceData: knownRetailPartners(),
-      vendorsWithExceptions: [...new Set(store.exceptions.map((e) => e.vendor))].sort(),
+      mySuppliers: knownSuppliers(),
       categoriesWithSupplierData: categoriesWithData,
       gs1Segments: getSegments(),
     },
@@ -234,12 +180,12 @@ export function getCapabilities() {
 export function createAttributeProfile(categoryName: string, brickCode: string) {
   const brick = getBrickByCode(brickCode)
   if (!brick) {
-    return { error: `Unknown GS1 brick code ${brickCode}. Use search_gs1_bricks to find the right brick first.` }
+    return { error: `Unknown GS1 category code ${brickCode}. Use search_gs1_bricks to find the right category first.` }
   }
   const store = getStore()
   const existing = store.profiles.find((p) => p.brickCode === brickCode)
   if (existing) {
-    return { error: `A profile for brick ${brickCode} (${existing.name}) already exists. Use add_attribute_requirement or set_image_requirement to extend it.` }
+    return { error: `A profile for GS1 category ${brickCode} (${existing.name}) already exists. Use add_attribute_requirement or set_image_requirement to extend it.` }
   }
   const profile: AttributeProfile = {
     name: categoryName,
@@ -260,14 +206,26 @@ export function createAttributeProfile(categoryName: string, brickCode: string) 
   }
 }
 
+// A write may only extend a profile that actually exists — otherwise the store
+// silently grows extras for a category the retailer never set up.
+function requireProfile(brickCode: string) {
+  const profile = getStore().profiles.find((p) => p.brickCode === brickCode)
+  if (!profile) {
+    return {
+      error: `No attribute profile exists for GS1 category ${brickCode}. Create one first with create_attribute_profile, then add requirements to it.`,
+    }
+  }
+  return null
+}
+
 export function addAttributeRequirement(
   brickCode: string,
   attributeName: string,
   target: "core" | "extended",
   guidance?: string
 ) {
-  const detail = getProfileDetail(brickCode)
-  if ("error" in detail) return detail
+  const missing = requireProfile(brickCode)
+  if (missing) return missing
   const extras = getProfileExtras(brickCode)
   const requirement: AttributeRequirement = {
     name: attributeName,
@@ -281,8 +239,8 @@ export function addAttributeRequirement(
 }
 
 export function setImageRequirement(brickCode: string, requirement: ImageRequirement) {
-  const detail = getProfileDetail(brickCode)
-  if ("error" in detail) return detail
+  const missing = requireProfile(brickCode)
+  if (missing) return missing
   const extras = getProfileExtras(brickCode)
   const idx = extras.imageRequirements.findIndex(
     (r) => r.requirementName.toLowerCase() === requirement.requirementName.toLowerCase()
@@ -295,22 +253,6 @@ export function setImageRequirement(brickCode: string, requirement: ImageRequire
     profileBrickCode: brickCode,
     demo_note: DEMO_NOTE,
   }
-}
-
-export function createVendorException(args: {
-  vendor: string
-  profile: string
-  exceptionType: ExceptionType
-  attributes: string[]
-  validUntil: string
-}) {
-  const exception: ExceptionRow = {
-    ...args,
-    status: "Active",
-    actions: ["Edit", "Revoke"],
-  }
-  getStore().exceptions.push(exception)
-  return { created: exception, demo_note: DEMO_NOTE }
 }
 
 function today(): string {

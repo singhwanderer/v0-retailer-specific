@@ -4,6 +4,7 @@ import { BadgeCheck } from "lucide-react"
 import {
   countBaselineGaps,
   countUncategorised,
+  getPartnerSummary,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
 
@@ -22,46 +23,17 @@ interface SupplierComplianceProps {
 type Partner = {
   id: string
   name: string
-  accountNumber: string
-  activeSince: string
-  selectionCodes: number
-  totalGaps: number
-  completeCodes: number
   /** Retailer-specific attributes required on top of the GS1 baseline */
   extras: number
 }
 
 const PARTNERS: Partner[] = [
-  {
-    id: "dillards",
-    name: "Dillard's",
-    accountNumber: "8712345000001",
-    activeSince: "Mar 2019",
-    selectionCodes: 3,
-    totalGaps: 8,
-    completeCodes: 1,
-    extras: 3,
-  },
-  {
-    id: "belk",
-    name: "Belk",
-    accountNumber: "8712345000042",
-    activeSince: "Jan 2021",
-    selectionCodes: 2,
-    totalGaps: 0,
-    completeCodes: 2,
-    extras: 1,
-  },
-  {
-    id: "nordstrom",
-    name: "Nordstrom",
-    accountNumber: "8712345000078",
-    activeSince: "Jun 2020",
-    selectionCodes: 4,
-    totalGaps: 14,
-    completeCodes: 2,
-    extras: 5,
-  },
+  { id: "dillards", name: "Dillard's", extras: 3 },
+  { id: "belk", name: "Belk", extras: 1 },
+  { id: "nordstrom", name: "Nordstrom", extras: 5 },
+  { id: "macys", name: "Macy's", extras: 2 },
+  { id: "saks", name: "Saks Fifth Avenue", extras: 6 },
+  { id: "bloomingdales", name: "Bloomingdale's", extras: 4 },
 ]
 
 // Reused from the former Trading Partners screen — the retailer-row status pill.
@@ -134,7 +106,7 @@ export function ScreenSupplierCompliance({
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
-              {["Compliance Target", "Account Number (GLN)", "Active Since", "Requirements", "Status"].map(
+              {["Compliance Target", "Requirements", "Status"].map(
                 (h) => (
                   <th
                     key={h}
@@ -170,8 +142,6 @@ export function ScreenSupplierCompliance({
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-3 font-light text-[#9CA3AF] align-middle">&mdash;</td>
-              <td className="px-4 py-3 font-light text-[#6B7280] align-middle">Always</td>
               <td className="px-4 py-3 font-light text-[#6B7280] align-middle">
                 Standard attributes per category
               </td>
@@ -199,52 +169,49 @@ export function ScreenSupplierCompliance({
               </td>
             </tr>
 
-            {/* ── Retailer rows (unchanged from Trading Partners) ── */}
-            {PARTNERS.map((partner, idx) => (
-              <tr
-                key={partner.id}
-                style={{
-                  borderBottom: idx < PARTNERS.length - 1 ? "1px solid #F3F4F6" : undefined,
-                }}
-                className="hover:bg-[#F4F6F8]/40 transition-colors"
-              >
-                <td className="px-4 py-3 align-middle">
-                  <div className="flex flex-col gap-0.5">
+            {/* ── Retailer rows ── */}
+            {PARTNERS.map((partner, idx) => {
+              const summary = getPartnerSummary(products, partner.name)
+              return (
+                <tr
+                  key={partner.id}
+                  style={{
+                    borderBottom: idx < PARTNERS.length - 1 ? "1px solid #F3F4F6" : undefined,
+                  }}
+                  className="hover:bg-[#F4F6F8]/40 transition-colors"
+                >
+                  <td className="px-4 py-3 align-middle">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => onSelectPartner(partner.id, partner.name)}
+                        className="font-medium hover:underline text-left"
+                        style={{ color: "#0168B3" }}
+                      >
+                        {partner.name}
+                      </button>
+                      <span className="text-[10px] font-light" style={{ color: "#9CA3AF" }}>
+                        GS1 baseline + {partner.extras} extra{partner.extras !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 font-light text-[#6B7280] align-middle tabular-nums">
+                    {summary.codes} Product/Selection Code{summary.codes !== 1 ? "s" : ""}
+                  </td>
+                  <td className="px-4 py-3 align-middle">
                     <button
                       onClick={() => onSelectPartner(partner.id, partner.name)}
-                      className="font-medium hover:underline text-left"
-                      style={{ color: "#0168B3" }}
+                      className="text-left"
                     >
-                      {partner.name}
+                      <ComplianceSummary
+                        gaps={summary.gaps}
+                        complete={summary.complete}
+                        total={summary.codes}
+                      />
                     </button>
-                    <span className="text-[10px] font-light" style={{ color: "#9CA3AF" }}>
-                      GS1 baseline + {partner.extras} extra{partner.extras !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 font-light text-[#6B7280] align-middle tabular-nums">
-                  {partner.accountNumber}
-                </td>
-                <td className="px-4 py-3 font-light text-[#6B7280] align-middle">
-                  {partner.activeSince}
-                </td>
-                <td className="px-4 py-3 font-light text-[#6B7280] align-middle tabular-nums">
-                  {partner.selectionCodes} selection code{partner.selectionCodes !== 1 ? "s" : ""}
-                </td>
-                <td className="px-4 py-3 align-middle">
-                  <button
-                    onClick={() => onSelectPartner(partner.id, partner.name)}
-                    className="text-left"
-                  >
-                    <ComplianceSummary
-                      gaps={partner.totalGaps}
-                      complete={partner.completeCodes}
-                      total={partner.selectionCodes}
-                    />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
 

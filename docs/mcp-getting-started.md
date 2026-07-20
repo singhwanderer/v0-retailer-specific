@@ -92,11 +92,11 @@ ChatGPT requires **Developer mode** to add a custom MCP connector (Plus/Pro/Team
 
 In a chat with the TGC connector enabled, type:
 
-> **"Which of my vendors are furthest behind on compliance, and on what?"**
+> **"Which of my suppliers are furthest behind on compliance, and on what?"**
 
 A correct response looks like the assistant **calling a TGC tool** (you'll usually see a
-"used TGC" / tool-call indicator) and then answering with specific vendor names and gap
-counts from the demo data — for example, ranking Dillard's and Belk by open attribute gaps.
+"used TGC" / tool-call indicator) and then answering with specific supplier names and gap
+counts from the demo data — for example, ranking J.Renée and Nike by open attribute gaps.
 If it answers with generic advice and *no* tool call, the connector isn't enabled for that
 chat — see troubleshooting.
 

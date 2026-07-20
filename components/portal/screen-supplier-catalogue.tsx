@@ -88,7 +88,7 @@ function AssignCategoryModal({
 
         <div className="flex flex-col gap-3 py-1">
           <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>
-            Choose the GS1 category (brick) for the selected products. Its standard attributes
+            Choose the GS1 category for the selected products. Its standard attributes
             become their GS1 baseline requirements.
           </p>
 
@@ -102,7 +102,7 @@ function AssignCategoryModal({
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search brick name or code…"
+                placeholder="Search category name or code…"
                 className="flex-1 text-sm outline-none bg-transparent text-[#111827] placeholder:text-[#9CA3AF]"
               />
             </div>
@@ -126,7 +126,7 @@ function AssignCategoryModal({
           >
             {filteredBricks.length === 0 ? (
               <p className="px-4 py-3 text-sm" style={{ color: "#9CA3AF" }}>
-                No bricks match your search.
+                No categories match your search.
               </p>
             ) : (
               filteredBricks.map((brick) => {
@@ -322,9 +322,10 @@ export function ScreenSupplierCatalogue({
   }
 
   function handleManualAssign(brick: Gs1Brick) {
+    const n = selected.size
     onAssignCategory(new Set(selected), brick.brickCode)
     showToast(
-      `${selected.size} product${selected.size !== 1 ? "s" : ""} categorised as ${brick.brickName}. GS1 baseline re-assessed.`
+      `${n} product${n !== 1 ? "s" : ""} categorised as ${brick.brickName} — compliance recalculated against GS1 and all retailers. Open Compliance Status to see it.`
     )
     setSelected(new Set())
   }

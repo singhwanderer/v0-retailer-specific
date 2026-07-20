@@ -96,6 +96,88 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
     brickCode: "10002100",
     brickName: "Nightwear/Pyjamas",
   },
+  {
+    name: "Dresses",
+    category: "Women's Apparel",
+    attributes: "13 attributes",
+    status: "Active",
+    lastUpdated: "Mar 15, 2026",
+    actions: ["Edit", "Deactivate"],
+    isLink: true,
+    brickCode: "10001333",
+    brickName: "Dresses",
+  },
+  {
+    name: "Skirts",
+    category: "Women's Apparel",
+    attributes: "11 attributes",
+    status: "Active",
+    lastUpdated: "Mar 12, 2026",
+    actions: ["Edit", "Deactivate"],
+    isLink: true,
+    brickCode: "10001334",
+    brickName: "Skirts",
+  },
+  {
+    name: "Trousers & Shorts",
+    category: "Women's Apparel",
+    attributes: "12 attributes",
+    status: "Draft",
+    lastUpdated: "Mar 14, 2026",
+    actions: ["Edit", "Activate"],
+    isLink: true,
+    brickCode: "10001335",
+    brickName: "Trousers/Shorts",
+  },
+  {
+    name: "Rings",
+    category: "Jewellery",
+    attributes: "10 attributes",
+    status: "Draft",
+    lastUpdated: "Mar 10, 2026",
+    actions: ["Edit", "Activate"],
+    isLink: true,
+    brickCode: "10006018",
+    brickName: "Rings",
+  },
+  {
+    name: "Belts",
+    category: "Accessories",
+    attributes: "9 attributes",
+    status: "Active",
+    lastUpdated: "Mar 7, 2026",
+    actions: ["Edit", "Deactivate"],
+    isLink: true,
+    brickCode: "10006031",
+    brickName: "Belts",
+  },
+]
+
+// ── Retailer's own suppliers (for MCP compliance queries) ─────────────────────
+// Supplier names reused from VENDOR_EXCEPTIONS below, each mapped to the
+// Dillard's category (ATTRIBUTE_PROFILES) their exception "profile" field
+// already implies, so supplier <-> category pairing stays internally
+// consistent rather than invented fresh. Category-level compliance counts —
+// this is what "which of my suppliers are behind, and on what" can answer.
+export interface SupplierComplianceRow {
+  supplier: string
+  brickCode: string
+  category: string
+  productsTotal: number
+  productsWithGaps: number
+  openGaps: number
+  productsComplete: number
+}
+
+export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
+  { supplier: "J.Renée", brickCode: "10005811", category: "Footwear", productsTotal: 14, productsWithGaps: 5, openGaps: 11, productsComplete: 9 },
+  { supplier: "Levi Strauss & Co.", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 22, productsWithGaps: 8, openGaps: 17, productsComplete: 14 },
+  { supplier: "Fossil Group", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 9, productsWithGaps: 2, openGaps: 3, productsComplete: 7 },
+  { supplier: "Calvin Klein", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 16, productsWithGaps: 6, openGaps: 14, productsComplete: 10 },
+  { supplier: "York and Jones", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 7, productsWithGaps: 1, openGaps: 1, productsComplete: 6 },
+  { supplier: "Michael Kors", brickCode: "10006030", category: "Handbags/Purses", productsTotal: 11, productsWithGaps: 3, openGaps: 5, productsComplete: 8 },
+  { supplier: "Nike", brickCode: "10001400", category: "Sports/Performance Tops", productsTotal: 18, productsWithGaps: 4, openGaps: 6, productsComplete: 14 },
+  { supplier: "Ralph Lauren", brickCode: "10001350", category: "Jackets/Blazers/Cardigans/Waistcoats", productsTotal: 13, productsWithGaps: 7, openGaps: 15, productsComplete: 6 },
 ]
 
 export type ExceptionType = "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"

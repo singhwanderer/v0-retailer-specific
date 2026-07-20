@@ -19,7 +19,7 @@ The endpoint speaks MCP over Streamable HTTP. No authentication is configured �
 1. Settings → **Connectors** → **Add custom connector**
 2. Name it "TGC", paste the endpoint URL, no authentication → Add
 3. In a new chat, open the tools/search menu and enable the TGC connector
-4. Ask: *"Which of my vendors are furthest behind on compliance?"*
+4. Ask: *"Which of my suppliers are furthest behind on compliance?"*
 
 **ChatGPT**
 1. Settings → **Apps & Connectors** → enable **Developer mode** (Plus/Pro/Team)
@@ -85,7 +85,7 @@ From `enum` constraints in the same schema. In production these would be generat
 The model will usually push back immediately because the schema says GIF isn't allowed. If it calls anyway, the server rejects the call with a field-level validation error, and the model relays the valid options. Invalid data cannot enter the store.
 
 **Q: Can it create requirements or only answer questions?**
-Both. Seven read tools (search bricks, list/get profiles, compliance summary, vendor gaps, exceptions, and a `get_capabilities` help tool) and four write tools (create profile, add attribute, set image requirement, create vendor exception).
+Both. Six read tools (search bricks, list/get profiles, list/get supplier compliance, and a `get_capabilities` help tool) and three write tools (create profile, add attribute, set image requirement).
 
 **Q: Does data created via chat persist?**
 Demo-grade only: writes go to the server's in-memory store, survive while the serverless instance is warm, and reset on cold start. Every write response carries a `demo_note` saying exactly this. Production persistence (a database or the real TGC API) is the P1 step.
@@ -117,14 +117,13 @@ Nothing on the AI side — the schema is the contract. Update the enum/required 
 
 Two discoverability aids make cold, off-script exploration reliable:
 
-- **Ask "What can you help me with?"** — the assistant calls the `get_capabilities` tool, which returns a plain-English catalog of actions plus a live snapshot of the demo data (which profiles, vendors, and categories actually have data). Because it's built from the store, it never drifts.
-- **Starter prompts in the picker** — in claude.ai the connector contributes clickable suggestions (*review supplier compliance*, *set up category requirements*, *audit a vendor*, *explain a profile*, *grant an exception*) via the MCP prompts primitive. Look for them in the connector's prompt picker.
+- **Ask "What can you help me with?"** — the assistant calls the `get_capabilities` tool, which returns a plain-English catalog of actions plus a live snapshot of the demo data (which profiles, suppliers, and categories actually have data). Because it's built from the store, it never drifts.
+- **Starter prompts in the picker** — in claude.ai the connector contributes clickable suggestions (*review supplier compliance*, *set up category requirements*, *audit a supplier*, *explain a profile*) via the MCP prompts primitive. Look for them in the connector's prompt picker.
 
 Example prompts to try:
 
-1. "Which of my vendors are furthest behind on compliance, and on which products?"
+1. "Which of my suppliers are furthest behind on compliance, and on what?"
 2. "What does my Footwear profile require, including image requirements?"
-3. "How are my accessories categories doing?" *(off-script — resolves against the seeded Handbags data)*
+3. "How is J.Renée doing on Footwear?" *(off-script — resolves against the seeded supplier data)*
 4. "Create an attribute profile for Dresses." *(watch it resolve the GS1 brick and confirm before writing)*
 5. "Add a lifestyle image requirement to Footwear." *(watch it ask for format and background, offering only the valid options — that's the schema at work)*
-6. "Give J.Renée a 60-day extension on Toe Shape for the Footwear profile, then show me all active exceptions."
