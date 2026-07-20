@@ -535,6 +535,85 @@ export function countUncategorised(products: SupplierProduct[]): number {
   return products.filter((p) => p.state === "uncategorised").length
 }
 
+// ── Completion % ──────────────────────────────────────────────────────────────
+// A product is "complete" for a target when it has zero open gaps for that
+// target (GS1 baseline: gs1Gaps === 0; a retailer: that retailer's entry reads
+// "complete"). We report completion as a % of products, grouped by category so
+// the multi-brick nature of a category (segment) is aggregated: a category such
+// as Clothing spans several GS1 bricks, and every product in those bricks rolls
+// up into the one Clothing figure.
+
+/** The category (GS1 segment) a product belongs to, or null when uncategorised. */
+export function getCategory(product: SupplierProduct): string | null {
+  if (product.state !== "categorised" || !product.brickCode) return null
+  return getBrickByCode(product.brickCode)?.segment ?? null
+}
+
+export type CategoryCompletion = {
+  category: string
+  total: number
+  complete: number
+  pct: number
+}
+
+export type TargetCompletion = {
+  total: number
+  complete: number
+  pct: number
+  byCategory: CategoryCompletion[]
+}
+
+/**
+ * Product-completion % for a compliance target — `"gs1"` for the baseline, or a
+ * retailer name. Only assessable products count toward the denominator:
+ * categorised products for GS1, and (for a retailer) categorised products that
+ * carry a status for that retailer. The `byCategory` breakdown aggregates every
+ * brick in a category into one figure.
+ */
+export function getTargetCompletion(
+  products: SupplierProduct[],
+  target: "gs1" | string
+): TargetCompletion {
+  const isGs1 = target === "gs1"
+
+  // Assessable products + whether each is complete for this target.
+  const assessed: { category: string; complete: boolean }[] = []
+  for (const p of products) {
+    const category = getCategory(p)
+    if (category === null) continue // uncategorised — cannot be assessed
+    if (isGs1) {
+      assessed.push({ category, complete: (p.gs1Gaps ?? 0) === 0 })
+    } else {
+      const rs = p.retailers?.find((r) => r.retailer === target)
+      if (!rs) continue // this retailer publishes nothing against the product
+      assessed.push({ category, complete: rs.gaps === "complete" })
+    }
+  }
+
+  const total = assessed.length
+  const complete = assessed.filter((a) => a.complete).length
+  const pct = total === 0 ? 0 : Math.round((complete / total) * 100)
+
+  // Group into per-category figures.
+  const byCat = new Map<string, { total: number; complete: number }>()
+  for (const a of assessed) {
+    const acc = byCat.get(a.category) ?? { total: 0, complete: 0 }
+    acc.total += 1
+    if (a.complete) acc.complete += 1
+    byCat.set(a.category, acc)
+  }
+  const byCategory: CategoryCompletion[] = [...byCat.entries()]
+    .map(([category, { total: t, complete: c }]) => ({
+      category,
+      total: t,
+      complete: c,
+      pct: t === 0 ? 0 : Math.round((c / t) * 100),
+    }))
+    .sort((a, b) => a.category.localeCompare(b.category))
+
+  return { total, complete, pct, byCategory }
+}
+
 /** Total GS1 baseline gaps across categorised products. */
 export function countBaselineGaps(products: SupplierProduct[]): number {
   return products.reduce((sum, p) => sum + (p.state === "categorised" ? p.gs1Gaps ?? 0 : 0), 0)

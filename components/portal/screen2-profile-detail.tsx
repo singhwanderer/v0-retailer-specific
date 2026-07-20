@@ -17,7 +17,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import type { AttributeProfile } from "@/lib/retailer-requirements"
+import type { AttributeProfile, ProfileBrick } from "@/lib/retailer-requirements"
+import { getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
+import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
 
 function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -881,15 +883,18 @@ function CategorySummaryCard({
   coreCount,
   extendedCount,
   imageCount,
-  brickMapping,
+  bricks,
   categoryName,
+  onAddCategory,
 }: {
   coreCount: number
   extendedCount: number
   imageCount: number
-  brickMapping?: { code: string; name: string } | null
+  bricks: ProfileBrick[]
   categoryName: string
+  onAddCategory: () => void
 }) {
+  const hasBricks = bricks.length > 0
   return (
     <div
       className="rounded-lg border bg-white overflow-hidden"
@@ -898,19 +903,49 @@ function CategorySummaryCard({
       <div className="p-5 flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-[#111827]">Category Summary</h2>
 
-        {/* GS1 Brick Mapping */}
+        {/* GS1 Brick Mapping(s) */}
         <div
-          className="rounded-md p-3 flex flex-col gap-1"
-          style={{ backgroundColor: brickMapping ? "#EFF6FF" : "#F4F6F8" }}
+          className="rounded-md p-3 flex flex-col gap-2"
+          style={{ backgroundColor: hasBricks ? "#EFF6FF" : "#F4F6F8" }}
         >
-          <span className="text-[10px] font-medium leading-tight" style={{ color: brickMapping ? "#0168B3" : "#9CA3AF" }}>
-            GS1 Category Mapping
-          </span>
-          {brickMapping ? (
-            <>
-              <span className="text-sm font-semibold text-[#111827]">{brickMapping.name}</span>
-              <span className="text-[10px] font-mono" style={{ color: "#6B7280" }}>{brickMapping.code}</span>
-            </>
+          <div className="flex items-center justify-between">
+            <span
+              className="text-[10px] font-medium leading-tight"
+              style={{ color: hasBricks ? "#0168B3" : "#9CA3AF" }}
+            >
+              GS1 Category Mapping{bricks.length > 1 ? "s" : ""}
+            </span>
+            <button
+              onClick={onAddCategory}
+              className="inline-flex items-center gap-1 text-[10px] font-medium hover:underline"
+              style={{ color: "#0168B3" }}
+            >
+              <Plus className="w-3 h-3" />
+              Add GS1 Category
+            </button>
+          </div>
+          {hasBricks ? (
+            <div className="flex flex-col gap-1.5">
+              {bricks.map((b) => {
+                const segment = getBrickByCode(b.code)?.segment
+                return (
+                  <div key={b.code} className="flex items-baseline justify-between gap-2">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-[#111827] truncate">{b.name}</span>
+                      <span className="text-[10px] font-mono" style={{ color: "#6B7280" }}>{b.code}</span>
+                    </div>
+                    {segment && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                        style={{ backgroundColor: "#FFFFFF", color: "#6B7280" }}
+                      >
+                        {segment}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <span className="text-xs italic" style={{ color: "#9CA3AF" }}>No standard mapping</span>
           )}
@@ -952,10 +987,126 @@ function CategorySummaryCard({
   )
 }
 
+// ── Add GS1 Category dialog ───────────────────────────────────────────────────
+// Reuses the shared brick picker so a requirement can map to more than one GS1
+// brick. The selected brick is handed back to the parent, which runs the
+// cross-category check before committing.
+function AddGs1CategoryDialog({
+  open,
+  onClose,
+  onSelectBrick,
+  excludeCodes,
+}: {
+  open: boolean
+  onClose: () => void
+  onSelectBrick: (brick: Gs1Brick) => void
+  excludeCodes: string[]
+}) {
+  const [candidate, setCandidate] = useState<Gs1Brick | null>(null)
+
+  function handleClose() {
+    setCandidate(null)
+    onClose()
+  }
+
+  function handleAdd() {
+    if (!candidate) return
+    onSelectBrick(candidate)
+    setCandidate(null)
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Add a GS1 Category
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-xs leading-relaxed pb-1" style={{ color: "#6B7280" }}>
+          Map another GS1 standard category to this requirement. Its standard extended
+          attributes will be added to the requirement.
+        </p>
+        <Gs1BrickPicker selected={candidate} onSelect={setCandidate} excludeCodes={excludeCodes} />
+        <DialogFooter>
+          <button
+            onClick={handleClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleAdd}
+            disabled={!candidate}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: "#0168B3" }}
+          >
+            Add Category
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Cross-category confirmation ───────────────────────────────────────────────
+// A requirement is ideally one category (GS1 segment). Adding a brick from a
+// different segment is allowed, but flagged so it's a deliberate choice.
+function ConfirmMixedCategoryModal({
+  candidate,
+  currentSegment,
+  onClose,
+  onConfirm,
+}: {
+  candidate: Gs1Brick | null
+  currentSegment: string | undefined
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  if (!candidate) return null
+  return (
+    <Dialog open={candidate !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Different category
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm leading-relaxed py-2" style={{ color: "#6B7280" }}>
+          <span className="font-medium text-[#111827]">{candidate.brickName}</span> belongs to the{" "}
+          <span className="font-medium text-[#111827]">{candidate.segment}</span> category, but this
+          requirement is currently <span className="font-medium text-[#111827]">{currentSegment}</span>.
+          Requirements usually cover a single category. Add it anyway?
+        </p>
+        <DialogFooter>
+          <button
+            onClick={onClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onConfirm(); onClose() }}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#D97706" }}
+          >
+            Add anyway
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Main Screen 2 ─────────────────────────────────────────────────────────────
 interface Screen2Props {
   onBack: () => void
   brickMapping?: { code: string; name: string } | null
+  /** All GS1 bricks mapped to this requirement (union drives extended rows) */
+  initialBricks?: ProfileBrick[]
   /** The retailer's internal category name typed in Step 1 of the Create flow */
   initialCategoryName?: string
   /** Standard extended attributes seeded from the GS1 brick, if one was selected */
@@ -969,6 +1120,7 @@ interface Screen2Props {
 export function Screen2ProfileDetail({
   onBack,
   brickMapping,
+  initialBricks,
   initialCategoryName,
   initialBrickExtendedRows,
   initialStatus,
@@ -982,6 +1134,21 @@ export function Screen2ProfileDetail({
   const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(
     isFootwear ? FOOTWEAR_IMAGE_ROWS : []
   )
+
+  // All GS1 bricks mapped to this requirement. Seeded from the profile; a user
+  // can add more (with a cross-category confirmation).
+  const seedBricks: ProfileBrick[] =
+    initialBricks && initialBricks.length > 0
+      ? initialBricks
+      : brickMapping
+      ? [{ code: brickMapping.code, name: brickMapping.name }]
+      : []
+  const [bricks, setBricks] = useState<ProfileBrick[]>(seedBricks)
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false)
+  // A candidate brick from a different category, awaiting confirmation.
+  const [pendingBrick, setPendingBrick] = useState<Gs1Brick | null>(null)
+  // The requirement's established category (segment) = its primary brick's.
+  const primarySegment = bricks[0] ? getBrickByCode(bricks[0].code)?.segment : undefined
 
   const [addAttrTarget, setAddAttrTarget] = useState<AddAttrTarget>(null)
   const [addImageOpen, setAddImageOpen] = useState(false)
@@ -1034,6 +1201,41 @@ export function Screen2ProfileDetail({
     showToast("Image requirement updated.")
   }
 
+  // A brick chosen in the Add-GS1-Category dialog. If it's a different category
+  // (segment) than the requirement's, ask for confirmation first; otherwise add.
+  function requestAddBrick(brick: Gs1Brick) {
+    if (primarySegment && brick.segment !== primarySegment) {
+      setPendingBrick(brick)
+    } else {
+      commitAddBrick(brick)
+    }
+  }
+
+  function commitAddBrick(brick: Gs1Brick) {
+    // Append the new brick's standard extended attributes, deduped by GS1 code.
+    const additions: AttributeRow[] = brick.extendedAttributes
+      .filter((a) => !extendedRows.some((r) => r.tgcGs1Name === `${a.name} (${a.code})`))
+      .map((a) => ({
+        retailerName: a.name,
+        tgcGs1Name: `${a.name} (${a.code})`,
+        guidance: "",
+        source: "standard" as const,
+      }))
+    const newExtendedRows = [...extendedRows, ...additions]
+    const newBricks: ProfileBrick[] = [...bricks, { code: brick.brickCode, name: brick.brickName }]
+    setExtendedRows(newExtendedRows)
+    setBricks(newBricks)
+    onUpdateProfile?.(profileKey, {
+      bricks: newBricks,
+      attributes:
+        `${coreRows.length + newExtendedRows.length} attributes` +
+        (imageRows.length ? ` · ${imageRows.length} image requirement${imageRows.length !== 1 ? "s" : ""}` : "") +
+        (newBricks.length > 1 ? ` · ${newBricks.length} GS1 categories` : ""),
+      lastUpdated: today(),
+    })
+    showToast(`Added ${brick.brickName} to this requirement.`)
+  }
+
   return (
     <div className="flex flex-col gap-0 p-8 max-w-[1200px]">
       {/* Breadcrumb */}
@@ -1082,7 +1284,11 @@ export function Screen2ProfileDetail({
               </button>
             </div>
             <p className="text-xs" style={{ color: "#6B7280" }}>
-              {brickMapping ? `GS1 Category: ${brickMapping.name} · ` : ""}
+              {bricks.length > 0
+                ? `GS1 Categor${bricks.length > 1 ? "ies" : "y"}: ${bricks[0].name}${
+                    bricks.length > 1 ? ` +${bricks.length - 1} more` : ""
+                  } · `
+                : ""}
               {coreRows.length + extendedRows.length} attributes required
             </p>
           </div>
@@ -1163,13 +1369,26 @@ export function Screen2ProfileDetail({
             coreCount={coreRows.length}
             extendedCount={extendedRows.length}
             imageCount={imageRows.length}
-            brickMapping={brickMapping}
+            bricks={bricks}
             categoryName={categoryName}
+            onAddCategory={() => setAddCategoryOpen(true)}
           />
         </div>
       </div>
 
       {/* Dialogs */}
+      <AddGs1CategoryDialog
+        open={addCategoryOpen}
+        onClose={() => setAddCategoryOpen(false)}
+        onSelectBrick={requestAddBrick}
+        excludeCodes={bricks.map((b) => b.code)}
+      />
+      <ConfirmMixedCategoryModal
+        candidate={pendingBrick}
+        currentSegment={primarySegment}
+        onClose={() => setPendingBrick(null)}
+        onConfirm={() => pendingBrick && commitAddBrick(pendingBrick)}
+      />
       <AddAttributeDialog
         open={addAttrTarget !== null}
         onClose={() => setAddAttrTarget(null)}

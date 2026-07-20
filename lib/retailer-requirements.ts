@@ -6,6 +6,12 @@
 
 export type ProfileStatus = "Active" | "Draft"
 
+/** One GS1 brick mapped to a requirement profile. */
+export interface ProfileBrick {
+  code: string
+  name: string
+}
+
 export interface AttributeProfile {
   name: string
   category: string
@@ -14,8 +20,27 @@ export interface AttributeProfile {
   lastUpdated: string
   actions: readonly string[]
   isLink: boolean
+  /** Primary GS1 brick (kept for existing single-brick readers) */
   brickCode: string
   brickName: string
+  /**
+   * All GS1 bricks mapped to this requirement. A requirement can span several
+   * bricks within one category (segment). Optional: when absent, the profile
+   * maps to just the primary `brickCode`/`brickName` — use `getProfileBricks`
+   * to read the effective list.
+   */
+  bricks?: ProfileBrick[]
+}
+
+/**
+ * The effective GS1 bricks for a profile: its explicit `bricks` list when set,
+ * otherwise the single primary brick. Empty when the profile has no mapping.
+ */
+export function getProfileBricks(
+  profile: Pick<AttributeProfile, "bricks" | "brickCode" | "brickName">
+): ProfileBrick[] {
+  if (profile.bricks && profile.bricks.length > 0) return profile.bricks
+  return profile.brickCode ? [{ code: profile.brickCode, name: profile.brickName }] : []
 }
 
 export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
@@ -33,13 +58,17 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   {
     name: "Apparel",
     category: "Women's Apparel",
-    attributes: "51 attributes",
+    attributes: "51 attributes · 2 GS1 categories",
     status: "Active",
     lastUpdated: "Feb 14, 2026",
     actions: ["Edit", "Deactivate"],
     isLink: true,
     brickCode: "10001352",
     brickName: "Shirts/Blouses/Polo Shirts/T-Shirts",
+    bricks: [
+      { code: "10001352", name: "Shirts/Blouses/Polo Shirts/T-Shirts" },
+      { code: "10001351", name: "Sweaters/Pullovers" },
+    ],
   },
   {
     name: "Jewellery",
