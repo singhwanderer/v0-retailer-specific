@@ -218,24 +218,44 @@ export function ScreenSupplierGapDetail({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right align-middle w-56">
-                        <Select
-                          value=""
-                          onValueChange={(value) => setPendingFill({ attr, value })}
-                        >
-                          <SelectTrigger
-                            className="ml-auto h-8 w-52 text-xs"
-                            aria-label={`Select a value for ${attr.name}`}
+                        {allowedValues && allowedValues.length > 0 ? (
+                          <Select
+                            value=""
+                            onValueChange={(value) => setPendingFill({ attr, value })}
                           >
-                            <SelectValue placeholder="Select a value…" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allowedValues.map((v) => (
-                              <SelectItem key={v} value={v} className="text-xs">
-                                {v}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            <SelectTrigger
+                              className="ml-auto h-8 w-52 text-xs"
+                              aria-label={`Select a value for ${attr.name}`}
+                            >
+                              <SelectValue placeholder="Select a value…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allowedValues.map((v) => (
+                                <SelectItem key={v} value={v} className="text-xs">
+                                  {v}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="Enter a value…"
+                            aria-label={`Enter a value for ${attr.name}`}
+                            className="ml-auto h-8 w-52 text-xs rounded-md border px-2.5 outline-none focus:ring-2"
+                            style={{ borderColor: "#E0E4E8" }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                const value = e.currentTarget.value.trim()
+                                if (value) setPendingFill({ attr, value })
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const value = e.currentTarget.value.trim()
+                              if (value) setPendingFill({ attr, value })
+                            }}
+                          />
+                        )}
                       </td>
                     </tr>
                   )
@@ -331,9 +351,10 @@ export function ScreenSupplierGapDetail({
 
     <ConfirmFillAttributeModal
       open={pendingFill !== null}
+      onOpenChange={(open) => !open && setPendingFill(null)}
       attributeName={pendingFill?.attr.name ?? ""}
       value={pendingFill?.value ?? ""}
-      onCancel={() => setPendingFill(null)}
+      productLabel={productDescription || productId}
       onViewGtins={() => onViewGtins(productId)}
       onConfirm={() => {
         if (pendingFill) onFillAttribute(productId, pendingFill.attr.code, pendingFill.value)
