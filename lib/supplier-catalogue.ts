@@ -28,6 +28,13 @@ export type SupplierProduct = {
   discontinued?: boolean
   /** Per-retailer compliance (static mock — gap-filling is not simulated) */
   retailers?: RetailerStatus[]
+  /**
+   * Attribute values the supplier has filled in from the gap-detail screen,
+   * keyed by GS1 attribute code → chosen value. A filled attribute is a
+   * product-level fact: it satisfies that attribute for every target (GS1
+   * baseline and every retailer), mirroring the "you keep one product" model.
+   */
+  filledAttributes?: Record<string, string>
 }
 
 export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
@@ -566,12 +573,23 @@ export const IMAGE_REQUIREMENT_POOL: MissingImage[] = [
   { name: "Detail Shot", spec: "close-up of material/texture" },
 ]
 
-/** Open gap count for a product against one target (0 when complete or not assessed). */
+/** Number of attribute gaps the supplier has filled in for this product. */
+export function countFilledAttributes(product: SupplierProduct): number {
+  return product.filledAttributes ? Object.keys(product.filledAttributes).length : 0
+}
+
+/**
+ * Open gap count for a product against one target (0 when complete or not
+ * assessed). Attributes the supplier has filled in reduce the count for every
+ * target, since a filled attribute is a product-level fact.
+ */
 export function getGapCount(product: SupplierProduct, target: GapTarget): number {
   if (product.state !== "categorised") return 0
-  if (target.kind === "gs1") return product.gs1Gaps ?? 0
+  const filled = countFilledAttributes(product)
+  if (target.kind === "gs1") return Math.max(0, (product.gs1Gaps ?? 0) - filled)
   const rs = product.retailers?.find((r) => r.retailer === target.name)
-  return !rs || rs.gaps === "complete" ? 0 : rs.gaps
+  if (!rs || rs.gaps === "complete") return 0
+  return Math.max(0, rs.gaps - filled)
 }
 
 /** Stable small hash of a string — deterministic across renders and reloads. */
@@ -587,21 +605,33 @@ export function getGapRecords(
 ): GapRecords {
   const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
   const attrPool = brick?.extendedAttributes ?? []
-  const gapCount = product ? getGapCount(product, target) : 0
+
+  // The image split is derived from the ORIGINAL gap count (before any fills) so
+  // that filling an attribute never disturbs which image requirements show —
+  // fills only ever reduce the attribute portion.
+  const filledCodes = new Set(product?.filledAttributes ? Object.keys(product.filledAttributes) : [])
+  const originalGapCount =
+    product && product.state === "categorised"
+      ? target.kind === "gs1"
+        ? product.gs1Gaps ?? 0
+        : (() => {
+            const rs = product.retailers?.find((r) => r.retailer === target.name)
+            return !rs || rs.gaps === "complete" ? 0 : rs.gaps
+          })()
+      : 0
 
   // Split the opaque gap count into named attribute gaps and image-requirement
   // gaps. A small, deterministic share (0–2) of the gaps falls to images —
   // keyed on product + target so it never changes between renders — rather than
   // "images only once every attribute is also missing", which would leave image
-  // requirements unreachable given the seed's modest gap counts. The two always
-  // sum back to the gap count the pills show.
+  // requirements unreachable given the seed's modest gap counts.
   const targetKey = target.kind === "gs1" ? "gs1" : `r:${target.name}`
   const hash = product ? stableHash(`${product.id}|${targetKey}`) : 0
   // Distribution across products with gaps: ~1/3 none, ~1/3 one, ~1/3 two.
-  const desiredImageGaps = gapCount === 0 ? 0 : hash % 3
+  const desiredImageGaps = originalGapCount === 0 ? 0 : hash % 3
 
-  let imageGapCount = Math.min(desiredImageGaps, gapCount, IMAGE_REQUIREMENT_POOL.length)
-  let attrCount = gapCount - imageGapCount
+  let imageGapCount = Math.min(desiredImageGaps, originalGapCount, IMAGE_REQUIREMENT_POOL.length)
+  let attrCount = originalGapCount - imageGapCount
   if (attrCount > attrPool.length) {
     // More attribute gaps than the pool holds — push the remainder to images.
     const extra = attrCount - attrPool.length
@@ -609,7 +639,12 @@ export function getGapRecords(
     attrCount = attrPool.length
   }
 
-  const missingAttrs = attrPool.slice(0, attrCount).map((a) => ({ name: a.name, code: a.code }))
+  // The originally-missing attributes, then drop the ones the supplier has since
+  // filled in so they read as provided and no longer count as gaps.
+  const missingAttrs = attrPool
+    .slice(0, attrCount)
+    .filter((a) => !filledCodes.has(a.code))
+    .map((a) => ({ name: a.name, code: a.code }))
   const missingImages = IMAGE_REQUIREMENT_POOL.slice(0, imageGapCount)
 
   return {
@@ -726,6 +761,28 @@ export function assignCategory(
         }
       : p
   )
+}
+
+/**
+ * Record a supplier-supplied value for one attribute on a product. The value
+ * applies to the whole product (and therefore every GTIN within it), satisfying
+ * that attribute for the GS1 baseline and every retailer at once — so gap counts
+ * everywhere drop by one. Passing an empty value clears a previously-filled
+ * attribute.
+ */
+export function fillAttribute(
+  products: SupplierProduct[],
+  productId: string,
+  attributeCode: string,
+  value: string
+): SupplierProduct[] {
+  return products.map((p) => {
+    if (p.id !== productId) return p
+    const next = { ...(p.filledAttributes ?? {}) }
+    if (value) next[attributeCode] = value
+    else delete next[attributeCode]
+    return { ...p, filledAttributes: next }
+  })
 }
 
 // ── Selection codes ───────────────────────────────────────────────────────────

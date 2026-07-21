@@ -1,14 +1,25 @@
 "use client"
 
+import { useState } from "react"
 import { BadgeCheck } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import {
   getGapRecords,
   IMAGE_REQUIREMENT_POOL,
   type GapTarget,
+  type MissingAttribute,
   type MissingImage,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
+import { getAllowedValues } from "@/lib/gs1-attribute-values"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { ConfirmFillAttributeModal } from "@/components/portal/confirm-fill-attribute-modal"
 
 export type GapDetailCrumb = { label: string; onClick: () => void }
 
@@ -23,6 +34,10 @@ interface GapDetailProps {
   breadcrumbs: GapDetailCrumb[]
   /** Open the image-upload flow for one missing image requirement */
   onUploadImage: (image: MissingImage) => void
+  /** Persist a supplier-supplied attribute value to the shared catalogue */
+  onFillAttribute: (productId: string, attributeCode: string, value: string) => void
+  /** Jump to the (out-of-scope) GTIN list for this product */
+  onViewGtins: (productId: string) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,11 +78,19 @@ export function ScreenSupplierGapDetail({
   products,
   breadcrumbs,
   onUploadImage,
+  onFillAttribute,
+  onViewGtins,
 }: GapDetailProps) {
   const product = products.find((p) => p.id === productId)
   const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
   const categoryLabel = brick?.brickName ?? "Uncategorised"
   const productDescription = product?.description ?? ""
+
+  // A value the supplier has chosen but not yet confirmed — drives the confirm
+  // modal. Cleared on confirm or cancel.
+  const [pendingFill, setPendingFill] = useState<{ attr: MissingAttribute; value: string } | null>(
+    null
+  )
 
   const isGs1 = target.kind === "gs1"
   const targetLabel = isGs1 ? "GS1 Standard" : target.name
@@ -84,6 +107,7 @@ export function ScreenSupplierGapDetail({
   const isComplete = gapCount === 0
 
   return (
+    <>
     <div className="p-8 flex flex-col gap-6 max-w-3xl">
 
       {/* Breadcrumb */}
@@ -151,7 +175,15 @@ export function ScreenSupplierGapDetail({
 
       {/* Section A — Missing Attributes */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-[#111827]">Missing Attributes</h2>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold text-[#111827]">Missing Attributes</h2>
+          {missingAttrs.length > 0 && (
+            <p className="text-xs font-light text-[#6B7280]">
+              Pick a value from the GS1 standard list to fill an attribute. It applies to every
+              GTIN within this product.
+            </p>
+          )}
+        </div>
         <div
           className="rounded-lg overflow-hidden"
           style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
@@ -166,28 +198,68 @@ export function ScreenSupplierGapDetail({
           ) : (
             <table className="w-full text-sm">
               <tbody>
-                {missingAttrs.map((attr, idx) => (
-                  <tr
-                    key={attr.code}
-                    style={{
-                      borderBottom:
-                        idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
-                    }}
-                  >
-                    <td className="px-4 py-3 w-8 align-middle">
-                      <Dot color="#F59E0B" />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <span className="font-medium text-[#111827]">{attr.name}</span>
-                      <span className="ml-2 text-xs font-light text-[#9CA3AF]">
-                        TGC: {attr.name} ({attr.code})
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right align-middle">
-                      <span className="text-xs font-light text-[#92400E]">Not provided</span>
-                    </td>
-                  </tr>
-                ))}
+                {missingAttrs.map((attr, idx) => {
+                  const allowedValues = getAllowedValues(attr.code)
+                  return (
+                    <tr
+                      key={attr.code}
+                      style={{
+                        borderBottom:
+                          idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
+                      }}
+                    >
+                      <td className="px-4 py-3 w-8 align-middle">
+                        <Dot color="#F59E0B" />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <span className="font-medium text-[#111827]">{attr.name}</span>
+                        <span className="ml-2 text-xs font-light text-[#9CA3AF]">
+                          TGC: {attr.name} ({attr.code})
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right align-middle w-56">
+                        {allowedValues && allowedValues.length > 0 ? (
+                          <Select
+                            value=""
+                            onValueChange={(value) => setPendingFill({ attr, value })}
+                          >
+                            <SelectTrigger
+                              className="ml-auto h-8 w-52 text-xs"
+                              aria-label={`Select a value for ${attr.name}`}
+                            >
+                              <SelectValue placeholder="Select a value…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allowedValues.map((v) => (
+                                <SelectItem key={v} value={v} className="text-xs">
+                                  {v}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="Enter a value…"
+                            aria-label={`Enter a value for ${attr.name}`}
+                            className="ml-auto h-8 w-52 text-xs rounded-md border px-2.5 outline-none focus:ring-2"
+                            style={{ borderColor: "#E0E4E8" }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                const value = e.currentTarget.value.trim()
+                                if (value) setPendingFill({ attr, value })
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const value = e.currentTarget.value.trim()
+                              if (value) setPendingFill({ attr, value })
+                            }}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
@@ -276,5 +348,19 @@ export function ScreenSupplierGapDetail({
         not verified.
       </p>
     </div>
+
+    <ConfirmFillAttributeModal
+      open={pendingFill !== null}
+      onOpenChange={(open) => !open && setPendingFill(null)}
+      attributeName={pendingFill?.attr.name ?? ""}
+      value={pendingFill?.value ?? ""}
+      productLabel={productDescription || productId}
+      onViewGtins={() => onViewGtins(productId)}
+      onConfirm={() => {
+        if (pendingFill) onFillAttribute(productId, pendingFill.attr.code, pendingFill.value)
+        setPendingFill(null)
+      }}
+    />
+    </>
   )
 }
