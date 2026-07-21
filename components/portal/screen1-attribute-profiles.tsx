@@ -28,10 +28,11 @@ interface Screen1Props {
 
 type StatusType = "Active" | "Draft"
 
-// Core attributes every profile starts with, regardless of category (mirrors
-// the MCP demo store's BASELINE_CORE_ATTRIBUTES: GTIN code/description, NRF
-// color/size code). Used to estimate a new profile's attribute count.
-const BASELINE_CORE_COUNT = 4
+// The 8 core attributes every profile starts with, regardless of category
+// (mirrors the MCP demo store's BASELINE_CORE_ATTRIBUTES: Product ID/Description,
+// GTIN code/description, NRF size/color code, Size/Color Description). Used to
+// estimate a new profile's attribute count.
+const BASELINE_CORE_COUNT = 8
 
 function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })

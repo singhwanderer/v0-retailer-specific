@@ -85,9 +85,11 @@ segment, extendedAttributes: { name, code }[] }`; helpers `getBrickByCode`, `get
 requirement model (baseline core attributes + per-brick extras + image requirements),
 exposed via `getProfileDetail(brickCode)`.
 
-- **Requirement tiers:** Core (baseline: GTIN code/description, NRF colour/size, plus
-  retailer core extras) · Extended (GS1 standard `extendedAttributes` ∪ retailer custom) ·
-  Image (format, background, min dimensions, max file size, crop, guidance).
+- **Requirement tiers:** Core (a fixed 8-attribute baseline shared by every profile
+  regardless of category: Product ID, Product Description, GTIN code, GTIN Description,
+  NRF Size Code, NRF Color Code, Size Description, Color Description; plus any retailer
+  core extras) · Extended (GS1 standard `extendedAttributes` ∪ retailer custom) · Image
+  (format, background, min dimensions, max file size, crop, guidance).
 - **Category vs brick:** a category (segment) contains several bricks; a requirement maps
   to one segment ideally, spanning one or more of its bricks.
 
