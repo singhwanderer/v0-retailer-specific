@@ -1,0 +1,1988 @@
+Code List Name,Code List Value,Code
+Adjustable Strap Code List,Fully Adjustable,GM03ADSTFA
+Adjustable Strap Code List,Partially Adjustable,GM03ADSTPA
+Adjustable Strap Code List,Non-Adjustable,GM03ADSTNA
+Adjustable Strap Code List,Other,GM03ADST99
+Advertised Origin Code List,Imported,GM03ADVOIM
+Advertised Origin Code List,Made in Canada,GM03ADVOMC
+Advertised Origin Code List,Made in U.S.A.,GM03ADVOMU
+Advertised Origin Code List,Made in U.S.A. and Imported,GM03ADVOUI
+Advertised Origin Code List,Made in U.S.A. or Imported,GM03ADVOUO
+Advertised Origin Code List,Made in another country*,GM04ADV099
+Bag Type Code List,Backpack,GM03BGSTBA
+Bag Type Code List,Saddle Bag,GM03BGSTSB
+Bag Type Code List,Bucket Bag,GM03BGSTBB
+Bag Type Code List,Satchel,GM03BGSTSA
+Bag Type Code List,Clutch,GM03BGSTCL
+Bag Type Code List,Shopper,GM03BGSTSJ
+Bag Type Code List,Crossbody,GM03BGSTCR
+Bag Type Code List,Shoulder Bag,GM03BGSTSH
+Bag Type Code List,Diaper Bag,GM03BGSTDB
+Bag Type Code List,Tote,GM03BGSTTT
+Bag Type Code List,Duffel,GM03BGSTDU
+Bag Type Code List,Waist Bag,GM03BGSTWB
+Bag Type Code List,Hobo,GM03BGSTHB
+Bag Type Code List,Wristlet,GM03BGSTWR
+Bag Type Code List,Messenger Bag,GM03BGSTMB
+Bag Type Code List,Other,GM04BGST99
+Bag Type Code List,Pouch,GM03BGSTPH
+Band Type Code List,Bangle,JW03WBNDBA
+Band Type Code List,Bracelet,JW03WBNDBR
+Band Type Code List,Cuff,JW03WBNDCU
+Band Type Code List,NATO Strap,JW03WBNDNA
+Band Type Code List,Strap,JW03WBNDST
+Band Type Code List,Other,JW04WBND99
+Beauty Area of Use Code List,Body,GM03BAOUBD
+Beauty Area of Use Code List,Lip,GM03BAOULP
+Beauty Area of Use Code List,Brow,GM03BAOUBR
+Beauty Area of Use Code List,Multi,GM03BAOUMU
+Beauty Area of Use Code List,Cheek,GM03BAOUCH
+Beauty Area of Use Code List,Nall,GM03BAOUNA
+Beauty Area of Use Code List,Eye,GM03BAOUEY
+Beauty Area of Use Code List,Neck,GM03BAOUNE
+Beauty Area of Use Code List,Face,GM03BAOUFA
+Beauty Area of Use Code List,Pedi,GM03BAOUPE
+Beauty Area of Use Code List,Hair,GM03BAOUHR
+Beauty Area of Use Code List,Teeth,GM03BAOUTE
+Beauty Area of Use Code List,Hand,GM03BAOUHN
+Beauty Area of Use Code List,Other,GM04BAOU99
+Beauty Area of Use Code List,Lash,GM03BAOULA
+Beauty Treatment Specialty Code List,After Sun,GM03BTSPAS
+Beauty Treatment Specialty Code List,Redness/Rosacea,GM03BTSPRR
+Beauty Treatment Specialty Code List,Anti-Acne,GM03BTSPAA
+Beauty Treatment Specialty Code List,Repair,GM03BTSPRE
+Beauty Treatment Specialty Code List,Cellulite,GM03BTSPCE
+Beauty Treatment Specialty Code List,Self Tan,GM03BTSPST
+Beauty Treatment Specialty Code List,Conditioning,GM03BTSPCD
+Beauty Treatment Specialty Code List,Shaving,GM03BTSPSH
+Beauty Treatment Specialty Code List,Day,GM03BTSPDA
+Beauty Treatment Specialty Code List,Uneven Skin Tone,GM03BTSPUN
+Beauty Treatment Specialty Code List,Firming/Lifting,GM03BTSPFL
+Beauty Treatment Specialty Code List,Wrinkles,GM03BTSPWR
+Beauty Treatment Specialty Code List,Moisturizing,GM03BTSPMS
+Beauty Treatment Specialty Code List,Heat and Sun Protection,GM03BTSPHS
+Beauty Treatment Specialty Code List,Anti-Frizz,GM03BTSPAF
+Beauty Treatment Specialty Code List,Oil Control,GM03BTSPOC
+Beauty Treatment Specialty Code List,Clarifying,GM03BTSPCL
+Beauty Treatment Specialty Code List,Straightening,GM03BTSPSG
+Beauty Treatment Specialty Code List,Color Protection,GM03BTSPCP
+Beauty Treatment Specialty Code List,Texturizing,GM03BTSPTX
+Beauty Treatment Specialty Code List,Curl Defining,GM03BTSPCD
+Beauty Treatment Specialty Code List,Thinning and Hair Loss,GM03BTSPTH
+Beauty Treatment Specialty Code List,Damage Repair,GM03BTSPDR
+Beauty Treatment Specialty Code List,Volumizing,GM03BTSPVO
+Beauty Treatment Specialty Code List,Dry Scalp,GM03BTSPDS
+Beauty Treatment Specialty Code List,Other,GM04BTSP99
+Beauty Treatment Specialty Code List,Dullness,GM03BTSPDU
+Beauty Treatment Specialty Code List,Night,GM03BTSPNI
+Beauty Type Code List,After Shave,GM03BETYAS
+Beauty Type Code List,Mask,GM03BETYMK
+Beauty Type Code List,Base Coat,GM03BETYBC
+Beauty Type Code List,Make-up Brush,GM03BETYMB
+Beauty Type Code List,BB/CC,GM03BETYBB
+Beauty Type Code List,Make-up Brush Cleaner,GM03BETYMC
+Beauty Type Code List,Blush/Bronzer,GM03BETYBL
+Beauty Type Code List,Mirror,GM03BETYMI
+Beauty Type Code List,Blade Sharpener,GM03BETYBR
+Beauty Type Code List,Moisturizer,GM03BETYΜΟ
+Beauty Type Code List,Beauty Spray,GM03BETYBS
+Beauty Type Code List,Multi-use Palette,GM03BETYMP
+Beauty Type Code List,Cleansing Brush,GM03BETYCB
+Beauty Type Code List,Make-up Remover,GM03BETYMR
+Beauty Type Code List,Curling Iron,GM03BETYCI
+Beauty Type Code List,Manicure Set,GM03BETYMS
+Beauty Type Code List,Cleanser,GM03BETYCL
+Beauty Type Code List,Nail Polish,GM03BETYNP
+Beauty Type Code List,Conditioner,GM03BETYCN
+Beauty Type Code List,Perfume/Cologne,GM03BETYPC
+Beauty Type Code List,Concealer,GM03BETYCO
+Beauty Type Code List,Plumper,GM03BETYPL
+Beauty Type Code List,Diffuser,GM03BETYDI
+Beauty Type Code List,Powder,GM03BETYΡΟ
+Beauty Type Code List,Curler,GM03BETYEC
+Beauty Type Code List,Primer,GM03BETYPR
+Beauty Type Code List,Eyebrow Enhancer,GM03BETYEE
+Beauty Type Code List,Pencil Sharpener,GM03BETYPS
+Beauty Type Code List,Electric Razor,GM03BETYER
+Beauty Type Code List,Pre-Shave,GM03BETYPE
+Beauty Type Code List,Eye Shadow,GM03BETYES
+Beauty Type Code List,Razor,GM03BETYRA
+Beauty Type Code List,Exfoliator,GM03BETYEX
+Beauty Type Code List,Razor Blade,GM03BETYRB
+Beauty Type Code List,False Eyelashes,GM03BETYFE
+Beauty Type Code List,Shave Brush,GM03BETYSB
+Beauty Type Code List,Flat Iron,GM03BETYFI
+Beauty Type Code List,Shaving Cream,GM03BETYSC
+Beauty Type Code List,Foundation,GM03BETYFO
+Beauty Type Code List,Sun Care,GM03BETYSU
+Beauty Type Code List,Gloss,GM03BETYGL
+Beauty Type Code List,Serum,GM03BETYSE
+Beauty Type Code List,Groomer,GM03BETYGR
+Beauty Type Code List,Shampoo,GM03BETYSH
+Beauty Type Code List,Hair Brush,GM03BETYHB
+Beauty Type Code List,Shave Bowl,GM03BETYSL
+Beauty Type Code List,Hair Dryer,GM03BETYHD
+Beauty Type Code List,Sponge,GM03BETYSP
+Beauty Type Code List,Hair Spray,GM03BETYHS
+Beauty Type Code List,Shave Set,GM03BETYSS
+Beauty Type Code List,Hair Trimmer,GM03BETYНТ
+Beauty Type Code List,Styling Product,GM03BETYST
+Beauty Type Code List,Laquer,GM03BETYLA
+Beauty Type Code List,Top Coat,GM03BETYTC
+Beauty Type Code List,Lip Balm,GM03BETYLB
+Beauty Type Code List,Toner/Clarifyer,GM03BETYΥΤΟ
+Beauty Type Code List,Lip Liner,GM03BETYLI
+Beauty Type Code List,Tinted Moisturizer,GM03BETYTM
+Beauty Type Code List,Lip Stick,GM03BETYLS
+Beauty Type Code List,Tweezer,GM03BETYTW
+Beauty Type Code List,Mascara,GM03BETΥΜΑ
+Beauty Type Code List,Other,GM04BETY99
+Bedding Size Code List,Baby/Swaddle,GM03BDSZBS
+Bedding Size Code List,Jumbo,GM03BDSZJU
+Bedding Size Code List,Body,GM03BDSZBD
+Bedding Size Code List,King,GM03BDSZKI
+Bedding Size Code List,California King,GM03BDSZCK
+Bedding Size Code List,Queen,GM03BDSZQU
+Bedding Size Code List,Contour,GM03BDSZCN
+Bedding Size Code List,Standard,GM03BDSZST
+Bedding Size Code List,Crib,GM03BDSZCR
+Bedding Size Code List,Throw,GM03BDSZTH
+Bedding Size Code List,Euro,GM03BDSZEU
+Bedding Size Code List,Twin,GM03BDSZTW
+Bedding Size Code List,Full/Queen,GM03BDSZFQ
+Bedding Size Code List,Twin Extra Long,GM03BDSZTX
+Bedding Size Code List,Full/Standard,GM03BDSZFS
+Bedding Size Code List,Other,GM04BDSZ99
+Bedding Type Code List,Bedspread,GM03BEDTBS
+Bedding Type Code List,Pillowcase,GM03BEDTPC
+Bedding Type Code List,Comforter,GM03BEDTCM
+Bedding Type Code List,Sham,GM03BEDTSH
+Bedding Type Code List,Duvet Cover,GM03BEDTDC
+Bedding Type Code List,Sheet Set,GM03BEDTSS
+Bedding Type Code List,Fitted Sheet,GM03BEDTFI
+Bedding Type Code List,Other,GM04BEDT99
+Bedding Type Code List,Flat Sheet,GM03BEDTFL
+Belt Type Code List,Braided,GM03BETYBR
+Belt Type Code List,Ratchet,GM03BETYRA
+Belt Type Code List,Chain,GM03BETYCH
+Belt Type Code List,Sash,GM03BETYSA
+Belt Type Code List,Cinch,GM03BETYCI
+Belt Type Code List,Strap,GM03BETYST
+Belt Type Code List,Cummerbund,GM03BETYCU
+Belt Type Code List,Stretch,GM03BETYSH
+Belt Type Code List,Hip,GM03BETYНІ
+Belt Type Code List,Suspenders,GM03BETYSU
+Belt Type Code List,Lace-up,GM03BETYLU
+Belt Type Code List,Yoke,GM03BETYYO
+Belt Type Code List,Military,GM03BETYMI
+Belt Type Code List,Other,GM04BETY99
+Belt Type Code List,Obi,GM03BETYOB
+Bill Logo Application Code List,Fabric Applique,GM03BILLFA
+Bill Logo Application Code List,Screen Print,GM03BILLSP
+Bill Logo Application Code List,Raised Embroidery,GM03BILLRE
+Bill Logo Application Code List,Other,GM04BILL99
+Bill Type Code List,Flip Color,GM03BILTFC
+Bill Type Code List,Print,GM03BILTPR
+Bill Type Code List,Flip Up,GM03BILTFU
+Bill Type Code List,Sandwich,GM03BILTSA
+Bill Type Code List,Normal,GM03BILTNL
+Bill Type Code List,Short,GM03BILTSH
+Boot Shaft Type Code List,Low shaft/Ankle,GM03BTSTAN
+Boot Shaft Type Code List,Over Knee XX,GM03BTSTOK
+Boot Shaft Type Code List,Knee High/Tall,GM03BTSTKH
+Boot Shaft Type Code List,Tall,GM03BTSTTL
+Boot Shaft Type Code List,Low Shaft,GM03BTSTLS
+Boot Shaft Type Code List,Other,GMOBTST99
+Boot Shaft Type Code List,Mid Calf,GM03BTSTMI
+Bra Band Type Code List,Smoothing Back,GM03BRBNSB
+Bra Band Type Code List,Toed In,GM03BRBNTI
+Bra Band Type Code List,Smoothing Side,GM03BRBNSS
+Bra Band Type Code List,U Back/Leotard Back,GM03BRBNUB
+Bra Band Type Code List,Straight Back,GM03BRBNST
+Bra Band Type Code List,Other,GM03BRBN99
+Bra Band Type Code List,T-back,GM03BRBNTB
+Bra Bust Type Code List,Average,GM03BRBTAV
+Bra Bust Type Code List,Shallow,GM03BRBTSH
+Bra Bust Type Code List,Full Figured,GM03BRBTFF
+Bra Bust Type Code List,Other,GM03BRBT99
+Bra Cup Coverage Code List,3/4,GM03BRCC34
+Bra Cup Coverage Code List,Plunge,GM03BRCCPL
+Bra Cup Coverage Code List,Balconette,GM03BRCСВА
+Bra Cup Coverage Code List,Triangle,GM03BRCCTR
+Bra Cup Coverage Code List,Demi,GM03BRCCDE
+Bra Cup Coverage Code List,Other,GM03BRCC99
+Bra Cup Coverage Code List,Full,GM03BRCCFL
+Bra Cup Type Code List,Contour (padded cup),GM03BRCTCO
+Bra Cup Type Code List,Molded (no padded cup),GM03BRCТΜΟ
+Bra Cup Type Code List,Cut & Sewn,GM03BRCTCU
+Bra Cup Type Code List,Push-Up,GM03BRCTPU
+Bra Cup Type Code List,Gel Padding,GM03BRCTGP
+Bra Cup Type Code List,Seamless,GM03BRCTSE
+Bra Cup Type Code List,Liquid Padding,GM03BRCTLP
+Bra Cup Type Code List,Spacer,GM03BRCTSP
+Bra Cup Type Code List,Memory Foam,GM03BRCTMF
+Bra Cup Type Code List,Other,GM03BRCT99
+Bra Impact Level Code List,High,GM03BRILHI
+Bra Impact Level Code List,Medium,GM03BRILMD
+Bra Impact Level Code List,High +,GM03BRILHP
+Bra Impact Level Code List,Other,GM03BRIL99
+Bra Impact Level Code List,Low,GM03BRILLO
+Bra Padding Code List,Integrated Padding,GM03BRPDIP
+Bra Padding Code List,Other,GM03BRPD99
+Bra Padding Code List,Removable Padding/Pocketed,GM03BRPDRP
+Bra Specialty Type Code List,Backless,GM03BRSTBL
+Bra Specialty Type Code List,Post-Surgical,GM03BRSTPS
+Bra Specialty Type Code List,Mastectomy,GM03BRSTMA
+Bra Specialty Type Code List,Sleep,GM03BRSTSL
+Bra Specialty Type Code List,Maternity/Nursing,GM03BRSTMT
+Bra Specialty Type Code List,Other,GM03BRST99
+Bra Type Code List,Bandeau,GM03BRTYBN
+Bra Type Code List,Minimizer,GM03BRTYΜΝ
+Bra Type Code List,Bralette,GM03BRTYBR
+Bra Type Code List,Sport,GM03BRTYSP
+Bra Type Code List,Bustier,GM03BRTYBU
+Bra Type Code List,Standard/Conventional,GM03BRTYSC
+Bra Type Code List,Convertible,GM03BRTYCN
+Bra Type Code List,Strapless,GM03BRTYST
+Bra Type Code List,Corset,GM03BRTYCO
+Bra Type Code List,Training,GM03BRTYTR
+Bra Type Code List,Halter,GM03BRTYНА
+Bra Type Code List,T-Shirt,GM03BRTYTS
+Bra Type Code List,Long Line,GM03BRTYLL
+Bra Type Code List,Other,GM03BRTY99
+Bracelet Type Code List,Adjustable,JW03BRTTAD
+Bracelet Type Code List,Hinge,JW03BRTTHN
+Bracelet Type Code List,Bangle,JW03BRTTВА
+Bracelet Type Code List,Line,JW03BRTTLI
+Bracelet Type Code List,Bracelet Set,JW03BRTTBS
+Bracelet Type Code List,Open Cuff,JW03BRTTOC
+Bracelet Type Code List,Chain,JW03BRTTCH
+Bracelet Type Code List,Stretch,JW03BRTTST
+Bracelet Type Code List,Charm,JW03BRTTCM
+Bracelet Type Code List,Wrap,JW03BRTTWR
+Bracelet Type Code List,Coil,JW03BRTTCL
+Bracelet Type Code List,Other,JW04BRTT99
+Bracelet Type Code List,Cuff,JW03BRTTCF
+Care Instructions Code List,Dishwasher Safe,GM03CAINDS
+Care Instructions Code List,Machine Wash Hot,GM03CAINΜΗ
+Care Instructions Code List,Do Not Iron,GM03CAINDN
+Care Instructions Code List,Machine Wash Line Dry,GM03CAINML
+Care Instructions Code List,Dry Clean,GM03CAINDC
+Care Instructions Code List,Machine Wash Tumble Dry,GM03CAINMT
+Care Instructions Code List,Hand Wash,GM03CAINHW
+Care Instructions Code List,Machine Wash Warm,GM03CAINMW
+Care Instructions Code List,Leather Method Dry Cleaning,GM03CAINLM
+Care Instructions Code List,Spot Clean,GM03CAINSC
+Care Instructions Code List,Machine Wash Cold,GM03CAINMC
+Care Instructions Code List,Wash Separately,GM03CAINWS
+Care Instructions Code List,Machine Wash Dry Flat,GM03CAINMD
+Care Instructions Code List,Other,GM04CAIN99
+Chemical Certifications Code List,bluesign,GM03CHCEBL
+Chemical Certifications Code List,ZDHC MRSL Certifications,GM03CHCEZD
+Chemical Certifications Code List,OEKO-TEX Standard 100 Certified,GM03CHCEOT
+Chemical Certifications Code List,Other,GM04CHCE99
+Chemical Certifications Code List,OEKO-TEX Standard Made in Green,GM03CHCEOG
+Closure Code List,Adjustable/Pull,GM03CLOSAP
+Closure Code List,Lace-up Front,GM03CLOSLF
+Closure Code List,Back,GM03CLOSBC
+Closure Code List,Latch,GM03CLOSLA
+Closure Code List,Back Button/Zip,GM03CLOSBB
+Closure Code List,Leverback,GM03CLOSLB
+Closure Code List,Back Hook/Zip,GM03CLOSBH
+Closure Code List,Lift-Lock,GM03CLOSLL
+Closure Code List,Barrel,GM03CLOSBA
+Closure Code List,Link/Clasp,GM03CLOSLC
+Closure Code List,Box Tab Insert,GM03CLOSBT
+Closure Code List,Lobster Claw,GM03CLOSLW
+Closure Code List,Buckle,GM03CLOSBU
+Closure Code List,Magnetic,GM03CLOSMG
+Closure Code List,Button,GM03CLOSBN
+Closure Code List,Pierced Post,GM03CLOSPP
+Closure Code List,Button Back,GM03CLOSBK
+Closure Code List,Push-Lock,GM03CLOSPL
+Closure Code List,Button Front,GM03CLOSBF
+Closure Code List,Side Button/Zip,GM03CLOSSB
+Closure Code List,Button Front Partial,GM03CLOSBP
+Closure Code List,Side Hook/Zip,GM03CLOSSZ
+Closure Code List,Button Shoulder,GM03CLOSBS
+Closure Code List,Snap,GM03CLOSSN
+Closure Code List,Clasp,GM03CLOSCL
+Closure Code List,Snap Back,GM03CLOSSM
+Closure Code List,Click Top,GM03CLOSCT
+Closure Code List,Snap Front,GM03CLOSSF
+Closure Code List,Clip On,GM03CLOSCO
+Closure Code List,Snap Front Partial,GM03CLOSS2
+Closure Code List,Drawstring,GM03CLOSDS
+Closure Code List,Snap Legs,GM03CLOSSE
+Closure Code List,Drawstring Front,GM03CLOSDF
+Closure Code List,Snap Shoulder,GM03CLOSSS
+Closure Code List,Drawstring Elastic,GM03CLOSDE
+Closure Code List,Snap Post,GM03CLOSSA
+Closure Code List,D Ring,GM03CLOSDR
+Closure Code List,String,GM03CLOSSR
+Closure Code List,Elastic Lace with Toggle,GM03CLOSET
+Closure Code List,Swivel,GM03CLOSSW
+Closure Code List,O Ring,GM03CLOSDO
+Closure Code List,Tab,GM03CLOSTB
+Closure Code List,Fishhook,GM03CLOSFS
+Closure Code List,Tie,GM03CLOSTI
+Closure Code List,Flap,GM03CLOSFP
+Closure Code List,Tie Back/Halter,GM03CLOSTH
+Closure Code List,Foldover,GM03CLOSFO
+Closure Code List,Tie Front,GM03CLOSTF
+Closure Code List,French Wire,GM03CLOSFW
+Closure Code List,Tie Side,GM03CLOSTS
+Closure Code List,Frog/Button Loop,GM03CLOSFA
+Closure Code List,Toggle,GM03CLOSTO
+Closure Code List,Front Button/Zip,GM03CLOSFZ
+Closure Code List,Toggle Front,GM03CLOSTN
+Closure Code List,Front Hook/Zip,GM03CLOSFH
+Closure Code List,Top Zip,GM03CLOSTZ
+Closure Code List,Hidden Button Front,GM03CLOSHB
+Closure Code List,Tunnel Side Tie,GM03CLOSTQ
+Closure Code List,Hidden Snap Front,GM03CLOSHS
+Closure Code List,Turn Lock,GM03CLOSTL
+Closure Code List,Hidden Zip Front,GM03CLOSHZ
+Closure Code List,Wrap,GM03CLOSWR
+Closure Code List,Hinged,GM03CLOSHI
+Closure Code List,Zipper,GM03CLOSZI
+Closure Code List,Hinged/Foldover,GM03CLOSHE
+Closure Code List,Zipper Back,GM03CLOSZB
+Closure Code List,Hook,GM03CLOSHO
+Closure Code List,Zipper Back Partial,GM03CLOSZP
+Closure Code List,Hook and Loop,GM03CLOSHL
+Closure Code List,Zipper Front,GM03CLOSZE
+Closure Code List,Hook-and-eye,GM03CLOSHC
+Closure Code List,Zipper Front Partial,GM03CLOSZR
+Closure Code List,Hook-and-eye Back Front,GM03CLOSHD
+Closure Code List,Zipper Side,GM03CLOSZS
+Closure Code List,Keyhole Button,GM03CLOSKB
+Closure Code List,Zipper Around,GM03CLOSZA
+Closure Code List,Kiss-Lock,GM03CLOSKL
+Closure Code List,1/4 Zip,GM03CLOSZQ
+Closure Code List,Knot,GM03CLOSKN
+Closure Code List,1/2 Zip,GM03CLOSZH
+Closure Code List,Lace Up,GM03CLOSLU
+Closure Code List,Other Closure,GM04CLOS99
+Coat/Jacket Type Code List,Anorak,GM03COATAN
+Coat/Jacket Type Code List,Pant/Car Coat,GM03COATPC
+Coat/Jacket Type Code List,Barn Coat,GM03COATBC
+Coat/Jacket Type Code List,Parka,GM03COATΡΑ
+Coat/Jacket Type Code List,Blazer,GM03COAТВА
+Coat/Jacket Type Code List,Peacoat,GM03COAΤΡΕ
+Coat/Jacket Type Code List,Bolero,GM03COATBL
+Coat/Jacket Type Code List,Poncho,GM03COAΤΡΝ
+Coat/Jacket Type Code List,Bomber,GM03COATBM
+Coat/Jacket Type Code List,Puffer,GM03COATPU
+Coat/Jacket Type Code List,Cape,GM03COATCP
+Coat/Jacket Type Code List,Sportscoat,GM03COATSP
+Coat/Jacket Type Code List,Cardigan,GM03COATCA
+Coat/Jacket Type Code List,Swing Coat,GM03COATSC
+Coat/Jacket Type Code List,Field Jacket,GM03COATFK
+Coat/Jacket Type Code List,Trench,GM03COATTR
+Coat/Jacket Type Code List,Fit & Flare,GM03COATFF
+Coat/Jacket Type Code List,Trucker,GM03COATTU
+Coat/Jacket Type Code List,Hoodie,GM03COATHO
+Coat/Jacket Type Code List,Vest,GM03COATVE
+Coat/Jacket Type Code List,Military,GM03COATMI
+Coat/Jacket Type Code List,Windbreaker,GM03COATWI
+Coat/Jacket Type Code List,Motorcycle,GM03COATMT
+Coat/Jacket Type Code List,Wrap,GM03COATWR
+Coat/Jacket Type Code List,Overcoat,GM03COATOC
+Coat/Jacket Type Code List,Other,GM04COAT99
+Collar/Neck Type Code List,Ballet,GM03CLNTBL
+Collar/Neck Type Code List,Plunge,GM03CLNTPJ
+Collar/Neck Type Code List,Banded,GM03CLNTBC
+Collar/Neck Type Code List,Point,GM03CLNTΡΟ
+Collar/Neck Type Code List,Boat or Bateau,GM03CLNTBE
+Collar/Neck Type Code List,Polo,GM03CLNTPU
+Collar/Neck Type Code List,Button-Down,GM03CLNTBD
+Collar/Neck Type Code List,Portrait Collar,GM03CLNTPR
+Collar/Neck Type Code List,Cowl,GM03CLNTCW
+Collar/Neck Type Code List,1/4-Zip Mock,GM03CLNTQZ
+Collar/Neck Type Code List,Crew,GM03CLNTCR
+Collar/Neck Type Code List,Racer Back,GM03CLNTRB
+Collar/Neck Type Code List,Drape,GM03CLNTDP
+Collar/Neck Type Code List,Rolled,GM03CLNTRO
+Collar/Neck Type Code List,Funnel,GM03CLNTFU
+Collar/Neck Type Code List,Round,GM03CLNTRU
+Collar/Neck Type Code List,Halter,GM03CLNTHA
+Collar/Neck Type Code List,Sailor,GM03CLNTSD
+Collar/Neck Type Code List,Henley,GM03CLNTHΝ
+Collar/Neck Type Code List,Scoop,GM03CLNTSC
+Collar/Neck Type Code List,Henley Faux,GM03CLNTHF
+Collar/Neck Type Code List,Shawl,GM03CLNTSH
+Collar/Neck Type Code List,Henley Functional,GM03CLNTHU
+Collar/Neck Type Code List,Slider Halter,GM03CLNTSL
+Collar/Neck Type Code List,Jewel,GM03CLNTJE
+Collar/Neck Type Code List,Spread,GM03CLNTSO
+Collar/Neck Type Code List,Johnny,GM03CLNTJO
+Collar/Neck Type Code List,Square,GM03CLNTSQ
+Collar/Neck Type Code List,Keyhole,GM03CLNTKE
+Collar/Neck Type Code List,Stand,GM03CLNTSV
+Collar/Neck Type Code List,Mandarin,GM03CLNTMB
+Collar/Neck Type Code List,Surplice,GM03CLNTSU
+Collar/Neck Type Code List,Marilyn,GM03CLNTMI
+Collar/Neck Type Code List,Sweetheart,GM03CLNTSX
+Collar/Neck Type Code List,Mockneck,GM03CLNTMO
+Collar/Neck Type Code List,Tab,GM03CLNTTA
+Collar/Neck Type Code List,Necklace,GM03CLNTNE
+Collar/Neck Type Code List,Tie,GM03CLNTTI
+Collar/Neck Type Code List,Notch,GM03CLNTNO
+Collar/Neck Type Code List,Turtle,GM03CLNTTU
+Collar/Neck Type Code List,Off the Shoulder,GM03CLNTOR
+Collar/Neck Type Code List,V-Neck,GM03CLNTVN
+Collar/Neck Type Code List,One Shoulder,GM03CLNTOS
+Collar/Neck Type Code List,Wing,GM03CLNTWI
+Collar/Neck Type Code List,Ottoman,GM03CLNTOT
+Collar/Neck Type Code List,Y-Neck,GM03CLNTΥΝ
+Collar/Neck Type Code List,Peter Pan,GM03CLNTΡΑ
+Collar/Neck Type Code List,Other Collar,GM04CLNT99
+Collar/Neck Type Code List,Platter,GM03CLNTΡΕ
+Conference Code List,ACC,ZZ03CONFAC
+Conference Code List,National League,ZZ03CONFNL
+Conference Code List,AFC,ZZ03CONFAF
+Conference Code List,NFC,ZZ03CONFNF
+Conference Code List,American League,ZZ03CONFAL
+Conference Code List,Pac 12,ZZ03CONFPA
+Conference Code List,Big 10,ZZ03CONFBT
+Conference Code List,SEC,ZZ03CONFSE
+Conference Code List,Big 12,ZZ03CONFBW
+Conference Code List,The American,ZZ03CONFAM
+Conference Code List,Eastern,ZZ03CONFEA
+Conference Code List,Western,ZZ03CONFWE
+Conference Code List,Independents,ZZ03CONFIN
+Conference Code List,Other,ZZ04CONF99
+Consumer Life Stage Code List,Adult,GM03CNLSAD
+Consumer Life Stage Code List,Teen,GM03CNLSTE
+Consumer Life Stage Code List,All Ages,GM03CNLSAG
+Consumer Life Stage Code List,Toddler,GM03CNLTDD
+Consumer Life Stage Code List,Baby/Infant,GM03CNLSBI
+Consumer Life Stage Code List,Unclassified,GM03CNLSYA
+Consumer Life Stage Code List,Child,GM03CNLSCH
+Consumer Life Stage Code List,Unidentified,GM03CNLSUC
+Consumer Life Stage Code List,Child 1-2 Years,GM03CNLSCT
+Consumer Life Stage Code List,Young Adult,GM03CNLSYA
+Consumer Life Stage Code List,Child 2 Years Onwards,GM03CNLSCW
+Consumer Life Stage Code List,Other,GM04CNLS99
+Consumer Life Stage Code List,Preemie,GM03CNLSPR
+Control Level Code List,Extra Firm,GM03CONLEF
+Control Level Code List,Medium,GM03CONLMD
+Control Level Code List,Firm,GM03CONLFR
+Control Level Code List,Other,GM03CONL99
+Control Level Code List,Light,GM03CONLLT
+Cookware Type Code List,Cake Pan,GM03COOКСР
+Cookware Type Code List,Pie Pan,GM03COOKPP
+Cookware Type Code List,Casserole Dish,GM03COOKCD
+Cookware Type Code List,Pizza Pan,GM03COOΚΡΙ
+Cookware Type Code List,Cookie Sheet,GM03COOKCS
+Cookware Type Code List,Pressure Cooker,GM03COOКРС
+Cookware Type Code List,Cupcake/Muffin Pan,GM03COOКСМ
+Cookware Type Code List,Roaster,GM03COOKRR
+Cookware Type Code List,Dutch Oven,GM03COOKDU
+Cookware Type Code List,Saucepan,GM03COOKSA
+Cookware Type Code List,Frying Pan,GM03COOKFP
+Cookware Type Code List,Sauté Pan,GM03COOKSE
+Cookware Type Code List,Griddle,GM03COOKGR
+Cookware Type Code List,Set,GM03COOKST
+Cookware Type Code List,Lids and accessory,GM03COOKLA
+Cookware Type Code List,Specialty,GM03COOKSP
+Cookware Type Code List,Multi-Cooker/Stockpot,GM03COOKMS
+Cookware Type Code List,Other,GM04COOK99
+Corporate/Philanthropic Certifications Code List,1% for the Planet,GM03COPHPL
+Corporate/Philanthropic Certifications Code List,NATURETEXTIL IVN certified BEST,GM03COPHΝΑ
+Corporate/Philanthropic Certifications Code List,BCorp Certified,GM03COPHBC
+Corporate/Philanthropic Certifications Code List,Nordic Swan,GM03COPHNS
+Corporate/Philanthropic Certifications Code List,Blue Angel,GM03COPΗΒΑ
+Corporate/Philanthropic Certifications Code List,Other,GM04COPH99
+Corporate/Philanthropic Certifications Code List,EU Ecolabel,GM03COPHEU
+Crown Code List,High,GM03CRWNHI
+Crown Code List,,GM03CRWNNN
+Crown Code List,Low,GM03CRWNLW
+Crown Code List,Other,GM04CRWN99
+Crown Code List,Mid,GM03CRWNMD
+Cuff Type Code List,Barrel,GM03CFTPВА
+Cuff Type Code List,No Cuff,GM03CFTPNC
+Cuff Type Code List,Bottom Hem Cuffed,GM03CFTPBH
+Cuff Type Code List,One Button,GM03CFTPBU
+Cuff Type Code List,Elastic,GM03CFTPEL
+Cuff Type Code List,Ribbed,GM03CFTPRB
+Cuff Type Code List,Faux Fur,GM03CFTPFF
+Cuff Type Code List,Thumb Hole,GM03CFTPΤΗ
+Cuff Type Code List,Folded,GM03CFTPFD
+Cuff Type Code List,Two-Button,GM03CFTPТВ
+Cuff Type Code List,French,GM03CFTPFR
+Cuff Type Code List,Other,GM04CFTP99
+Cuff Type Code List,Mitered,GM03CFTPΜΙ
+Dinnerware Category Code List,Everyday,GM03DNRCEV
+Dinnerware Category Code List,Other,GM04DNRC99
+Dinnerware Category Code List,Fine China,GM03DNRCFC
+Dress Type Code List,A-line,GM03DRTPAL
+Dress Type Code List,Pencil,GM03DRTΡΡΕ
+Dress Type Code List,Babydoll,GM03DRTPΡΒΑ
+Dress Type Code List,Peplum,GM03DRTPPL
+Dress Type Code List,Blouson,GM03DRTPBL
+Dress Type Code List,Popover,GM03DRTPPV
+Dress Type Code List,Body-Conscious,GM03DRTPРBC
+Dress Type Code List,Sheath,GM03DRTPSE
+Dress Type Code List,Caftan,GM03DRTPСА
+Dress Type Code List,Shift,GM03DRTPSI
+Dress Type Code List,Circular,GM03DRTPСІ
+Dress Type Code List,Shirtdress,GM03DRTPSD
+Dress Type Code List,Dress,GM03DRTPDR
+Dress Type Code List,Skater,GM03DRTPSK
+Dress Type Code List,Drop Waist,GM03DRTPDW
+Dress Type Code List,Skort,GM03DRTPSR
+Dress Type Code List,Empire Waist,GM03DRTPEW
+Dress Type Code List,Slipdress,GM03DRTPSL
+Dress Type Code List,Faux Wrap,GM03DRTPFW
+Dress Type Code List,Sweater Dress,GM03DRTPSW
+Dress Type Code List,Flared,GM03DRTPFL
+Dress Type Code List,Tank Dress,GM03DRTPTD
+Dress Type Code List,Full Skirt,GM03DRTPFS
+Dress Type Code List,Tiered,GM03DRTPTI
+Dress Type Code List,Gown,GM03DRTPGN
+Dress Type Code List,Two Piece,GM03DRTPΤΡ
+Dress Type Code List,Jacket Dress,GM03DRTPJD
+Dress Type Code List,Wedding,GM03DRTPWE
+Dress Type Code List,Jumper,GM03DRTPJU
+Dress Type Code List,Wrap,GM03DRTPWR
+Dress Type Code List,Maternity,GM03DRTPΡΜΑ
+Dress Type Code List,Other,GM04DRTP99
+Dress Type Code List,Mermaid/Trumpet,GM03DRTPMT
+Earring Type Code List,Button,JW03EATPBU
+Earring Type Code List,Ear Wrap,JW03EATPEW
+Earring Type Code List,Chandelier,JW03EATPCH
+Earring Type Code List,Hoop,JW03EATPΗΡ
+Earring Type Code List,Drop,JW03EATPDR
+Earring Type Code List,Stud,JW03EATPST
+Earring Type Code List,Ear Cuff,JW03EATPЕС
+Earring Type Code List,Other,JW04EATP99
+Earring Type Code List,Ear Jacket,JW03EATPEJ
+Eyewear Type Code List,Aviator,GM03EYESAV
+Eyewear Type Code List,Polarized Lenses,GM03EYESPL
+Eyewear Type Code List,Brow Bar,GM03EYESBB
+Eyewear Type Code List,Shield,GM03EYESSH
+Eyewear Type Code List,Cat Eye,GM03EYESCE
+Eyewear Type Code List,Wayfarer,GM03EYESWA
+Eyewear Type Code List,Clubmaster,GM03EYESCL
+Eyewear Type Code List,Wrap,GM03EYESWR
+Eyewear Type Code List,Mirrored Lenses,GM03EYESML
+Eyewear Type Code List,Other,GM04EYES99
+Fabric or Material Code List,14K Gold,GM03FBMC14
+Fabric or Material Code List,Marble/Wood,GM03FBMCMD
+Fabric or Material Code List,18K Gold,GM03FBMC18
+Fabric or Material Code List,Matte Jersey,GM03FBMCME
+Fabric or Material Code List,Agate,GM03FBMCAG
+Fabric or Material Code List,Melamine,GM03FBMCMF
+Fabric or Material Code List,Aluminum,GM03FBMCAL
+Fabric or Material Code List,Mercury Glass,GM03FBMCMG
+Fabric or Material Code List,Amethyst,GM03FBMCAM
+Fabric or Material Code List,Mesh,GM03FBMCMH
+Fabric or Material Code List,Anodized Aluminum,GM03FBMCAN
+Fabric or Material Code List,Metal,GM03FBMCMI
+Fabric or Material Code List,Beaded,GM03FBMCBD
+Fabric or Material Code List,Metal Alloy,GM03FBMCMJ
+Fabric or Material Code List,Birthstone,GM03FBMCBE
+Fabric or Material Code List,Metallic,GM03FBMCMK
+Fabric or Material Code List,Bi-stretch,GM03FBMCBF
+Fabric or Material Code List,Microfiber,GM03FBMCML
+Fabric or Material Code List,Bone,GM03FBMCBG
+Fabric or Material Code List,Microfleece,GM03FBMCMM
+Fabric or Material Code List,Boucle,GM03FBMCBH
+Fabric or Material Code List,Mikado,GM03FBMCMN
+Fabric or Material Code List,Brass,GM03FBMCBI
+Fabric or Material Code List,Mixed Materials,GM03FBMCMO
+Fabric or Material Code List,Broadcloth,GM03FBMCBJ
+Fabric or Material Code List,Mogador,GM03FBMCMP
+Fabric or Material Code List,Brocade,GM03FBMCBL
+Fabric or Material Code List,Moleskin,GM03FBMCMQ
+Fabric or Material Code List,Bronze,GM03FBMCBN
+Fabric or Material Code List,Mother-of-Pearl,GM03FBMCMR
+Fabric or Material Code List,Brushed Back Satin,GM03FBMCBS
+Fabric or Material Code List,Natural,GM03FBMCNA
+Fabric or Material Code List,Brushed Back Terry,GM03FBMCBT
+Fabric or Material Code List,Natural Fiber,GM03FBMCNB
+Fabric or Material Code List,Burlap,GM03FBMCBU
+Fabric or Material Code List,Nonstick,GM03FBMCNC
+Fabric or Material Code List,Canvas,GM03FBMCCA
+Fabric or Material Code List,Nubuck,GM03FBMCND
+Fabric or Material Code List,Cashmink,GM03FBMCCB
+Fabric or Material Code List,Onyx,GM03FBMCOA
+Fabric or Material Code List,Cast Aluminum,GM03FBMCCC
+Fabric or Material Code List,Opal,GM03FBMСОВ
+Fabric or Material Code List,Cast Iron,GM03FBMCCD
+Fabric or Material Code List,Organza,GM03FBMCOC
+Fabric or Material Code List,Ceramic,GM03FBMCCE
+Fabric or Material Code List,Ostrich,GM03FBMCOD
+Fabric or Material Code List,Challis,GM03FBMCCF
+Fabric or Material Code List,Ostrich Embossed,GM03FBMCOE
+Fabric or Material Code List,Chambray,GM03FBMCCG
+Fabric or Material Code List,Oxford,GM03FBMCOF
+Fabric or Material Code List,Charmeuse,GM03FBMCCH
+Fabric or Material Code List,Palladium,GM03FBMCPA
+Fabric or Material Code List,Chenille,GM03FBMCCI
+Fabric or Material Code List,Paper Braid,GM03FBMCPB
+Fabric or Material Code List,Chiffon/Sheer,GM03FBMCCJ
+Fabric or Material Code List,Patent Leather,GM03FBMCPC
+Fabric or Material Code List,Coated Canvas,GM03FBMCCK
+Fabric or Material Code List,Pearl,GM03FBMCPD
+Fabric or Material Code List,Composite,GM03FBMCCL
+Fabric or Material Code List,Percale,GM03FBMCPE
+Fabric or Material Code List,Confetti,GM03FBMCCM
+Fabric or Material Code List,Pinpoint,GM03FBMCPF
+Fabric or Material Code List,Copper,GM03FBMCCN
+Fabric or Material Code List,Pique,GM03FBMCPG
+Fabric or Material Code List,Coral,GM03FBMCCO
+Fabric or Material Code List,Plastic,GM03FBMCPH
+Fabric or Material Code List,Corduroy,GM03FBMCСР
+Fabric or Material Code List,Plastic/Acetate,GM03FBMCPI
+Fabric or Material Code List,Corian,GM03FBMCCQ
+Fabric or Material Code List,Plastic/Metal,GM03FBMCPJ
+Fabric or Material Code List,Cork,GM03FBMCCR
+Fabric or Material Code List,Plush,GM03FBMCPK
+Fabric or Material Code List,Crepe,GM03FBMCCS
+Fabric or Material Code List,Pointelle,GM03FBMCPL
+Fabric or Material Code List,Crinoline,GM03FBMCCT
+Fabric or Material Code List,Polycarbonate,GM03FBMCPM
+Fabric or Material Code List,Crochet,GM03FBMCCU
+Fabric or Material Code List,Ponte,GM03FBMCPN
+Fabric or Material Code List,Crochet/Openwork,GM03FBMCCV
+Fabric or Material Code List,Poplin,GM03FBMCPO
+Fabric or Material Code List,Croco,GM03FBMCCW
+Fabric or Material Code List,Porcelain,GM03FBMCPP
+Fabric or Material Code List,Croco Embossed,GM03FBMCCX
+Fabric or Material Code List,Portuguese Flannel,GM03FBMCPQ
+Fabric or Material Code List,Crystal,GM03FBMCCY
+Fabric or Material Code List,Propionate,GM03FBMCPR
+Fabric or Material Code List,Cubic Zirconia,GM03FBMCCZ
+Fabric or Material Code List,PU,GM03FBMCPS
+Fabric or Material Code List,Denim,GM03FBMCDA
+Fabric or Material Code List,Quartz,GM03FBMCQA
+Fabric or Material Code List,Diamond,GM03FBMCDB
+Fabric or Material Code List,Rattan,GM03FBMCRA
+Fabric or Material Code List,Dobby,GM03FBMCDC
+Fabric or Material Code List,Resin,GM03FBMCRB
+Fabric or Material Code List,Double Knit,GM03FBMCDD
+Fabric or Material Code List,Rhodium,GM03FBMCRC
+Fabric or Material Code List,Down,GM03FBMCDE
+Fabric or Material Code List,Ribbon,GM03FBMCRD
+Fabric or Material Code List,Down Fill,GM03FBMCDF
+Fabric or Material Code List,Rope,GM03FBMRE
+Fabric or Material Code List,Drop Needle,GM03FBMCDG
+Fabric or Material Code List,Saffiano,GM03FBMCSA
+Fabric or Material Code List,Earthenware,GM03FBMCEA
+Fabric or Material Code List,Sateen,GM03FBMCSB
+Fabric or Material Code List,Elephant Embossed,GM03FBMCEB
+Fabric or Material Code List,Satin,GM03FBMCSC
+Fabric or Material Code List,Enamel,GM03FBMCEC
+Fabric or Material Code List,Scuba,GM03FBMCSD
+Fabric or Material Code List,Enamel/Aluminum,GM03FBMCED
+Fabric or Material Code List,Seagrass,GM03FBMCSE
+Fabric or Material Code List,Enamel/Epoxy,GM03FBMCEF
+Fabric or Material Code List,Seersucker,GM03FBMCSF
+Fabric or Material Code List,Enamel/Iron,GM03FBMCEG
+Fabric or Material Code List,Sequin,GM03FBMCSG
+Fabric or Material Code List,Enamel/Steel,GM03FBMCЕН
+Fabric or Material Code List,Shantung,GM03FBMCSH
+Fabric or Material Code List,End-on-End,GM03FBMCEI
+Fabric or Material Code List,Shearling,GM03FBMCSI
+Fabric or Material Code List,Epoxy,GM03FBMCEJ
+Fabric or Material Code List,Sheeting,GM03FBMCSJ
+Fabric or Material Code List,Eyelet,GM03FBMСЕК
+Fabric or Material Code List,Shell,GM03FBMCSK
+Fabric or Material Code List,Fabric,GM03FBMCFA
+Fabric or Material Code List,Silicone,GM03FBMCSL
+Fabric or Material Code List,Faux Fur,GM03FBMCFB
+Fabric or Material Code List,Sinamay,GM03FBMCSM
+Fabric or Material Code List,Faux Leather,GM03FBMCFC
+Fabric or Material Code List,Slate,GM03FBMCSN
+Fabric or Material Code List,Faux Pearl,GM03FBMCFD
+Fabric or Material Code List,Slub,GM03FBMCSO
+Fabric or Material Code List,Faux Shearling,GM03FBMCFE
+Fabric or Material Code List,Snake Embossed,GM03FBMCSP
+Fabric or Material Code List,Faux Suede,GM03FBMCFF
+Fabric or Material Code List,Snit,GM03FBMCSQ
+Fabric or Material Code List,Felt,GM03FBMCFG
+Fabric or Material Code List,Stainless Steel,GM03FBMCSR
+Fabric or Material Code List,Flannel,GM03FBMCFH
+Fabric or Material Code List,Steel,GM03FBMCST
+Fabric or Material Code List,Flat Knit,GM03FBMCFI
+Fabric or Material Code List,Sterling Silver,GM03FBMCSU
+Fabric or Material Code List,Fleece,GM03FBMCFJ
+Fabric or Material Code List,Stone,GM03FBMCSV
+Fabric or Material Code List,Foam,GM03FBMCFK
+Fabric or Material Code List,Stoneware,GM03FBMCSW
+Fabric or Material Code List,French Terry,GM03FBMCFL
+Fabric or Material Code List,Straw,GM03FBMCSX
+Fabric or Material Code List,Fresh Water Pearl,GM03FBMCFM
+Fabric or Material Code List,Styrofoam,GM03FBMCSY
+Fabric or Material Code List,Fur,GM03FBMCFN
+Fabric or Material Code List,Suede,GM03FBMCSZ
+Fabric or Material Code List,Gabardine,GM03FBMCGA
+Fabric or Material Code List,Sweater Yarn,GM03FBMCSS
+Fabric or Material Code List,Galvanized,GM03FBMCGB
+Fabric or Material Code List,Swiss Dot,GM03FBMCWI
+Fabric or Material Code List,Gauze,GM03FBMCGC
+Fabric or Material Code List,Synthetic,GM03FBMCYT
+Fabric or Material Code List,Genuine Stone,GM03FBMCGD
+Fabric or Material Code List,Taffeta,GM03FBMCТА
+Fabric or Material Code List,Georgette,GM03FBMCGE
+Fabric or Material Code List,Terra Cotta,GM03FBMCTB
+Fabric or Material Code List,Glass,GM03FBMCGF
+Fabric or Material Code List,Terry Cloth,GM03FBMCTC
+Fabric or Material Code List,Glitter,GM03FBMCGI
+Fabric or Material Code List,Thermal,GM03FBMCTD
+Fabric or Material Code List,Grenadine,GM03FBMCGG
+Fabric or Material Code List,Titanium,GM03FBMCTЕ
+Fabric or Material Code List,Grosgrain,GM03FBMCGH
+Fabric or Material Code List,Topaz,GM03FBMCTF
+Fabric or Material Code List,Hard Anodized,GM03FBMCHA
+Fabric or Material Code List,Tricot,GM03FBMCTG
+Fabric or Material Code List,Hatchi,GM03FBMCHB
+Fabric or Material Code List,Tri-Ply Stainless Steel,GM03FBMCTH
+Fabric or Material Code List,Heavy Gauge Steel,GM03FBMCHC
+Fabric or Material Code List,Tritan,GM03FBMCTI
+Fabric or Material Code List,High-Carbon Steel,GM03FBMCHD
+Fabric or Material Code List,Tulle,GM03FBMCT 
+Fabric or Material Code List,Hopsack,GM03FBMCHE
+Fabric or Material Code List,Turquoise,GM03FBMCTK
+Fabric or Material Code List,Howlite,GM03FBMCHF
+Fabric or Material Code List,Tweed,GM03FBMCTL
+Fabric or Material Code List,Ironstone,GM03FBMCIA
+Fabric or Material Code List,Tweed/Boucle,GM03FBMCTM
+Fabric or Material Code List,Jacquard,GM03FBMCJA
+Fabric or Material Code List,Twill,GM03FBMCTN
+Fabric or Material Code List,Jade,GM03FBMCJB
+Fabric or Material Code List,Velour,GM03FBMCVA
+Fabric or Material Code List,Jasper,GM03FBMCJC
+Fabric or Material Code List,Velvet,GM03FBMCVB
+Fabric or Material Code List,Knit (Generic),GM03FBMСKA
+Fabric or Material Code List,Velveteen,GM03FBMCVC
+Fabric or Material Code List,Knit Cable,GM03FBMCKB
+Fabric or Material Code List,Voile,GM03FBMCVD
+Fabric or Material Code List,Knit Fine Gauge,GM03FBMCKC
+Fabric or Material Code List,Waffle,GM03FBMCWA
+Fabric or Material Code List,Knit Intarsia,GM03FBMCKD
+Fabric or Material Code List,Wax,GM03FBMCWB
+Fabric or Material Code List,Knit Interlock,GM03FBMCKE
+Fabric or Material Code List,Wicker,GM03FBMCWC
+Fabric or Material Code List,Knit Jersey,GM03FBMCKF
+Fabric or Material Code List,Wire,GM03FBMCWD
+Fabric or Material Code List,Knit Ribbed,GM03FBMCKG
+Fabric or Material Code List,Wood,GM03FBMCWE
+Fabric or Material Code List,Knit/Woven,GM03FBMCKH
+Fabric or Material Code List,Wood Alternative,GM03FBMCWF
+Fabric or Material Code List,Knitted,GM03FBMCKI
+Fabric or Material Code List,Wool,GM03FBMCWG
+Fabric or Material Code List,Lace,GM03FBMCLA
+Fabric or Material Code List,Woven (generic),GM03FBMCWH
+Fabric or Material Code List,Leather,GM03FBMCLB
+Fabric or Material Code List,Other,GM03FBMC99
+Fabric or Material Code List,Lizard Embossed,GM03FBMCLC
+Fabric or Material Code List,Magnesite,GM03FBMCMA
+Fabric or Material Code List,Magnet,GM03FBMCMB
+Fabric or Material Code List,Marble,GM03FBMCMC
+Fiber Code List,Acetate,GM03FIBRAA
+Fiber Code List,Paper,GM03FIBRPA
+Fiber Code List,Acrylic,GM03FIBRAB
+Fiber Code List,Pashmina,GM03FIBRPB
+Fiber Code List,Alpaca,GM03FIBRAC
+Fiber Code List,Pigskin,GM03FIBRPC
+Fiber Code List,Angora,GM03FIBRAD
+Fiber Code List,Pima Cotton,GM03FIBRPD
+Fiber Code List,Bamboo,GM03FIBRBA
+Fiber Code List,Pima Cotton Blend,GM03FIBRPE
+Fiber Code List,Buffalo,GM03FIBRBB
+Fiber Code List,Polyester,GM03FIBRPF
+Fiber Code List,Cashmere,GM03FIBRCA
+Fiber Code List,Polyester Blend,GM03FIBRPG
+Fiber Code List,Cotton,GM03FIBRCB
+Fiber Code List,Polyester/Cotton,GM03FIBRPH
+Fiber Code List,Cotton Blend,GM03FIBRCC
+Fiber Code List,Polyester/Elastane,GM03FIBRPI
+Fiber Code List,Cotton/Cashmere,GM03FIBRCD
+Fiber Code List,Polyester/Modal,GM03FIBRPJ
+Fiber Code List,Cotton/Elastane,GM03FIBRCE
+Fiber Code List,Polyester/Nylon,GM03FIBRPK
+Fiber Code List,Cotton/Lyocell,GM03FIBRCF
+Fiber Code List,Polyester/Rayon,GM03FIBRPL
+Fiber Code List,Cotton/Polyester,GM03FIBRCG
+Fiber Code List,Polypropylene,GM03FIBRPM
+Fiber Code List,Cotton/Polyester/Elastane,GM03FIBRCH
+Fiber Code List,Polyurethane,GM03FIBRPN
+Fiber Code List,Cotton/Rayon,GM03FIBRCI
+Fiber Code List,PVC,GM03FIBRPO
+Fiber Code List,Cotton/Silk,GM03FIBRCJ
+Fiber Code List,Qmiich,GM03FIBRQM
+Fiber Code List,Cow,GM03FIBRCK
+Fiber Code List,Raffia,GM03FIBRRA
+Fiber Code List,Deer,GM03FIBRDA
+Fiber Code List,Ramie,GM03FIBRRB
+Fiber Code List,Egyptian Cotton,GM03FIBREA
+Fiber Code List,Rayon,GM03FIBRRC
+Fiber Code List,Elastane,GM03FIBREB
+Fiber Code List,Rayon (Viscose),GM03FIBRRD
+Fiber Code List,Flax,GM03FIBRFA
+Fiber Code List,Rayon/Elastane,GM03FIBRRE
+Fiber Code List,Goat,GM03FIBRGA
+Fiber Code List,Rayon/Nylon,GM03FIBRRF
+Fiber Code List,Hair On Hide,GM03FIBRHA
+Fiber Code List,Rayon/Nylon/Elastane,GM03FIBRRG
+Fiber Code List,Haircalf,GM03FIBRHB
+Fiber Code List,Rhino,GM03FIBRRH
+Fiber Code List,Hemp,GM03FIBRHC
+Fiber Code List,Rubber,GM03FIBRRI
+Fiber Code List,Horse Hair,GM03FIBRHD
+Fiber Code List,Sheepskin,GM03FIBRSA
+Fiber Code List,Jute,GM03FIBRJA
+Fiber Code List,Silk,GM03FIBRSB
+Fiber Code List,Lamb,GM03FIBRLA
+Fiber Code List,Sisal,GM03FIBRSC
+Fiber Code List,Lambs Wool/Nylon,GM03FIBRLB
+Fiber Code List,Snake,GM03FIBRSD
+Fiber Code List,Leather,GM03FIBRLC
+Fiber Code List,Supplex,GM03FIBRSE
+Fiber Code List,Leather/Nylon,GM03FIBRLD
+Fiber Code List,Supplex/Elastane,GM03FIBRSF
+Fiber Code List,Linen,GM03FIBRLE
+Fiber Code List,Turkish Cotton,GM03FIBRTA
+Fiber Code List,Linen/Cotton,GM03FIBRLF
+Fiber Code List,UGG Wool,GM03FIBRUA
+Fiber Code List,Linen/Silk,GM03FIBRLG
+Fiber Code List,Vinyl,GM03FIBRVA
+Fiber Code List,Lurex,GM03FIBRLH
+Fiber Code List,Viscose,GM03FIBRVB
+Fiber Code List,Lyocell,GM03FIBRLI
+Fiber Code List,Wool,GM03FIBRWA
+Fiber Code List,Metallic Yarm,GM03FIBRMA
+Fiber Code List,Wool Blend,GM03FIBRWB
+Fiber Code List,Microcotton,GM03FIBRMB
+Fiber Code List,Wool/Bamboo,GM03FIBRWC
+Fiber Code List,Microfiber,GM03FIBRMC
+Fiber Code List,Wool/Cashmere,GM03FIBRWD
+Fiber Code List,Modal,GM03FIBRMD
+Fiber Code List,Wool/Elastane,GM03FIBRWE
+Fiber Code List,Modal/Elastane,GM03FIBRME
+Fiber Code List,Wool/Nylon/Cashmere,GM03FIBRWF
+Fiber Code List,Mohair,GM03FIBRMF
+Fiber Code List,Wool/Silk,GM03FIBRWG
+Fiber Code List,Neoprene,GM03FIBRNA
+Fiber Code List,Other,GM03FIBR99
+Fiber Code List,Nylon,GM03FIBRNB
+Fiber Code List,Nylon/Elastane,GM03FIBRNC
+Fiber Code List,Olefin,GM03FIBROA
+Fill Material Code List,Down,GM03FILMDW
+Fill Material Code List,Natural Fill,GM03FILMNA
+Fill Material Code List,Down Alternative,GM03FILMDA
+Fill Material Code List,Nylon Fill,GM03FILMNY
+Fill Material Code List,Down/Feather,GM03FILMDF
+Fill Material Code List,Polyfill,GM03FILMPY
+Fill Material Code List,Feather,GM03FILMFE
+Fill Material Code List,Synthetic,GM03FILMSY
+Fill Material Code List,Latex Foam,GM03FILMLF
+Fill Material Code List,Other,GM04FILM99
+Fill Material Code List,Memory Foam,GM03FILMMF
+Finish Code List,Acid Washed,GM03FNSHAW
+Finish Code List,Patent,GM03FNSHPA
+Finish Code List,Antique,GM03FNSHAN
+Finish Code List,Polished,GM03FNSHPL
+Finish Code List,Brushed,GM03FNSHBR
+Finish Code List,Raw/Dry,GM03FNSHRD
+Finish Code List,Coated,GM03FNSHCT
+Finish Code List,Rub-Off,GM03FNSHRB
+Finish Code List,Distressed,GM03FNSHDI
+Finish Code List,Satin,GM03FNSHSA
+Finish Code List,Dual/Etched,GM03FNSHDE
+Finish Code List,Shiny,GM03FNSHSH
+Finish Code List,Embossed,GM03FNSHEM
+Finish Code List,Stone Wash,GM03FNSHSW
+Finish Code List,Matte,GM03FNSHMA
+Finish Code List,Velvet,GM03FNSHVE
+Finish Code List,Matte/Frosted,GM03FNSHMF
+Finish Code List,Washed,GM03FNSHWA
+Finish Code List,Metallic,GM03FNSHME
+Finish Code List,Other,GM04FNSH99
+Finish Code List,Nappa,GM03FNSHNA
+Fit Code List,Relaxed,GM03FITTRE
+Fit Code List,Other,GM04FITT99
+Fit Code List,Structured,GM03FITTST
+Flatware Type Code List,Butter Knife,GM03FLATBU
+Flatware Type Code List,Pasta Server,GM03FLATPΑ
+Flatware Type Code List,Cake Knife,GM03FLATCA
+Flatware Type Code List,Pierced Serving Spoon,GM03FLATΡΙ
+Flatware Type Code List,Carving Fork,GM03FLATCR
+Flatware Type Code List,Salad Fork,GM03FLATSA
+Flatware Type Code List,Cocktail Fork,GM03FLATCC
+Flatware Type Code List,Serving Fork,GM03FLATSF
+Flatware Type Code List,Cocktail Spoon,GM03FLATCS
+Flatware Type Code List,Serving Spoon,GM03FLATSS
+Flatware Type Code List,Dessert Server,GM03FLATDE
+Flatware Type Code List,Soup Spoon,GM03FLATSP
+Flatware Type Code List,Dinner Fork,GM03FLATDI
+Flatware Type Code List,Spoon,GM03FLATSN
+Flatware Type Code List,Fork,GM03FLATFK
+Flatware Type Code List,Spreader Knife,GM03FLATSK
+Flatware Type Code List,Ice Tea Spoon,GM03FLATIC
+Flatware Type Code List,Steak Knife,GM03FLATST
+Flatware Type Code List,Knife,GM03FLATKN
+Flatware Type Code List,Sugar Spoon,GM03FLATSU
+Flatware Type Code List,Ladle,GM03FLATLD
+Flatware Type Code List,Tablespoon,GM03FLATTA
+Flatware Type Code List,Lasagna Server,GM03FLATLS
+Flatware Type Code List,Teaspoon,GM03FLATTE
+Flatware Type Code List,Luncheon Fork,GM03FLATLF
+Flatware Type Code List,Tongs,GM03FLATTG
+Flatware Type Code List,Luncheon Knife,GM03FLATLK
+Flatware Type Code List,Other,GM04FLAT99
+Formulation Code List,Capsules,GM03FORMCA
+Formulation Code List,Mousse/Foam,GM03FORMMF
+Formulation Code List,Cream,GM03FORMCR
+Formulation Code List,Oil,GM03FORMIL
+Formulation Code List,Cream-To-Powder,GM03FORMCP
+Formulation Code List,Paste,GM03FORMPS
+Formulation Code List,Gel,GM03FORMGL
+Formulation Code List,Pressed Powder,GM03FORMPP
+Formulation Code List,Liquid,GM03FORMLQ
+Formulation Code List,Solid,GM03FORMSL
+Formulation Code List,Loose Powder,GM03FORMLP
+Formulation Code List,Wax,GM03FORMWX
+Formulation Code List,Lotion,GM03FORMLT
+Formulation Code List,Wipe,GM03FORMWP
+Formulation Code List,Mist/Spray,GM03FORMMS
+Formulation Code List,Other,GM04FORM99
+Fur Animal Name Code List,Australian Brushtail Possum,GM03FANMAP
+Fur Animal Name Code List,Otter,GM03FANMOU
+Fur Animal Name Code List,Beaver,GM03FANMBV
+Fur Animal Name Code List,Pony Hair,GM03FANMPH
+Fur Animal Name Code List,Calf Hair,GM03FANMCH
+Fur Animal Name Code List,Rabbit,GM03FANMRI
+Fur Animal Name Code List,Fox,GM03FANMFX
+Fur Animal Name Code List,Raccoon,GM03FANMRC
+Fur Animal Name Code List,Golden Jackal,GM03FANMGJ
+Fur Animal Name Code List,Sable,GM03FANMSG
+Fur Animal Name Code List,Grey Wolf,GM03FANMGW
+Fur Animal Name Code List,Skunk,GM03FANMSK
+Fur Animal Name Code List,Marten,GM03FANMΜΑ
+Fur Animal Name Code List,Other Fur Animal*,GM04FANM99
+Fur Animal Name Code List,Mink,GM03FANMMK
+Fur Treatment Code List,Artificially Colored,GM03FTMTAC
+Fur Treatment Code List,Natural (untreated),GM03FTMTΝΑ
+Fur Treatment Code List,Bleached,GM03FTMTBM
+Fur Treatment Code List,Painted,GM03FTMTPT
+Fur Treatment Code List,Dyed,GM03FTMTDY
+Fur Treatment Code List,Other Fur Treatment,GM04FTMT99
+Gauge Code List,16lbs Dozen,GM03GAUGSX
+Gauge Code List,Opaque,GM03GAUGPQ
+Gauge Code List,Fine,GM03GAUGFI
+Gauge Code List,Semi-Opaque,GM03GAUGSE
+Gauge Code List,Heavy,GM03GAUGHV
+Gauge Code List,Sheer,GM03GAUGSH
+Gauge Code List,Heavyweight,GM03GAUGHW
+Gauge Code List,Super Opaque,GM03GAUGSU
+Gauge Code List,Light,GM03GAUGLI
+Gauge Code List,Other,GM04GAUG99
+Gauge Code List,Medium,GM03GAUGMD
+Gender Code List,Female,ZZ03GENDFE
+Gender Code List,Gender Neutral,ZZ03GENDUN
+Gender Code List,Male,ZZ03GENDMA
+Glove Type Code List,Mitten,GM03GLTYΜΙ
+Glove Type Code List,Flip Top,GM03GLTYFL
+Glove Type Code List,Fingerless,GM03GLTYFI
+Glove Type Code List,Lobster Gel,GM03GLTYLG
+Glove Type Code List,Tech,GM03GLTYTE
+Glove Type Code List,Other,GM04GLTY99
+Glove Type Code List,Traditional,GM03GLTYTR
+Hat Code List,Balaclava,GM03HATSBL
+Hat Code List,Floppy,GM03HATSFL
+Hat Code List,Baseball Cap,GM03HATSBS
+Hat Code List,Newsboy,GM03HATSNW
+Hat Code List,Beanie,GM03HATSBE
+Hat Code List,Panama,GM03HATSPN
+Hat Code List,Beret,GM03HATSBR
+Hat Code List,Slouchy,GM03HATSSL
+Hat Code List,Boater,GM03HATSBA
+Hat Code List,Snap Back,GM03HATSSN
+Hat Code List,Bonnet,GM03HATSBN
+Hat Code List,Sun Hat,GM03HATSSH
+Hat Code List,Bowler,GM03HATSBW
+Hat Code List,Trapper,GM03HATSTR
+Hat Code List,Bucket Hat,GM03HATSBH
+Hat Code List,Trucker,GM03HATSTU
+Hat Code List,Cowboy,GM03HATSCW
+Hat Code List,Visor,GM03HATSVS
+Hat Code List,Ear Muffs,GM03HATSEM
+Hat Code List,Wide Brim,GM03HATSWB
+Hat Code List,Fedora,GM03HATSFD
+Hat Code List,Other,GM04HATS99
+Heel Height Range Code List,Extra-High > 3 inch,GM03HLHTЕН
+Heel Height Range Code List,Low > .5 to 1 inch,GM03HLHTLW
+Heel Height Range Code List,Flat - 0 - .5 inch,GM03HLHTFL
+Heel Height Range Code List,Medium - > 1 inch - 2 inch,GM03HLHTMD
+Heel Height Range Code List,High > 2 inch 3 inch,GM03HLHTHI
+Heel Height Range Code List,Other,GM04HLHT99
+Heel Material Code List,Cork,GM03HLMTCK
+Heel Material Code List,Synthetic,GM03HLMTSY
+Heel Material Code List,Leather,GM03HLMTLE
+Heel Material Code List,Textile/Fabric,GM03HLMTTE
+Heel Material Code List,Metallic,GM03HLMTME
+Heel Material Code List,Wood,GM03HLMTWD
+Heel Material Code List,Rope,GM03HLMTRP
+Heel Material Code List,Other,GM04HLMT99
+Heel Type Code List,Block,GM03HLTYBL
+Heel Type Code List,No Heel/Flat,GM03HLTYNH
+Heel Type Code List,Comma,GM03HLTYCM
+Heel Type Code List,Novelty,GM03HLTYNV
+Heel Type Code List,Cone,GM03HLTYCN
+Heel Type Code List,Spool,GM03HLTYSP
+Heel Type Code List,Demi-Wedge,GM03HLTYDW
+Heel Type Code List,Stacked,GM03HLTYSA
+Heel Type Code List,Flare,GM03HLTYFL
+Heel Type Code List,Stiletto/Pointed,GM03HLTYSL
+Heel Type Code List,Flatform,GM03HLTYFF
+Heel Type Code List,Wedge,GM03HLTYWE
+Heel Type Code List,Kitten,GM03HLTYKI
+Heel Type Code List,Other,GM04HLTY99
+Heel Type Code List,Louis,GM03HLTYLU
+Holiday/Event Code List,Christmas,ZZ03HOEVCH
+Holiday/Event Code List,New Year's,ZZ03HOEVNY
+Holiday/Event Code List,Easter,ZZ03HOEVEA
+Holiday/Event Code List,St. Patrick's Day,ZZ03HOEVSP
+Holiday/Event Code List,Father's Day,ZZ03HOEVFA
+Holiday/Event Code List,Thanksgiving,ZZ03HOEVTH
+Holiday/Event Code List,Fourth of July,ZZ03HOEVFJ
+Holiday/Event Code List,Valentine's Day,ZZ03HOEVVA
+Holiday/Event Code List,Halloween,ZZ03HOEVHA
+Holiday/Event Code List,Wedding,ZZ03HOEVWE
+Holiday/Event Code List,Hanukkah,ZZ03HOEVHU
+Holiday/Event Code List,Other,ZZ04HOEV99
+Holiday/Event Code List,Mother's Day,ZZ03HOEVMD
+Hosiery/Sock Type Code List,Arm Warmer,GM03HOSOAW
+Hosiery/Sock Type Code List,No Show,GM03HOSONS
+Hosiery/Sock Type Code List,Crew,GM03HOSOCR
+Hosiery/Sock Type Code List,Over the Calf,GM03HOSOOC
+Hosiery/Sock Type Code List,Footless Tights,GM03HOSOFT
+Hosiery/Sock Type Code List,Over the Knee,GM03HOSOOK
+Hosiery/Sock Type Code List,Knee High,GM03HOSOKH
+Hosiery/Sock Type Code List,Quarter,GM03HOSOQU
+Hosiery/Sock Type Code List,Leggings,GM03HOSOLG
+Hosiery/Sock Type Code List,Thigh High,GM03HOSOTH
+Hosiery/Sock Type Code List,Legwarmer,GM03HOSOLW
+Hosiery/Sock Type Code List,Tights,GM03HOSOTG
+Hosiery/Sock Type Code List,Liner,GM03HOSOLI
+Hosiery/Sock Type Code List,Trouser,GM03HOSOTR
+Hosiery/Sock Type Code List,Low Cut,GM03HOSOLC
+Hosiery/Sock Type Code List,Other,GM04HOSO99
+Jewelry Sets Code List,Bracelet/Ears,JW03JWSTBE
+Jewelry Sets Code List,Neck/Ears/Bracelet,JW03JWSTNB
+Jewelry Sets Code List,Neck/Ears,JW03JWSTNE
+Jewelry Sets Code List,Other,JW04JWST99
+Jewelry Type Code List,Costume,JW03JWLTCS
+Jewelry Type Code List,Fine,JW03JWLTFI
+Jewelry Type Code List,Fashion,JW03JWLTFA
+Jewelry Type Code List,Other,JW04JWLT99
+Knit Type Code List,Pom,GM03KNITPM
+Knit Type Code List,Tassel,GM03KNITSK
+Knit Type Code List,Skully,GM03KNITTA
+Knit Type Code List,Other,GM04KNIT99
+League Code List,CFL,ZZ03LEAGCF
+League Code List,NBA,ZZ03LEAGNB
+League Code List,Indy Car,ZZ03LEAGIC
+League Code List,NCAA,ZZ03LEAGNC
+League Code List,International Soccer,ZZ03LEAGIS
+League Code List,NFL,ZZ03LEAGNF
+League Code List,LPGA,ZZ03LEAGLP
+League Code List,NHL,ZZ03LEAGNH
+League Code List,Mexican League,ZZ03LEAGME
+League Code List,Olympics,ZZ03LEAGLM
+League Code List,Mexican Pacific League,ZZ03LEAGMP
+League Code List,PGA,ZZ03LEAGPG
+League Code List,MiLB,ZZ03LEAGMI
+League Code List,UFC,ZZ03LEAGUF
+League Code List,MLB,ZZ03LEAGML
+League Code List,WWE,ZZ03LEAGWW
+League Code List,MLS,ZZ03LEAGMS
+League Code List,Other,ZZ04LEAG99
+League Code List,NASCAR,ZZ03LEAGNS
+Leg Type Code List,Boot Cut,GM03LGTYBC
+Leg Type Code List,Tapered,GM03LGTYΤΑ
+Leg Type Code List,Flare Leg,GM03LGTYFL
+Leg Type Code List,Wide Leg,GM03LGTYWI
+Leg Type Code List,Skinny Leg,GM03LGTYSK
+Leg Type Code List,Other,GM04LGTY99
+Leg Type Code List,Straight Leg,GM03LGTYST
+Leather Animal Name Code List,Alligator,GM03LEANAL
+Leather Animal Name Code List,Lamb,GM03LEANLA
+Leather Animal Name Code List,Buffalo,GM03LEANBU
+Leather Animal Name Code List,Lizard,GM03LEANLI
+Leather Animal Name Code List,Calf,GM03LEANCA
+Leather Animal Name Code List,Ostrich,GM03LEANOS
+Leather Animal Name Code List,Cod,GM03LEANCO
+Leather Animal Name Code List,Perch,GM03LEANPE
+Leather Animal Name Code List,Cow,GM03LEANCW
+Leather Animal Name Code List,Pig,GM03LEANPI
+Leather Animal Name Code List,Deer,GM03LEANDE
+Leather Animal Name Code List,Rabbit,GM03LEANRA
+Leather Animal Name Code List,Eel,GM03LEANEE
+Leather Animal Name Code List,Salmon,GM03LEANSL
+Leather Animal Name Code List,Elk,GM03LEANEL
+Leather Animal Name Code List,Sheep,GM03LEANSH
+Leather Animal Name Code List,Frog/Toad,GM03LEANFR
+Leather Animal Name Code List,Snake,GM03LEANSN
+Leather Animal Name Code List,Goat,GM03LEANGO
+Leather Animal Name Code List,Stingray,GM03LEANST
+Leather Animal Name Code List,Horse,GM03LEANHO
+Leather Animal Name Code List,Tilapia,GM03LEANTI
+Leather Animal Name Code List,Kangaroo,GM03LEANΚΑ
+Leather Animal Name Code List,Wolffish,GM03LEANWO
+Leather Animal Name Code List,Other,GM04LEAN99
+Length Description Code List,Above Knee,GM03LNTHAK
+Length Description Code List,Midi Short,GM03LNTHMS
+Length Description Code List,Ankle,GM03LNTHAN
+Length Description Code List,Mini,GM03LNTΗΜΝ
+Length Description Code List,Basketball,GM03LNTHΒΑ
+Length Description Code List,Regular/Full,GM03LNTHRF
+Length Description Code List,Below Knee,GM03LNTHBK
+Length Description Code List,Short,GM03LNTHST
+Length Description Code List,Capri/Calf,GM03LNTHCC
+Length Description Code List,Skimmer,GM03LNTHSK
+Length Description Code List,Car,GM03LNTHCA
+Length Description Code List,Tall,GM03LNTHΤΑ
+Length Description Code List,Cropped,GM03LNTHCR
+Length Description Code List,Tea/Ballet,GM03LNTHTB
+Length Description Code List,Extra Long,GM03LNTHEL
+Length Description Code List,Tunic,GM03LNTHTU
+Length Description Code List,High-Low,GM03LNTHHL
+Length Description Code List,Waist,GM03LNTHWA
+Length Description Code List,Knee,GM03LNTHHKN
+Length Description Code List,Walker,GM03LNTHWK
+Length Description Code List,Long,GM03LNTHLN
+Length Description Code List,Waltz,GM03LNTHWZ
+Length Description Code List,Maxi,GM03LNTHMX
+Length Description Code List,Other,GM04LNTH99
+Length Description Code List,Mid,GM03LNTHMD
+Lined Code List,Fully Lined,GM03LINDFL
+Lined Code List,Other,GM04LIND99
+Lined Code List,Semi-Lined,GM03LINDSL
+Lining Material Code List,Antimicrobial,GM03LIMTAN
+Lining Material Code List,Nylon,GM03LIMTNY
+Lining Material Code List,Cotton,GM03LIMTCT
+Lining Material Code List,Organic Material,GM03LIMTOM
+Lining Material Code List,Fabric,GM03LIMTFD
+Lining Material Code List,Polyester,GM03LIMTPR
+Lining Material Code List,Faux Fur,GM03LIMTFB
+Lining Material Code List,PU,GM03LIMTPU
+Lining Material Code List,Faux Leather,GM03LIMTFL
+Lining Material Code List,PVC,GM03LIMTPV
+Lining Material Code List,Faux Shearling,GM03LIMTFS
+Lining Material Code List,Quilted,GM03LIMTQT
+Lining Material Code List,Fleece,GM03LIMTFC
+Lining Material Code List,Shearling Lined,GM03LIMTSL
+Lining Material Code List,Gel,GM03LIMTGE
+Lining Material Code List,Sherpa,GM03LIMTSP
+Lining Material Code List,Leather,GM03LIMTLE
+Lining Material Code List,Straw,GM03LIMTST
+Lining Material Code List,Logo Lining,GM03LIMTLL
+Lining Material Code List,Synthetic,GM03LIMTSY
+Lining Material Code List,Memory Foam,GM03LIMTMF
+Lining Material Code List,Taffeta,GM03LIMTTA
+Lining Material Code List,Mesh,GM03LIMTME
+Lining Material Code List,Other,GM04LIMT99
+Metal Code List,Aluminum,JW03METLAI
+Metal Code List,Platinum,JW03METLPT
+Metal Code List,Brass,JW03METLBR
+Metal Code List,Rhodium,JW03METLRH
+Metal Code List,Bronze,JW03METLBZ
+Metal Code List,Rose Gold,JW03METLRG
+Metal Code List,Cast Iron,JW03METLCI
+Metal Code List,Silver,JW03METLAG
+Metal Code List,Copper,JW03METLCU
+Metal Code List,Stainless Steel,JW03METLSS
+Metal Code List,Gold,JW03METLAU
+Metal Code List,Titanium,JW03METLTI
+Metal Code List,Gold Plated,JW03METLGP
+Metal Code List,White Gold,JW03METLWG
+Metal Code List,Nickel,JW03METLNI
+Metal Code List,Other,JW04METL99
+Metal Code List,Palladium,JW03METLPD
+Metal Composition Code List,18/0,GM03MTLCCA
+Metal Composition Code List,Other,GM04MTLC99
+Metal Composition Code List,18/10,GM03MTLCCB
+Metal Composition Code List,18/8,GM03MTLCCC
+Necklace Type Code List,Chain,JW03NKLCCA
+Necklace Type Code List,Pearl Strand,JW03NKLCPS
+Necklace Type Code List,Choker,JW03NKLCCH
+Necklace Type Code List,Pendant,JW03NKLCPE
+Necklace Type Code List,Collar,JW03NKLCCL
+Necklace Type Code List,Y-Necklace,JW03NKLCYN
+Necklace Type Code List,Locket,JW03NKLCLK
+Necklace Type Code List,Other,JW04NKLC99
+Necklace Type Code List,Multi Strand,JW03NKLCMS
+Neckwear Type Code List,Bandana,GM03NECKBN
+Neckwear Type Code List,Neck Tie,GM03NECKNT
+Neckwear Type Code List,Boa,GM03NECKВА
+Neckwear Type Code List,Oblong Scarf,GM03NECKBS
+Neckwear Type Code List,Bolo,GM03NECKBL
+Neckwear Type Code List,Sarong/Pareo,GM03NECKSP
+Neckwear Type Code List,Bow Tie,GM03NECKBT
+Neckwear Type Code List,Square Scarf,GM03NECKSS
+Neckwear Type Code List,Clip-On Tie,GM03NECKCT
+Neckwear Type Code List,Stole,GM03NECKST
+Neckwear Type Code List,Cravat,GM03NECKCR
+Neckwear Type Code List,Wrap/Shawl,GM03NECKWS
+Neckwear Type Code List,Infinity Scarf,JW03NKLCMS
+Neckwear Type Code List,Other,GM04NECK99
+Neckwear Type Code List,Muffler,GM03NECKMU
+Number of Settings Code List,Eight,GM03SETSEI
+Number of Settings Code List,Twelve,GM03SETSTW
+Number of Settings Code List,Four,GM03SETSFR
+Number of Settings Code List,Other,GM04SETS99
+Number of Settings Code List,Six,GM03SETSSX
+Occasion Code List,Active/Workout,GM030CCNAW
+Occasion Code List,Evening,GM030CCNEV
+Occasion Code List,Anniversary,GM030CCNAN
+Occasion Code List,Fashion,GM030CCNFA
+Occasion Code List,Athleisure,GM030CCNAL
+Occasion Code List,Flower Girl,GM030CCNFG
+Occasion Code List,Athletic,GM030CCNAT
+Occasion Code List,Formal,GM030CCNFR
+Occasion Code List,Baby Shower,GM030CCNBS
+Occasion Code List,Graduation,GM030CCNGG
+Occasion Code List,Beach/Pool,GM030CCNBP
+Occasion Code List,Groom,GM030CCNGM
+Occasion Code List,Birthday,GM030CCNBI
+Occasion Code List,Homecoming,GM030CCNHM
+Occasion Code List,Bride,GM030CCNBR
+Occasion Code List,Lounge,GM030CCNLN
+Occasion Code List,Bridesmaid,GM030CCNBD
+Occasion Code List,Mother of the Bride,GM030CCNMB
+Occasion Code List,Career,GM030CCNCR
+Occasion Code List,Outdoor,GM030CCNUT
+Occasion Code List,Casual,GM030CCNCS
+Occasion Code List,Performance,GM030CCNPE
+Occasion Code List,Christening/Baptism,GM030CCNCB
+Occasion Code List,Prom,GM030CCNPR
+Occasion Code List,Cocktail,GM030CCNCT
+Occasion Code List,Resort,GM030CCNRE
+Occasion Code List,Comfort,GM030CCNCF
+Occasion Code List,Ring Bearer,GM030CCNRB
+Occasion Code List,Communion,GM030CCNCM
+Occasion Code List,Safety,GM030CCNSA
+Occasion Code List,Daytime,GM030CCNDT
+Occasion Code List,Wedding,GM030CCNSU
+Occasion Code List,Dress,GM030CCNDR
+Occasion Code List,Work/Uniform,GM030CCNWU
+Occasion Code List,Easter,GM030CCNEA
+Occasion Code List,Other,GM040CCN99
+Occasion Code List,Engagement,GM030CCNEN
+Outsole Type Code List,Dimpled,GM030UTSDP
+Outsole Type Code List,Non-Slip,GM030UTSNS
+Outsole Type Code List,Driver,GM030UTSDR
+Outsole Type Code List,Tooth,GM030UTSTT
+Outsole Type Code List,Embossed,GM03OUTSEM
+Outsole Type Code List,Tread,GM030UTSTR
+Outsole Type Code List,Heavy Lug,GM03OUTSHV
+Outsole Type Code List,Other,GM040UTS99
+Outsole Type Code List,Light Lug,GM030UTSLL
+Open/Closed Toe Code List,Closed,GM030PCLCL
+Open/Closed Toe Code List,Open,GM030PCLOP
+Pants/Shorts Type Code List,5 Pocket/Jean,GM03PTSHFJ
+Pants/Shorts Type Code List,Gaucho/Palazzo,GM03PTSHGP
+Pants/Shorts Type Code List,Bermuda,GM03PTSHBE
+Pants/Shorts Type Code List,Jogger,GM03PTSHJG
+Pants/Shorts Type Code List,Boxer,GM03PTSHBX
+Pants/Shorts Type Code List,Leggings,GM03PTSHLE
+Pants/Shorts Type Code List,Capri,GM03PTSHCA
+Pants/Shorts Type Code List,Pleated,GM03PTSHPL
+Pants/Shorts Type Code List,Cargo,GM03PTSHCG
+Pants/Shorts Type Code List,Skort,GM03PTSHSK
+Pants/Shorts Type Code List,Carpenter,GM03PTSHCP
+Pants/Shorts Type Code List,Sweatpant,GM03PTSHSW
+Pants/Shorts Type Code List,Chino,GM03PTSHCH
+Pants/Shorts Type Code List,Tap,GM03PTSHTΑ
+Pants/Shorts Type Code List,Culotte,GM03PTSHCL
+Pants/Shorts Type Code List,Track,GM03PTSHTR
+Pants/Shorts Type Code List,Cut Off,GM03PTSHCT
+Pants/Shorts Type Code List,Trouser,GM03PTSHTU
+Pants/Shorts Type Code List,Flat Front,GM03PTSHFF
+Pants/Shorts Type Code List,Other,GM04PTSH99
+Panty Back Coverage Code List,Cheeky,GM03PNBCCH
+Panty Back Coverage Code List,Medium,GM03PNBCMD
+Panty Back Coverage Code List,Full,GM03PNBCFL
+Panty Back Coverage Code List,Other,GM03PNBC99
+Panty Type Code List,Bikini,GM03PNTYBI
+Panty Type Code List,Retro Thong,GM03PNTYRT
+Panty Type Code List,Boyshort,GM03PNTYΒΟ
+Panty Type Code List,Seamless,GM03PNTYSE
+Panty Type Code List,French Cut,GM03PNTYFC
+Panty Type Code List,Shorty,GM03PNTYSH
+Panty Type Code List,Full Brief,GM03PNTYFL
+Panty Type Code List,String,GM03PNTYST
+Panty Type Code List,Hi Cut,GM03PNTYНC
+Panty Type Code List,Tanga,GM03PNTΥΤΑ
+Panty Type Code List,High Waist Brief,GM03PNTYНB
+Panty Type Code List,Thong,GM03PNTYTH
+Panty Type Code List,High Waist Thong,GM03PNTYНТ
+Panty Type Code List,Other,GM03PNTY99
+Panty Type Code List,Hipster,GM03PNTYHP
+Primary Detail Application Code List,Applique,GM03PDAPAP
+Primary Detail Application Code List,Logo Pin,GM03PDAPLP
+Primary Detail Application Code List,Banded,GM03PDAРВА
+Primary Detail Application Code List,Metallic Ink,GM03PDAΡΜΙ
+Primary Detail Application Code List,Bling,GM03PDAPBL
+Primary Detail Application Code List,Patch,GM03PDAPPA
+Primary Detail Application Code List,Cut,GM03PDAPCU
+Primary Detail Application Code List,Printed,GM03PDAPPR
+Primary Detail Application Code List,Decal,GM03PDAPDE
+Primary Detail Application Code List,Printed Tackle Twill,GM03PDAPPT
+Primary Detail Application Code List,Embossed,GM03PDAPEM
+Primary Detail Application Code List,Raised Embroidery,GM03PDAPRE
+Primary Detail Application Code List,Etched,GM03PDAPET
+Primary Detail Application Code List,Reactive Glaze,GM03PDAPRG
+Primary Detail Application Code List,Fabric Applique,GM03PDAPFA
+Primary Detail Application Code List,Reflective Applique,GM03PDAPRA
+Primary Detail Application Code List,Felt Applique,GM03PDAPFE
+Primary Detail Application Code List,Reflective Screen Print,GM03PDAPRS
+Primary Detail Application Code List,Flat Embroidered,GM03PDAPFM
+Primary Detail Application Code List,Rhinestone,GM03PDAPRH
+Primary Detail Application Code List,Foll,GM03PDAPFL
+Primary Detail Application Code List,Screen Print,GM03PDAPSP
+Primary Detail Application Code List,Glitter,GM03PDAPGL
+Primary Detail Application Code List,Sequins,GM03PDAPSE
+Primary Detail Application Code List,Hand Painted,GM03PDAPΗΡ
+Primary Detail Application Code List,Tackle Twill,GM03PDAPTT
+Primary Detail Application Code List,Heat Seal,GM03PDAPHS
+Primary Detail Application Code List,Woven,GM03PDAPWV
+Primary Detail Application Code List,High-Density Ink,GM03PDAPHD
+Primary Detail Application Code List,Other,GM04PDAP99
+Primary Detail Application Code List,Jacquard Knit,GM03PDAPIN
+Primary Detail Placement Code List,All Over,GM03PDPLAA
+Primary Detail Placement Code List,Front Pocket,GM03PDPLFP
+Primary Detail Placement Code List,Back Bottom,GM03PDPLBB
+Primary Detail Placement Code List,Front Right,GM03PDPLFR
+Primary Detail Placement Code List,Back Center,GM03PDPLBC
+Primary Detail Placement Code List,Front Top,GM03PDPLFT
+Primary Detail Placement Code List,Back Left,GM03PDPLBL
+Primary Detail Placement Code List,Full Body,GM03PDPLFD
+Primary Detail Placement Code List,Back Pocket,GM03PDPLBP
+Primary Detail Placement Code List,Full Front,GM03PDPLFF
+Primary Detail Placement Code List,Back Right,GM03PDPLBR
+Primary Detail Placement Code List,Hem,GM03PDPLHE
+Primary Detail Placement Code List,Back Top,GM03PDPLBT
+Primary Detail Placement Code List,Left Leg,GM03PDPLLL
+Primary Detail Placement Code List,Bill,GM03PDPLBI
+Primary Detail Placement Code List,Left Sleeve,GM03PDPLLS
+Primary Detail Placement Code List,Collar,GM03PDPLCL
+Primary Detail Placement Code List,Leg,GM03PDPLLE
+Primary Detail Placement Code List,Cuff,GM03PDPLCU
+Primary Detail Placement Code List,Right Leg,GM03PDPLRL
+Primary Detail Placement Code List,Front Bottom,GM03PDPLFB
+Primary Detail Placement Code List,Right Sleeve,GM03PDPLRS
+Primary Detail Placement Code List,Front Center,GM03PDPLFC
+Primary Detail Placement Code List,Sleeve,GM03PDPLSL
+Primary Detail Placement Code List,Front Left,GM03PDPLFL
+Primary Detail Placement Code List,Other,GM04PDPL99
+Primary Detail Size Code List,Large,GM03PDSZLG
+Primary Detail Size Code List,Small,GM03PDSZSM
+Primary Detail Size Code List,Medium,GM03PDSZMD
+Primary Detail Size Code List,Other,GM04PDSZ99
+Primary Detail Type Code List,Brand,GM03PDTPBR
+Primary Detail Type Code List,Player Name,GM03PDTPPN
+Primary Detail Type Code List,League,GM03PDTPLE
+Primary Detail Type Code List,Script,GM03PDTPSC
+Primary Detail Type Code List,Letter,GM03PDTPLT
+Primary Detail Type Code List,Team,GM03PDTPТЕ
+Primary Detail Type Code List,Mascot,GM03PDTPΜΑ
+Primary Detail Type Code List,Wordmark,GM03PDTPWM
+Primary Detail Type Code List,Number,GM03PDTPNU
+Primary Detail Type Code List,Other,GM04PDTP99
+Primary Detail Type Code List,Patch,GM03PDTPΡΑ
+Primary Motif Theme Code List,Americana,GM03PMTTAM
+Primary Motif Theme Code List,Character,GM03PMTTCH
+Primary Motif Theme Code List,Animal,GM03PMTTAN
+Primary Motif Theme Code List,Other,GM04PMTT99
+Raw Materials Certifications,BASF e3,Gm03RAMABA
+Raw Materials Certifications,Regenagri,GM03RAMARG
+Raw Materials Certifications,Certified Vegan,GM03RAMACV
+Raw Materials Certifications,Regenerative Organic Certified (ROC),GM03RAMARO
+Raw Materials Certifications,Cotton Made in Africa (CMIA),GM03RAMACM
+Raw Materials Certifications,Responsible Alpaca Standard (RAS),GM03RAMARA
+Raw Materials Certifications,Downpass Standard,GM03RAMADS
+Raw Materials Certifications,Responsible Down Standard (RDS),GM03RAMARD
+Raw Materials Certifications,Fibershed,GM03RAMAFI
+Raw Materials Certifications,Responsible Mohair Standard (RMS),GM03RAMARM
+Raw Materials Certifications,Forest Stewardship Council (FSC),GM03RAMAFS
+Raw Materials Certifications,Responsible Wool Standard (RWS),GM03RAMARW
+Raw Materials Certifications,Global Organic Textile Standard (GOTS),GM03RAMAGO
+Raw Materials Certifications,Roundtable on Sustainable Biomaterials (RSB),GM03RAMARS
+Raw Materials Certifications,Global Recycled Standard (GRS),GM03RAMAGR
+Raw Materials Certifications,Soil Association Certified Organic,GM03RAMASA
+Raw Materials Certifications,Global Cashmere Standard,GM03RAMAGC
+Raw Materials Certifications,Sustainable Fibre Alliance (SFA) certified,GM03RAMASF
+Raw Materials Certifications,Leather Working Group,GM03RAMALW
+Raw Materials Certifications,Traumpass Label,GM03RAMATR
+Raw Materials Certifications,NewMerino,GM03RAMANM
+Raw Materials Certifications,USCTP (US Cotton Trust Protocol),GM03RAMAUS
+Raw Materials Certifications,"Organic (US, EU or UK standards)",GM03RAMAOR
+Raw Materials Certifications,USDA Certified Biobased,GM03RAMAUB
+Raw Materials Certifications,Organic Cotton Standard (OCS),GM03RAMAOC
+Raw Materials Certifications,USDA Certified Organic,GM03RAMAUD
+Raw Materials Certifications,PETA Certified Vegan,GM03RAMAPV
+Raw Materials Certifications,Vegan Trademark,GM03RAMAVT
+Raw Materials Certifications,ReCot,GM03RAMART
+Raw Materials Certifications,ZQ Certified Merino Label,GM03RAMAZQ
+Raw Materials Certifications,ReDown,GM03RAMARD
+Raw Materials Certifications,Other,GM04RAMA99
+Raw Materials Certifications,REEL Cotton,GM03RAMARE
+Ring Type Code List,Band,JW03RINGBA
+Ring Type Code List,Stacked,JW03RINGST
+Ring Type Code List,Midi,JW03RINGMI
+Ring Type Code List,Toe,JW03RINGTE
+Ring Type Code List,Signet,JW03RINGSI
+Ring Type Code List,Other,JW04RING99
+Rug Type Code List,Accent,GM03RUGTAC
+Rug Type Code List,Outdoor,GM03RUGTUT
+Rug Type Code List,Bath,GM03RUGTBA
+Rug Type Code List,Rug Pad,GM03RUGTRP
+Rug Type Code List,Dining Room,GM03RUGTDR
+Rug Type Code List,Runners,GM03RUGTRU
+Rug Type Code List,Doormat,GM03RUGTDM
+Rug Type Code List,Other,GM04RUGT99
+Rug Type Code List,Kitchen,GM03RUGTKI
+Scarf Type Code List,Blanket,GM03SCTYBL
+Scarf Type Code List,Oblong,GM03SCTYOB
+Scarf Type Code List,Bandana/Neckerchief,GM03SCTYΒΑ
+Scarf Type Code List,Poncho,GM03SCTYΡΟ
+Scarf Type Code List,Boa,GM03SCTYBO
+Scarf Type Code List,Pull-through,GM03SCTYPU
+Scarf Type Code List,Buff,GM03SCTYBU
+Scarf Type Code List,Shawl,GM03SCTYSH
+Scarf Type Code List,Cowl,GM03SCTYCO
+Scarf Type Code List,Snood,GM03SCTYSN
+Scarf Type Code List,Evening,GM03SCTYEV
+Scarf Type Code List,Square,GM03SCTYSQ
+Scarf Type Code List,Gaiter,GM03SCTYGA
+Scarf Type Code List,Stole,GM03SCTYST
+Scarf Type Code List,Head Scarf,GM03SCTYHS
+Scarf Type Code List,Triangle,GM03SCTYTR
+Scarf Type Code List,Infinity,GM03SCTYIN
+Scarf Type Code List,Turban,GM03SCTYTU
+Scarf Type Code List,Muffler,GM03SCTYMU
+Scarf Type Code List,Wrap,GM03SCTYWR
+Scarf Type Code List,Necklace,GM03SCTYNE
+Scarf Type Code List,Other,GM04SCTY99
+Scent Type Code List,Aquatic,GM03SCTPAQ
+Scent Type Code List,Oriental,GM03SCTPOR
+Scent Type Code List,Citrus,GM03SCTPСІ
+Scent Type Code List,Powdery,GM03SCTPPW
+Scent Type Code List,Earthy,GM03SCTPΕΑ
+Scent Type Code List,Spicy,GM03SCTPSP
+Scent Type Code List,Earthy and Woody,GM03SCTPEW
+Scent Type Code List,Sweet,GM03SCTPSW
+Scent Type Code List,Floral,GM03SCTPFL
+Scent Type Code List,Unscented,GM03SCTPUS
+Scent Type Code List,Fresh and Clean,GM03SCTPFC
+Scent Type Code List,Vanilla,GM03SCTPVA
+Scent Type Code List,Fruity,GM03SCTPFR
+Scent Type Code List,Warm and Spicy,GM03SCTPWS
+Scent Type Code List,Mixed,GM03SCTPΜΙ
+Scent Type Code List,Woody,GM03SCTPWD
+Scent Type Code List,Musk,GM03SCTPMU
+Scent Type Code List,Other,GM04SCTP99
+Seams Code List,Adhesive,IA03SEAMAD
+Seams Code List,Raised,IA03SEAMRA
+Seams Code List,Bonded,IA03SEAMBO
+Seams Code List,Seamed,IA03SEAMSA
+Seams Code List,Flat,IA03SEAMFL
+Seams Code List,Seamless,IA03SEAMSE
+Seams Code List,Laser Cut,IA03SEAMLC
+Seams Code List,Other,IA04SEAM99
+Secondary Detail Application Code List,Applique,GM03SDAPAP
+Secondary Detail Application Code List,Logo Pin,GM03SDAPLP
+Secondary Detail Application Code List,Banded,GM03SDAРВА
+Secondary Detail Application Code List,Metallic Ink,GM03SDAΡΜΙ
+Secondary Detail Application Code List,Bling,GM03SDAPBL
+Secondary Detail Application Code List,Patch,GM03SDAPPA
+Secondary Detail Application Code List,Cut,GM03SDAPCU
+Secondary Detail Application Code List,Printed,GM03SDAPPR
+Secondary Detail Application Code List,Decal,GM03SDASDE
+Secondary Detail Application Code List,Printed Tackle Twill,GM03SDAPPT
+Secondary Detail Application Code List,Embossed,GM03SDAPEM
+Secondary Detail Application Code List,Raised Embroidery,GM03SDAPRE
+Secondary Detail Application Code List,Etched,GM03SDAPET
+Secondary Detail Application Code List,Reactive Glaze,GM03SDAPRG
+Secondary Detail Application Code List,Fabric Applique,GM03SDAPFA
+Secondary Detail Application Code List,Reflective Applique,GM03SDAPRA
+Secondary Detail Application Code List,Felt Applique,GM03SDAPFE
+Secondary Detail Application Code List,Reflective Screen Print,GM03SDAPRS
+Secondary Detail Application Code List,Flat Embroidered,GM03SDAPFM
+Secondary Detail Application Code List,Rhinestone,GM03SDAPRH
+Secondary Detail Application Code List,Foil,GM03SDAPFL
+Secondary Detail Application Code List,Screen Print,GM03SDAPSP
+Secondary Detail Application Code List,Glitter,GM03SDAPGL
+Secondary Detail Application Code List,Sequins,GM03SDAPSE
+Secondary Detail Application Code List,Hand Painted,GM03SDAΡΗΡ
+Secondary Detail Application Code List,Tackle Twill,GM03SDAPTT
+Secondary Detail Application Code List,Heat Seal,GM03SDAPHS
+Secondary Detail Application Code List,Woven,GM03SDAPWV
+Secondary Detail Application Code List,High-Density Ink,GM03SDAPHD
+Secondary Detail Application Code List,Other,GM04SDAP99
+Secondary Detail Application Code List,Jacquard Knit,GM03SDAPJN
+Secondary Detail Placement Code List,All Over,GM03SDPLAA
+Secondary Detail Placement Code List,Front Pocket,GM03SDPLFP
+Secondary Detail Placement Code List,Back Bottom,GM03SDPLBB
+Secondary Detail Placement Code List,Front Right,GM03SDPLFR
+Secondary Detail Placement Code List,Back Center,GM03SDPLBC
+Secondary Detail Placement Code List,Front Top,GM03SDPLFT
+Secondary Detail Placement Code List,Back Left,GM03SDPLBL
+Secondary Detail Placement Code List,Full Body,GM03SDPLFD
+Secondary Detail Placement Code List,Back Pocket,GM03SDPLBP
+Secondary Detail Placement Code List,Full Front,GM03SDPLFF
+Secondary Detail Placement Code List,Back Right,GM03SDPLBR
+Secondary Detail Placement Code List,Hem,GM03SDPLHE
+Secondary Detail Placement Code List,Back Top,GM03SDPLBT
+Secondary Detail Placement Code List,Left Leg,GM03SDPLLL
+Secondary Detail Placement Code List,Bill,GM03SDPLBI
+Secondary Detail Placement Code List,Left Sleeve,GM03SDPLLS
+Secondary Detail Placement Code List,Collar,GM03SDPLCL
+Secondary Detail Placement Code List,Leg,GM03SDPLLE
+Secondary Detail Placement Code List,Cuff,GM03SDPLCU
+Secondary Detail Placement Code List,Right Leg,GM03SDPLRL
+Secondary Detail Placement Code List,Front Bottom,GM03SDPLFB
+Secondary Detail Placement Code List,Right Sleeve,GM03SDPLRS
+Secondary Detail Placement Code List,Front Center,GM03SDPLFC
+Secondary Detail Placement Code List,Sleeve,GM03SDPLSL
+Secondary Detail Placement Code List,Front Left,GM03SDPLFL
+Secondary Detail Placement Code List,Other,GM04SDPL99
+Secondary Detail Size Code List,Large,GM03SDSZLG
+Secondary Detail Size Code List,Small,GM03SDSZSM
+Secondary Detail Size Code List,Medium,GM03SDSZMD
+Secondary Detail Size Code List,Other,GM04SDSZ99
+Secondary Detail Type Code List,Brand,GM03SDTPBR
+Secondary Detail Type Code List,Player Name,GM03SDTPPN
+Secondary Detail Type Code List,League,GM03SDTPLE
+Secondary Detail Type Code List,Script,GM03SDTPSC
+Secondary Detail Type Code List,Letter,GM03SDTPLT
+Secondary Detail Type Code List,Team,GM03SDTPTE
+Secondary Detail Type Code List,Mascot,GM03SDTΡΜΑ
+Secondary Detail Type Code List,Wordmark,GM03SDTPWM
+Secondary Detail Type Code List,Number,GM03SDTPNU
+Secondary Detail Type Code List,Other,GM04SDTP99
+Secondary Detail Type Code List,Patch,GM03SDTPΡΑ
+Secondary Motif Theme Code List,Americana,GM03SMTTAM
+Secondary Motif Theme Code List,Character,GM03SMTTCH
+Secondary Motif Theme Code List,Animal,GM03SMTTAN
+Secondary Motif Theme Code List,Other,GM04SMTT99
+Selling Channel Code List,In store only,ZZ03SELCIS
+Selling Channel Code List,Online only,ZZ03SELCON
+Selling Channel Code List,Drop Ship,ZZ03SELCDS
+Selling Channel Code List,Other,ZZ04SELC99
+Selling Channel Code List,No restrictions,ZZ03SELCNR
+Shape Code List,Bedrest,GM03SHPEВE
+Shape Code List,Rectangular,GM03SHPERE
+Shape Code List,Bolster,GM03SHPEBL
+Shape Code List,Round,GM03SHPERO
+Shape Code List,Breakfast/Boudoir,GM03SHPEBB
+Shape Code List,Shaped/Novelty,GM03SHPESN
+Shape Code List,Figure/Shaped,GM03SHPEFS
+Shape Code List,Soft Square,GM03SHPESS
+Shape Code List,Lumbar,GM03SHPELU
+Shape Code List,Square,GM03SHPESQ
+Shape Code List,Neckroll,GM03SHPENE
+Shape Code List,Triangle,GM03SHPETR
+Shape Code List,Oval/Oblong,GM03SHPEVB
+Shape Code List,Other,GM04SHPE99
+Shapewear Type Code List,Body Shaper (to the knee),GM03SWRTBS
+Shapewear Type Code List,Open Bust Shaper,GM03SWRTOB
+Shapewear Type Code List,Bodysuit (to the ankle),GM03SWRTBU
+Shapewear Type Code List,Shaping Slip,GM03SWRTSH
+Shapewear Type Code List,Camisole/Tank,GM03SWRTCA
+Shapewear Type Code List,Thigh Slimmer,GM03SWRTTS
+Shapewear Type Code List,Control Panty,GM03SWRTCP
+Shapewear Type Code List,Waist Trainer,GM03SWRTWT
+Shapewear Type Code List,Legging,GM03SWRTLG
+Shapewear Type Code List,Other,GM03SWRT99
+Sho Style Code List,Alpine Boot,GM03SHOEAB
+Sho Style Code List,Instep Strap,GM03SHOEIS
+Sho Style Code List,Ankle Strap,GM03SHOEAS
+Sho Style Code List,Low Top,GM03SHOELT
+Sho Style Code List,Athleisure,GM03SHOEAT
+Sho Style Code List,Jellies,GM03SHOEJE
+Sho Style Code List,Ballet,GM03SHOЕВА
+Sho Style Code List,Mary Jane,GM03SHOEMJ
+Sho Style Code List,Biker Boot,GM03SHOEBI
+Sho Style Code List,Military & Police,GM03SHOEMP
+Sho Style Code List,Boat Shoe,GM03SHOEBS
+Sho Style Code List,Moccasin,GM03SHOEMC
+Sho Style Code List,Bootie,GM03SHOEВТ
+Sho Style Code List,Monk Strap,GM03SHOEMS
+Sho Style Code List,Caged,GM03SHOECA
+Sho Style Code List,Penny Loafer,GM03SHOEPE
+Sho Style Code List,Chelsea,GM03SHOECH
+Sho Style Code List,Rain Boot,GM03SHOERA
+Sho Style Code List,Chukka,GM03SHOECK
+Sho Style Code List,Riding Boot,GM03SHOERI
+Sho Style Code List,Cleats,GM03SHOECL
+Sho Style Code List,Shootie,GM03SHOESH
+Sho Style Code List,Combat Boot,GM03SHOЕСB
+Sho Style Code List,Slide,GM03SHOESL
+Sho Style Code List,Comfort,GM03SHOECF
+Sho Style Code List,Sling Back,GM03SHOESB
+Sho Style Code List,Cowboy,GM03SHOECW
+Sho Style Code List,Slip On,GM03SHOESO
+Sho Style Code List,Derby,GM03SHOEDE
+Sho Style Code List,Smoking Slipper,GM03SHOESM
+Sho Style Code List,D'Orsay,GM03SHOEDR
+Sho Style Code List,Snow Boot,GM03SHOESW
+Sho Style Code List,Driver,GM03SHOEDV
+Sho Style Code List,Sport Specific,GM03SHOESS
+Sho Style Code List,Espadrille,GM03SHOEES
+Sho Style Code List,Strappy,GM03SHOESY
+Sho Style Code List,Fisherman,GM03SHOEFI
+Sho Style Code List,T-Strap,GM03SHOETS
+Sho Style Code List,Flip-Flop,GM03SHOEFP
+Sho Style Code List,Thong,GM03SHOETH
+Sho Style Code List,Ghillie,GM03SHOEGH
+Sho Style Code List,Water Shoe,GM03SHOEWS
+Sho Style Code List,Gladiator,GM03SHOEGL
+Sho Style Code List,Wingtip,GM03SHOEWT
+Sho Style Code List,High Top,GM03SHOEНТ
+Sho Style Code List,Work Boot,GM03SHOEWB
+Sho Style Code List,Huarache,GM03SHOEHU
+Sho Style Code List,Other,GM04SHOE99
+Shoe Type Code List,Boots/Booties,GM03SETPBB
+Shoe Type Code List,Pumps,GM03SETPPP
+Shoe Type Code List,Clogs/Mules,GM03SETPCM
+Shoe Type Code List,Sandals,GM03SETPSA
+Shoe Type Code List,Flats,GM03SETPFL
+Shoe Type Code List,Slippers,GM03SETPSL
+Shoe Type Code List,Loafers,GM03SETPLM
+Shoe Type Code List,Sneakers,GM03SETPSN
+Shoe Type Code List,Oxfords,GM03SETPXF
+Shoe Type Code List,Other,GM04SETP99
+Skin Type Code List,Aging,GM03SKTPAG
+Skin Type Code List,Oily,GM03SKTPLY
+Skin Type Code List,All,GM03SKTPAL
+Skin Type Code List,Sensitive,GM03SKTPSE
+Skin Type Code List,Combination,GM03SKTPCM
+Skin Type Code List,Other,GM04SKTP99
+Skin Type Code List,Dry,GM03SKTPDR
+Skirt Type Code List,A-line,GM03SKRTAL
+Skirt Type Code List,Pencil,GM03SKRTPE
+Skirt Type Code List,Circular,GM03SKRTCI
+Skirt Type Code List,Skort,GM03SKRTSK
+Skirt Type Code List,Faux Wrap,GM03SKRTFW
+Skirt Type Code List,Straight,GM03SKRTST
+Skirt Type Code List,Flared,GM03SKRTFL
+Skirt Type Code List,Tiered,GM03SKRTTI
+Skirt Type Code List,Full,GM03SKRTFU
+Skirt Type Code List,Wrap,GM03SKRTWR
+Skirt Type Code List,Mermaid/Trumpet,GM03SKRTMT
+Skirt Type Code List,Other,GM04SKRT99
+Sleepwear Type Code List,Bridal,GM03SLPTBR
+Sleepwear Type Code List,PJ Set,GM03SLPTPJ
+Sleepwear Type Code List,Caftan,GM03SLPTСA
+Sleepwear Type Code List,Robe,GM03SLPTRO
+Sleepwear Type Code List,Chemise,GM03SLPTCH
+Sleepwear Type Code List,Sleep Pant,GM03SLPTSP
+Sleepwear Type Code List,Gown,GM03SLPTGW
+Sleepwear Type Code List,Sleep Shirt,GM03SLPTSH
+Sleepwear Type Code List,Loungewear,GM03SLPTLN
+Sleepwear Type Code List,Sleep Short,GM03SLPTSO
+Sleepwear Type Code List,Maternity,GM03SLPTMA
+Sleepwear Type Code List,Sleep Top,GM03SLPTST
+Sleepwear Type Code List,One Piece,GM03SLPTOP
+Sleepwear Type Code List,Other,GM03SLPT99
+Sleeve Type Code List,1/2 Sleeve,GM03SLVTHT
+Sleeve Type Code List,Roll-Tab (Long to elbow/short),GM03SLVTRT
+Sleeve Type Code List,1/4 sleeve,GM03SLVTQS
+Sleeve Type Code List,Short,GM03SLVTST
+Sleeve Type Code List,3/4 Sleeve,GM03SLVTTT
+Sleeve Type Code List,Sleeveless,GM03SLVTS4
+Sleeve Type Code List,Cap,GM03SLVTCS
+Sleeve Type Code List,Spaghetti Strap,GM03SLVTSI
+Sleeve Type Code List,Elbow,GM03SLVTES
+Sleeve Type Code List,Other Sleeve Type*,GM04SLVT99
+Sleeve Type Code List,Long,GM03SLVTLO
+Sleeve Type Code List,Roll-Tab (3/4 to short),GM03SLVTTR
+Slip Type Code List,Full,GM03SLTPFL
+Slip Type Code List,Other,GM03SLTP99
+Slip Type Code List,Half,GM03SLTPHA
+Social Certifications Code List,Fair Trade Certified,GM03SOCEFT
+Social Certifications Code List,NMSDC with MBE Cert,GM03SOCENM
+Social Certifications Code List,Fair Trade Certified Textile Standard,GM03SOCEFS
+Social Certifications Code List,NGLCC with LGTBTE Cert,GM03SOCENG
+Social Certifications Code List,"RISE (or BSR Her, C.A.R.E, IFC Better Work)",GM03SOCERI
+Social Certifications Code List,USPAACC,GM03SOCEUS
+Social Certifications Code List,Fair for Life,GM03SOCEFL
+Social Certifications Code List,Other,GM04SOCE99
+Sole Type Code List,Leather,GM03SOLTLS
+Sole Type Code List,Rubber,GM03SOLTRS
+Sole Type Code List,Synthetic,GM03SOLTSJ
+Sole Type Code List,Recycled,GM03SOLTRE
+Sole Type Code List,Natural Fiber,GM03SOLTNS
+Sole Type Code List,Other Sole Type,GM04SOLT99
+Special Embellishment Code List,Beads,GM03SPEMBE
+Special Embellishment Code List,Logo,GM03SPEMLG
+Special Embellishment Code List,Belting,GM03SPEMBL
+Special Embellishment Code List,Metal,GM03SPEMME
+Special Embellishment Code List,Bows,GM03SPEMBW
+Special Embellishment Code List,Metal Ornament,GM03SPEMMR
+Special Embellishment Code List,Braiding,GM03SPEMBR
+Special Embellishment Code List,Nailheads,GM03SPEΜΝΑ
+Special Embellishment Code List,Broguing,GM03SPEMBG
+Special Embellishment Code List,Penny Keeper,GM03SPEMPK
+Special Embellishment Code List,Buckle(s),GM03SPEMBU
+Special Embellishment Code List,Perforation,GM03SPEMPE
+Special Embellishment Code List,Chain,GM03SPEMCH
+Special Embellishment Code List,Piping,GM03SPEMPI
+Special Embellishment Code List,Contrast Stitching,GM03SPEMCS
+Special Embellishment Code List,Pleated,GM03SPEMPL
+Special Embellishment Code List,Crochet,GM03SPEMCR
+Special Embellishment Code List,Quilting,GM03SPEMQU
+Special Embellishment Code List,Cuff,GM03SPEMCF
+Special Embellishment Code List,Rhinestones,GM03SPEMRH
+Special Embellishment Code List,Cut-outs,GM03SPEMCU
+Special Embellishment Code List,Ruffles,GM03SPEMRU
+Special Embellishment Code List,Embroidery,GM03SPEMEM
+Special Embellishment Code List,Sequins,GM03SPEMSE
+Special Embellishment Code List,Feathers,GM03SPEMFE
+Special Embellishment Code List,Speed Lacing,GM03SPEMSL
+Special Embellishment Code List,Filigree,GM03SPEMFI
+Special Embellishment Code List,Stones,GM03SPEMSN
+Special Embellishment Code List,Flower,GM03SPEMFL
+Special Embellishment Code List,Studded,GM03SPEMST
+Special Embellishment Code List,Fringe,GM03SPEMFR
+Special Embellishment Code List,Tassels,GM03SPEMTA
+Special Embellishment Code List,Glitter,GM03SPEMGL
+Special Embellishment Code List,Tortoise,GM03SPEMTS
+Special Embellishment Code List,Grommets,GM03SPEMGR
+Special Embellishment Code List,Wood,GM03SPEMWD
+Special Embellishment Code List,Harness,GM03SPEMНА
+Special Embellishment Code List,Zipper,GM03SPEMZI
+Special Embellishment Code List,Jewels,GM03SPEMJE
+Special Embellishment Code List,Other,GM04SPEM99
+Special Embellishment Code List,Knotting,GM03SPEMKN
+Special Embellishment Code List,Lace,GM03SPEMLA
+SPF Rating Code List,10,GM03SPFRRA
+SPF Rating Code List,50,GM03SPFRRE
+SPF Rating Code List,15,GM03SPFRRB
+SPF Rating Code List,60,GM03SPFRRF
+SPF Rating Code List,30,GM03SPFRRC
+SPF Rating Code List,80,GM03SPFRRG
+SPF Rating Code List,40,GM03SPFRRD
+SPF Rating Code List,Other,GM04SPFR99
+Sport Code List,Badminton,ZZ03SPRTBD
+Sport Code List,Hunting,ZZ03SPRTHU
+Sport Code List,Baseball,ZZ03SPRTBA
+Sport Code List,Lacrosse,ZZ03SPRTLA
+Sport Code List,Basketball,ZZ03SPRTBK
+Sport Code List,Racing,ZZ03SPRTRA
+Sport Code List,Bocce Ball,ZZ03SPRTBB
+Sport Code List,Racquetball,ZZ03SPRTRC
+Sport Code List,Bowling,ZZ03SPRTBW
+Sport Code List,Rowing,ZZ03SPRTRW
+Sport Code List,Boxing/Martial Arts,ZZ03SPRTBM
+Sport Code List,Running,ZZ03SPRTRU
+Sport Code List,Climbing,ZZ03SPRTCL
+Sport Code List,Skiing,ZZ03SPRTSK
+Sport Code List,Cross Country,ZZ03SPRTCC
+Sport Code List,Soccer,ZZ03SPRTSC
+Sport Code List,Cross-Training,ZZ03SPRTCT
+Sport Code List,Softball,ZZ03SPRTSF
+Sport Code List,Cycling,ZZ03SPRTCY
+Sport Code List,Tennis,ZZ03SPRTTE
+Sport Code List,Dance,ZZ03SPRTDA
+Sport Code List,Walking,ZZ03SPRTWK
+Sport Code List,Football,ZZ03SPRTFT
+Sport Code List,Water Skiing,ZZ03SPRTWA
+Sport Code List,Golf,ZZ03SPRTGF
+Sport Code List,Wrestling,ZZ03SPRTWR
+Sport Code List,Hiking,ZZ03SPRTHI
+Sport Code List,Yoga,ZZ03SPRTYG
+Sport Code List,Hockey,ZZ03SPRTΗΚ
+Sport Code List,Other,ZZ04SPRT99
+Strap Placement Code List,Centered Back,GM03STPLCB
+Strap Placement Code List,Wide Set Back,GM03STPLWB
+Strap Placement Code List,Centered Front,GM03STPLCF
+Strap Placement Code List,Wide Set Front,GM03STPLWF
+Strap Placement Code List,Centered Front and Back,GM03STPLCT
+Strap Placement Code List,Other,GM03STPL99
+Strap Placement Code List,Racerback,GM03STPLRA
+Supplemental Circularity Certification Code List,Reusable/Recyclable Product,GM03SUCCRR
+Supplemental Circularity Certification Code List,Rentable Product,GM03SUCCRP
+Supplemental Circularity Certification Code List,Take-Back Program,GM03SUCСТВ
+Supplemental Circularity Certification Code List,Other,GM04SUCC99
+Supplemental Circularity Certification Code List,Archive Collection or Unworn Vintage,GM03SCUUAC
+Supplemental Corporate/Philanthropic Code List,Charitable Contribution X Every Purchase,GM03SCOPCC
+Supplemental Corporate/Philanthropic Code List,Accreditation,GM03SCOPAC
+Supplemental Corporate/Philanthropic Code List,One for One,GM03SCOPOO
+Supplemental Corporate/Philanthropic Code List,Other,GM04SCOP99
+Supplemental Corporate/Philanthropic Code List,Positive Luxury Butterfly Mark,GM03SCOPPL
+Supplemental Packaging Certifications Code List,Reusable Packaging,GM03SPCERP
+Supplemental Packaging Certifications Code List,FSC Certified Paper/Fiber-based packaging,GM03SPCEFS
+Supplemental Packaging Certifications Code List,Recyclable Packaging,GM03SPCERG
+Supplemental Packaging Certifications Code List,Reduced Packaging,GM03SPCERE
+Supplemental Packaging Certifications Code List,Packaging-Free,GM03SPCERF
+Supplemental Packaging Certifications Code List,Other,GM04SPCE99
+Supplemental Packaging Certifications Code List,Recycled Packaging Materials,GM03SPCERM
+Supplemental Raw Materials Certifications Code List,Non-cert Upcycled Materials,GM03SRMCUM
+Supplemental Raw Materials Certifications Code List,PEFC (Programme for the endorsement of Forest Certification,GM03SRMCPE
+Supplemental Raw Materials Certifications Code List,Non-cert Recycled Materials,GM03SRMCRM
+Supplemental Raw Materials Certifications Code List,Canopy GreenShirt Designation,GM03SRMCCG
+Supplemental Raw Materials Certifications Code List,Non-cert Vegan,GM03SRMCNV
+Supplemental Raw Materials Certifications Code List,Other,GM04SRMC99
+Supplemental Raw Materials Certifications Code List,Biodegradable Products Institute (BPI),GM03SRMCBP
+Supplemental Raw Materials Certifications Code List,Better Cotton,GM03SRMCBC
+Supplemental Traceability Programs Code List,Digital Passport,GM03SUTRDP
+Supplemental Traceability Programs Code List,Traceability Program,GM03SUTRTP
+Supplemental Traceability Programs Code List,Material Traceability,GM03SUTRMT
+Supplemental Traceability Programs Code List,Other,GM04SUTR99
+Supplemental Traceability Programs Code List,Open Hub Supply,GM03SUTROS
+Supply Type Code List,Evergreen,ZZ03SUTYEV
+Supply Type Code List,Perennial,ZZ03SUTYPE
+Supply Type Code List,Made To Order,ZZ03SUTYMT
+Supply Type Code List,Seasonal with Limited Replenishment,ZZ03SUTYSL
+Supply Type Code List,Made to Stock,ZZ03SUTYMS
+Supply Type Code List,Other,ZZ04SUTY99
+Support Level Code List,Comfort Support,GM03SULVCA
+Support Level Code List,Maximum Support,GM03SULVMA
+Support Level Code List,Full Support,GM03SULVFA
+Support Level Code List,Medium Support,GM03SULVMB
+Support Level Code List,Light Support,GM03SULVLA
+Support Level Code List,Other,GM03SULV99
+Sweater/Pullover Type Code List,Babydoll,GM03SWPUBA
+Sweater/Pullover Type Code List,Hoodie,GM03SWPUHD
+Sweater/Pullover Type Code List,Blouse,GM03SWPUBL
+Sweater/Pullover Type Code List,Peasant,GM03SWPUPE
+Sweater/Pullover Type Code List,Box Top,GM03SWPUBT
+Sweater/Pullover Type Code List,Peplum,GM03SWPUPP
+Sweater/Pullover Type Code List,Bustier/Bra Top,GM03SWPUBB
+Sweater/Pullover Type Code List,Pullover,GM03SWPUPU
+Sweater/Pullover Type Code List,Button Front,GM03SWPUBF
+Sweater/Pullover Type Code List,Racerback,GM03SWPURA
+Sweater/Pullover Type Code List,Cami,GM03SWPUCA
+Sweater/Pullover Type Code List,Sweater,GM03SWPUSW
+Sweater/Pullover Type Code List,Camisole,GM03SWPUCM
+Sweater/Pullover Type Code List,Sweatshirt,GM03SWPUSS
+Sweater/Pullover Type Code List,Cardigan,GM03SWPUCR
+Sweater/Pullover Type Code List,Tank,GM03SWPUTA
+Sweater/Pullover Type Code List,Cocoon,GM03SWPUCC
+Sweater/Pullover Type Code List,T-Shirt,GM03SWPUTS
+Sweater/Pullover Type Code List,Dress Shirt,GM03SWPUDS
+Sweater/Pullover Type Code List,Tunic,GM03SWPUTU
+Sweater/Pullover Type Code List,Drop Waist,GM03SWPUDW
+Sweater/Pullover Type Code List,Vest,GM03SWPUVE
+Sweater/Pullover Type Code List,Faux Wrap,GM03SWPUFW
+Sweater/Pullover Type Code List,Wrap,GM03SWPUWR
+Sweater/Pullover Type Code List,Flyaway/Apron,GM03SWPUFA
+Sweater/Pullover Type Code List,Other,GM04SWPU99
+Swim Bottom Type Code List,Banded,GM03SWBТВА
+Swim Bottom Type Code List,Skirted,GM03SWBTSK
+Swim Bottom Type Code List,Boardshort,GM03SWBТВО
+Swim Bottom Type Code List,Tab Side,GM03SWBTTS
+Swim Bottom Type Code List,Brief,GM03SWBTBR
+Swim Bottom Type Code List,Tie Side,GM03SWBTTI
+Swim Bottom Type Code List,High Waist,GM03SWBTHW
+Swim Bottom Type Code List,Trunk,GM03SWBTTR
+Swim Bottom Type Code List,Hipster,GM03SWBTHI
+Swim Bottom Type Code List,Other,GM04SWBT99
+Swim Cover Up Type Code List,Beach Shirt,GM03SWCTBS
+Swim Cover Up Type Code List,Pareo,GM03SWCТРА
+Swim Cover Up Type Code List,Bottom,GM03SWCTВО
+Swim Cover Up Type Code List,Sun Dress,GM03SWCTSD
+Swim Cover Up Type Code List,Caftan,GM03SWCTCA
+Swim Cover Up Type Code List,Top,GM03SWCTTO
+Swim Cover Up Type Code List,Jumpsuit/Romper,GM03SWCTJU
+Swim Cover Up Type Code List,Tunic,GM03SWCTTU
+Swim Cover Up Type Code List,Kimono,GM03SWCTKІ
+Swim Cover Up Type Code List,Other,GM04SWCT99
+Swim Cover Up Type Code List,Maxi Dress,GM03SWCTMD
+Swim One-Piece Type Code List,Bandeau,GM03SWOТВА
+Swim One-Piece Type Code List,Scoop Neck,GM03SWOTSC
+Swim One-Piece Type Code List,Halter,GM03SWOTHA
+Swim One-Piece Type Code List,Square Neck,GM03SWOTSQ
+Swim One-Piece Type Code List,High Neck,GM03SWOТHΝ
+Swim One-Piece Type Code List,Surplice,GM03SWOTSU
+Swim One-Piece Type Code List,Monokini,GM03SWOTMO
+Swim One-Piece Type Code List,Swim Dress,GM03SWOTSW
+Swim One-Piece Type Code List,Off-Shoulder,GM03SWOTOF
+Swim One-Piece Type Code List,Tank,GM03SWOTTA
+Swim One-Piece Type Code List,One Shoulder,GM03SWOTON
+Swim One-Piece Type Code List,Underwire,GM03SWOTUN
+Swim One-Piece Type Code List,Plunge,GM03SWOTPL
+Swim One-Piece Type Code List,V-neck,GM03SWOTVN
+Swim One-Piece Type Code List,Rashguard,GM03SWOTRA
+Swim One-Piece Type Code List,Other,GM04SWOT09
+Swim Top Type Code List,Bandeau,GM03SWTTBA
+Swim Top Type Code List,One Shoulder,GM03SWTTON
+Swim Top Type Code List,Bandini,GM03SWTTBN
+Swim Top Type Code List,Rashguard,GM03SWTTRA
+Swim Top Type Code List,Bralette,GM03SWTTBR
+Swim Top Type Code List,Tankini,GM03SWTTTA
+Swim Top Type Code List,Flutter,GM03SWTTFL
+Swim Top Type Code List,Triangle,GM03SWTTTR
+Swim Top Type Code List,Halter,GM03SWTTHA
+Swim Top Type Code List,Underwire,GM03SWTTUN
+Swim Top Type Code List,High Neck,GM03SWTTΗΝ
+Swim Top Type Code List,Other,GM04SWTT99
+Swim Top Type Code List,Off Shoulder,GM03SWTTOF
+Tableware Type Code List,Dinnerware,GM03TBLTDI
+Tableware Type Code List,Glassware,GM03TBLTGL
+Tableware Type Code List,Flatware,GM03TBLTFL
+Tableware Type Code List,Other,GM04TBLT99
+Toe Shape Code List,Almond,GM03TOESAL
+Toe Shape Code List,Round,GM03TOESRD
+Toe Shape Code List,Chisel,GM03TOESCH
+Toe Shape Code List,Snip,GM03TOESSN
+Toe Shape Code List,Oblique,GM03TOESOB
+Toe Shape Code List,Square,GM03TOESSQ
+Toe Shape Code List,Pointy,GM03TOESPY
+Toe Shape Code List,Other,GM04TOES99
+Toe Style Code List,Apron Toe,GM03TOESAP
+Toe Style Code List,Split Toe,GM03TOESSP
+Toe Style Code List,Bike Toe,GM03TOESBI
+Toe Style Code List,Steel Toe,GM03TOESST
+Toe Style Code List,Cap Toe,GM03TOESCT
+Toe Style Code List,Tabi Toe,GM03TOESTA
+Toe Style Code List,Peep Toe,GM03TOESPT
+Toe Style Code List,Other,GM04TOES99
+Towel Type Code List,Bath,GM03TOWLBA
+Towel Type Code List,Towel Set,GM03TOWLTS
+Towel Type Code List,Beach,GM03TOWLBE
+Towel Type Code List,Wash,GM03TOWLWA
+Towel Type Code List,Hand,GM03TOWLHA
+Towel Type Code List,Other,GM04TOWL99
+Towel Type Code List,Kitchen,GM03TOWLKI
+Waist Rise Code List,Classic,GM03WSDRCL
+Waist Rise Code List,Mid,GM03WSDRMI
+Waist Rise Code List,High,GM03WSDRHI
+Waist Rise Code List,Other,GM04WSDR99
+Waist Rise Code List,Low,GM03WSDRLW
+Waistband Type Code List,Band Roll,GM03WBTPBR
+Waistband Type Code List,Knit,GM03WBTPKN
+Waistband Type Code List,Belt Hook,GM03WBTРВH
+Waistband Type Code List,Maternity,GM03WBTPMT
+Waistband Type Code List,Drawstring,GM03WBTPDS
+Waistband Type Code List,,GM03WBTPNN
+Waistband Type Code List,D-ring,GM03WBTPDR
+Waistband Type Code List,Rigid,GM03WBTPRG
+Waistband Type Code List,Expander,GM03WBTРЕX
+Waistband Type Code List,Self-Fabric Underwear,GM03WBTPSF
+Waistband Type Code List,Full Elastic,GM03WBTPFE
+Waistband Type Code List,Side Elastic,GM03WBTPSE
+Waistband Type Code List,Half Elastic,GM03WBTPHE
+Waistband Type Code List,Side Tab,GM03WBTPST
+Waistband Type Code List,Hook and Loop,GM03WBTPVE
+Waistband Type Code List,Stretch Elastic,GM03WBTPSR
+Waistband Type Code List,Ino-Flex,GM03WBTPIF
+Waistband Type Code List,Other,GM04WBTP99
+Waistband Type Code List,Inside Adjustable,GM03WBTΡIA
+Watch Case Shape Code List,Oval,JW03WACSVA
+Watch Case Shape Code List,Square,JW03WACSSQ
+Watch Case Shape Code List,Rectangular,JW03WACSRE
+Watch Case Shape Code List,Other,JW04WACS99
+Watch Case Shape Code List,Round,JW03WACSRN
+Water Repellent Code List,Waterproof,ZZ03WATRPF
+Water Repellent Code List,Other,ZZ04WATR99
+Water Repellent Code List,Water Resistant,ZZ03WATRRE
