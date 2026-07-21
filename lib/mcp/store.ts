@@ -47,24 +47,27 @@ export interface DemoStore {
   profileExtras: Record<string, ProfileExtras>
 }
 
-// Baseline core attributes every profile shares (mirrors Screen 2's seed rows)
+// The 8 baseline core attributes every profile shares, regardless of category
+// (mirrors Screen 2's BASELINE_CORE_ROWS).
 export const BASELINE_CORE_ATTRIBUTES: AttributeRequirement[] = [
+  { name: "Product ID", gs1Name: "Product ID", guidance: "", source: "standard", target: "core" },
+  { name: "Product Description", gs1Name: "Product Description", guidance: "", source: "standard", target: "core" },
   { name: "GTIN code", gs1Name: "GTIN code", guidance: "", source: "standard", target: "core" },
   { name: "GTIN Description", gs1Name: "GTIN Description", guidance: "Max 35 characters. Plain language product name.", source: "standard", target: "core" },
-  { name: "NRF Color Code", gs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide.", source: "standard", target: "core" },
   { name: "NRF Size Code", gs1Name: "NRF Size Code", guidance: "Primary and secondary codes both required.", source: "standard", target: "core" },
+  { name: "NRF Color Code", gs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide.", source: "standard", target: "core" },
+  { name: "Size Description", gs1Name: "Size Description", guidance: "", source: "standard", target: "core" },
+  { name: "Color Description", gs1Name: "Color Description", guidance: "Max 10 characters. All caps.", source: "standard", target: "core" },
 ]
 
 function seed(): DemoStore {
   return {
     profiles: ATTRIBUTE_PROFILES.map((p) => ({ ...p })),
     profileExtras: {
-      // Footwear ships with the custom rows Screen 2 displays
+      // Footwear ships with the Hero Shot image requirement Screen 2 displays.
+      // Its core attributes are the shared 8-attribute baseline — no custom core rows.
       "10005811": {
-        customAttributes: [
-          { name: "Color Description", gs1Name: "Color Description", guidance: "Max 10 characters. All caps.", source: "custom", target: "core" },
-          { name: "Size Description", gs1Name: "Size Description", guidance: "", source: "custom", target: "core" },
-        ],
+        customAttributes: [],
         imageRequirements: [
           {
             requirementName: "Hero Shot",

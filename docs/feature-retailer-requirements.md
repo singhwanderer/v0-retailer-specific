@@ -116,6 +116,15 @@ brick code — read by both the connector's `get_profile_detail` and Screen 2 di
   `extendedAttributes` plus that brick's own custom extended rows) · Image (format,
   background, min dimensions, max file size, crop, guidance) — all scoped to one brick,
   never merged with another mapped brick's set.
+`searchBricks`. The MCP demo store (`lib/mcp/store.ts`) holds the richer structured
+requirement model (baseline core attributes + per-brick extras + image requirements),
+exposed via `getProfileDetail(brickCode)`.
+
+- **Requirement tiers:** Core (a fixed 8-attribute baseline shared by every profile
+  regardless of category: Product ID, Product Description, GTIN code, GTIN Description,
+  NRF Size Code, NRF Color Code, Size Description, Color Description; plus any retailer
+  core extras) · Extended (GS1 standard `extendedAttributes` ∪ retailer custom) · Image
+  (format, background, min dimensions, max file size, crop, guidance).
 - **Category vs brick:** a category (segment) contains several bricks; a requirement maps
   to one segment ideally, spanning one or more of its bricks, each kept independent.
 

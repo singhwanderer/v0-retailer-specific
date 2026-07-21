@@ -47,6 +47,53 @@ const EMPTY_ATTRS: BrickAttributeSet = {
   imageRequirements: [],
 }
 
+// ── GS1 catalogue (mock) ──────────────────────────────────────────────────────
+const gs1Catalogue = [
+  { name: "Heel Type", code: "GM03HLTY" },
+  { name: "Heel Height Range", code: "GM03HLHT" },
+  { name: "Toe Shape", code: "GM03TOES" },
+  { name: "Outsole Type", code: "GM03OUTS" },
+  { name: "Closure", code: "GM03CLOS" },
+  { name: "Lining Material", code: "GM03LIMT" },
+  { name: "Fabric or Material", code: "GM03FBMC" },
+  { name: "Fit", code: "GM03FITT" },
+  { name: "Fur Treatment", code: "GM03FTMT" },
+  { name: "Gender", code: "GENDER" },
+  { name: "Consumer Life Stage", code: "CONLIFESTAGE" },
+]
+
+// ── Seeded data ───────────────────────────────────────────────────────────────
+// The 8 baseline core attributes every profile starts with, regardless of
+// category (mirrors the MCP demo store's BASELINE_CORE_ATTRIBUTES).
+const BASELINE_CORE_ROWS: AttributeRow[] = [
+  { retailerName: "Product ID", tgcGs1Name: "Product ID", guidance: "", source: "standard" },
+  { retailerName: "Product Description", tgcGs1Name: "Product Description", guidance: "", source: "standard" },
+  { retailerName: "GTIN code", tgcGs1Name: "GTIN code", guidance: "", source: "standard" },
+  { retailerName: "GTIN Description", tgcGs1Name: "GTIN Description", guidance: "Max 35 characters. Plain language product name.", source: "standard" },
+  { retailerName: "NRF Size Code", tgcGs1Name: "NRF Size Code", guidance: "Primary and secondary codes both required.", source: "standard" },
+  { retailerName: "NRF Color Code", tgcGs1Name: "NRF Color Code", guidance: "Must match NRF standard code table. See NRF guide.", source: "standard" },
+  { retailerName: "Size Description", tgcGs1Name: "Size Description", guidance: "", source: "standard" },
+  { retailerName: "Color Description", tgcGs1Name: "Color Description", guidance: "Max 10 characters. All caps.", source: "standard" },
+]
+
+// Footwear (GS1 brick 10005811) ships with a Hero Shot image requirement on top
+// of the shared baseline — matching the seeded data in lib/mcp/store.ts's
+// profileExtras for that brick. Its core attributes are the baseline 8.
+const FOOTWEAR_IMAGE_ROWS: ImageRequirementRow[] = [
+  {
+    requirementName: "Hero Shot",
+    format: "JPEG",
+    background: "Pure white (#FFFFFF)",
+    minDimensions: "2000 × 2000 px",
+    maxFileSize: "10 MB",
+    shapeCrop: "Square, product centered",
+    guidanceNote: "No mannequin, no props.",
+  },
+]
+
+const FOOTWEAR_BRICK_CODE = "10005811"
+type ProfileStatus = "Active" | "Draft"
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
@@ -955,9 +1002,15 @@ export function Screen2ProfileDetail({
   initialStatus,
   onUpdateProfile,
 }: Screen2Props) {
-  // All GS1 bricks mapped to this requirement. Attributes are always
-  // brick-scoped — a profile spanning several bricks keeps each brick's
-  // attribute set independent, with no merging across bricks.
+  const isFootwear = brickMapping?.code === FOOTWEAR_BRICK_CODE
+  const [coreRows, setCoreRows] = useState<AttributeRow[]>(BASELINE_CORE_ROWS)
+  const [extendedRows, setExtendedRows] = useState<AttributeRow[]>(initialBrickExtendedRows ?? [])
+  const [imageRows, setImageRows] = useState<ImageRequirementRow[]>(
+    isFootwear ? FOOTWEAR_IMAGE_ROWS : []
+  )
+
+  // All GS1 bricks mapped to this requirement. Seeded from the profile; a user
+  // can add more (with a cross-category confirmation).
   const seedBricks: ProfileBrick[] =
     initialBricks && initialBricks.length > 0
       ? initialBricks
