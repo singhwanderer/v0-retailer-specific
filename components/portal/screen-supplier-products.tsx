@@ -6,15 +6,18 @@ import { getBrickByCode } from "@/lib/gs1-standard-library"
 import type { RetailerStatus, SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── Shared product leaf ───────────────────────────────────────────────────────
-// One product table, reached from two compliance targets:
+// One product table, reached from three targets:
 //   • retailer target — filtered by selection code, showing this partner's gaps
 //   • gs1 target       — filtered by category, showing GS1 baseline gaps
-// Both land here because the leaf ("a product + its compliance → gap detail")
+//   • code target      — account-wide, locked to one GS1 brick/selection code,
+//                         reached from the account-wide Selection Code List
+// All land here because the leaf ("a product + its compliance → gap detail")
 // is identical; only the filter axis and the compliance column differ.
 
 type ProductsTarget =
   | { kind: "retailer"; partnerName: string; selectionCode: string; brickCode: string }
   | { kind: "gs1" }
+  | { kind: "code"; brickCode: string; label: string }
 
 interface SupplierProductsProps {
   target: ProductsTarget
@@ -174,6 +177,7 @@ export function ScreenSupplierProducts({
   onGoToCatalogue,
 }: SupplierProductsProps) {
   const isGs1 = target.kind === "gs1"
+  const showsGs1Status = target.kind !== "retailer"
   const partnerName = target.kind === "retailer" ? target.partnerName : ""
 
   const [search, setSearch] = useState("")
@@ -194,6 +198,19 @@ export function ScreenSupplierProducts({
       if (categoryFilter === "all") return true
       if (categoryFilter === "uncategorised") return row.state === "uncategorised"
       return row.brickCode === categoryFilter
+    }
+    if (target.kind === "code") {
+      // Account-wide, locked to this one brick — no retailer dimension at all.
+      if (row.state !== "categorised" || row.brickCode !== target.brickCode) return false
+      const matchesSearch =
+        search.trim() === "" ||
+        row.id.toLowerCase().includes(search.toLowerCase()) ||
+        row.description.toLowerCase().includes(search.toLowerCase())
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "gaps" && (row.gs1Gaps ?? 0) > 0) ||
+        (statusFilter === "complete" && (row.gs1Gaps ?? 0) === 0)
+      return matchesSearch && matchesStatus
     }
     // Retailer mode: only products in this selection code's category that this
     // partner actually requires.
@@ -221,25 +238,32 @@ export function ScreenSupplierProducts({
   // view is scoped to categorised products this partner requires.
   const uncategorisedCount = isGs1 ? products.filter((p) => p.state === "uncategorised").length : 0
 
-  // GS1: attribute chips for a single selected category
+  // GS1/code: attribute chips for the selected (or locked) category
   const activeBrick =
-    isGs1 && categoryFilter !== "all" && categoryFilter !== "uncategorised"
+    target.kind === "code"
+      ? getBrickByCode(target.brickCode)
+      : isGs1 && categoryFilter !== "all" && categoryFilter !== "uncategorised"
       ? getBrickByCode(categoryFilter)
       : undefined
 
-  const statusColHeader = isGs1 ? "GS1 Compliance" : "Compliance Status"
+  const statusColHeader = showsGs1Status ? "GS1 Compliance" : "Compliance Status"
 
   return (
     <div className="p-8 flex flex-col gap-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm flex-wrap">
         <button onClick={onBack} className="font-light hover:underline" style={{ color: "#0168B3" }}>
-          Compliance
+          {target.kind === "code" ? "Selection Code List" : "Compliance"}
         </button>
-        {isGs1 ? (
+        {target.kind === "gs1" ? (
           <>
             <span style={{ color: "#9CA3AF" }}>›</span>
             <span className="font-light text-[#6B7280]">GS1 Standard</span>
+          </>
+        ) : target.kind === "code" ? (
+          <>
+            <span style={{ color: "#9CA3AF" }}>›</span>
+            <span className="font-light text-[#6B7280]">{target.label}</span>
           </>
         ) : (
           <>
@@ -255,7 +279,7 @@ export function ScreenSupplierProducts({
 
       {/* Header */}
       <div className="flex flex-col gap-1">
-        {isGs1 ? (
+        {target.kind === "gs1" ? (
           <>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl font-semibold text-[#111827]">GS1 Standard</h1>
@@ -272,6 +296,14 @@ export function ScreenSupplierProducts({
               Satisfying the baseline advances every retailer at once.
             </p>
           </>
+        ) : target.kind === "code" ? (
+          <>
+            <h1 className="text-xl font-semibold text-[#111827]">{target.label}</h1>
+            <p className="text-sm font-light text-[#6B7280]">
+              {filtered.length} product{filtered.length !== 1 ? "s" : ""} under this selection code,
+              account-wide, assessed against the GS1 baseline.
+            </p>
+          </>
         ) : (
           <>
             <h1 className="text-xl font-semibold text-[#111827]">
@@ -285,7 +317,7 @@ export function ScreenSupplierProducts({
       </div>
 
       {/* Filter bar (branches by target) */}
-      {isGs1 ? (
+      {target.kind === "gs1" ? (
         <div className="flex items-center gap-3 flex-wrap">
           <div
             className="relative inline-flex items-center rounded-md"
@@ -480,7 +512,7 @@ export function ScreenSupplierProducts({
                       )}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      {isGs1 ? (
+                      {showsGs1Status ? (
                         <Gs1Status row={row} />
                       ) : (
                         <ComplianceTrigger
@@ -503,8 +535,10 @@ export function ScreenSupplierProducts({
           className="px-4 py-2.5 text-[11px] font-light leading-relaxed"
           style={{ color: "#9CA3AF", borderTop: "1px solid #F3F4F6" }}
         >
-          {isGs1
+          {target.kind === "gs1"
             ? "GS1 baseline requirements are defined per category, so this view filters by category where a retailer view filters by selection code. Requirements are maintained by GS1 and cannot be modified."
+            : target.kind === "code"
+            ? "This selection code groups every product assigned to this GS1 category, account-wide. Compliance shown here is against the GS1 baseline only — per-retailer requirements are checked from that retailer's own Compliance view."
             : "You keep one product. Each retailer's requirements are checked against it — filling a gap once satisfies every retailer who requires it. A product must have a category before its requirements can be checked."}
         </p>
       </div>

@@ -701,3 +701,39 @@ export function getPartnerSummary(products: SupplierProduct[], partnerName: stri
     complete: codes.reduce((sum, c) => sum + c.complete, 0),
   }
 }
+
+// ── Account-wide selection codes ───────────────────────────────────────────────
+// The real Selection Code List is a flat, account-wide catalogue view — no
+// retailer filter, no compliance/gap dimension — unlike getSelectionCodesForPartner
+// above (which stays as the retailer-scoped compliance breakdown, untouched).
+
+export type AllSelectionCodeSummary = {
+  id: string
+  brickCode: string
+  label: string
+  products: number
+}
+
+/**
+ * Account-wide selection codes — one row per GS1 brick with at least one
+ * categorised product, aggregated across every retailer (or none at all).
+ * This is a separate numbering space from getSelectionCodesForPartner's
+ * per-partner "001", "002" — the two are never rendered together.
+ */
+export function getAllSelectionCodes(products: SupplierProduct[]): AllSelectionCodeSummary[] {
+  const byBrick = new Map<string, SupplierProduct[]>()
+  for (const p of products) {
+    if (p.state !== "categorised" || !p.brickCode) continue
+    const list = byBrick.get(p.brickCode) ?? []
+    list.push(p)
+    byBrick.set(p.brickCode, list)
+  }
+  return [...byBrick.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([brickCode, rows], i) => ({
+      id: String(i + 1).padStart(3, "0"),
+      brickCode,
+      label: getBrickByCode(brickCode)?.brickName ?? brickCode,
+      products: rows.length,
+    }))
+}
