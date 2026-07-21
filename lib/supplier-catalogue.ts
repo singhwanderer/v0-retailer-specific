@@ -24,6 +24,8 @@ export type SupplierProduct = {
   gs1Gaps?: number
   /** How the category was set — manual picker vs. (future) enrichment flow */
   source?: "manual"
+  /** Discontinued line — Compliance Reports can exclude these on request */
+  discontinued?: boolean
   /** Per-retailer compliance (static mock — gap-filling is not simulated) */
   retailers?: RetailerStatus[]
 }
@@ -73,6 +75,7 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
     state: "categorised",
     brickCode: "10001333",
     gs1Gaps: 0,
+    discontinued: true,
     retailers: [{ retailer: "Belk", gaps: "complete" }],
   },
   { id: "B11446", description: "Denim Shirtdress", state: "uncategorised" },
@@ -158,6 +161,7 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
     state: "categorised",
     brickCode: "10001401",
     gs1Gaps: 0,
+    discontinued: true,
     retailers: [{ retailer: "Macy's", gaps: "complete" }],
   },
   {
@@ -482,6 +486,7 @@ export const SUPPLIER_PRODUCTS_SEED: SupplierProduct[] = [
     state: "categorised",
     brickCode: "10002100",
     gs1Gaps: 0,
+    discontinued: true,
     retailers: [{ retailer: "Macy's", gaps: 1 }],
   },
 

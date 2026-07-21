@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, LayoutDashboard, Tag } from "lucide-react"
+import { ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
@@ -16,6 +16,7 @@ interface SidebarProps {
 const retailerNavItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, wired: true },
   { id: "attribute-profiles", label: "Attributes & Images", icon: Tag, wired: true },
+  { id: "compliance-reports", label: "Compliance Reports", icon: FileChartColumn, wired: true },
 ]
 
 // ── Supplier nav — mirrors the real Trading Grid Catalogue left nav ────────────
@@ -45,8 +46,12 @@ const supplierSections: NavSection[] = [
       { id: "edi-console", label: "EDI Management Console" },
       { id: "text-file-upload", label: "Text File Upload" },
       { id: "text-file-download", label: "Text File Download" },
+      // Compliance Checks stays inert: in the live product it's per-file
+      // validation at upload time — a different concept from the on-demand
+      // catalogue-wide Compliance Report, and the sidebar's job is to mirror
+      // the legacy IA faithfully.
       { id: "compliance-checks", label: "Compliance Checks" },
-      { id: "compliance-reports", label: "Compliance Reports" },
+      { id: "compliance-reports", label: "Compliance Reports", wired: true, isNew: true },
       { id: "supplier-compliance", label: "Compliance Status", wired: true, isNew: true },
     ],
   },

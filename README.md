@@ -29,14 +29,22 @@ This is a demo, so some surfaces are deliberately not built:
 - **Wired:** retailer requirement authoring (create/activate/deactivate, edit
   attributes and image rules, map a requirement to one or more GS1 categories);
   supplier categorisation with live compliance recalculation; the compliance →
-  selection code → product → gap-detail drill-down; per-code CSV export.
+  selection code → product → gap-detail drill-down; per-code CSV export;
+  **Compliance Reports** on both sides (supplier: proactive scans against any
+  retailer's account filter or a global System filter; retailer: defensive
+  scans of the vendor base against its own profiles or the same System
+  filters) — see `docs/feature-compliance-reports.md`.
 - **Intentionally inert (shown for realism):** the supplier sidebar reproduces
-  the full TGC left nav, but only **Products** and **Compliance Status** are
-  active. The retailer **Dashboard** is a placeholder. The **AI Attributes
-  Enrichment** step is shown as a hand-off signpost only — the enrichment screen
-  itself is out of scope. The retailer-side **Import from CSV** dialog is a
-  placeholder pending a decided CSV format. A **Vendor Exceptions** screen exists
-  in the code but is not wired into navigation in this build.
+  the full TGC left nav, but only **Selection Code List**, **Compliance
+  Status**, and **Compliance Reports** are active. **Compliance Checks** stays
+  inert on purpose — in the live product it's per-file validation at upload
+  time, a different concept from the on-demand catalogue-wide report. The
+  retailer **Dashboard** is a placeholder. The **AI Attributes Enrichment**
+  step is shown as a hand-off signpost only — the enrichment screen itself is
+  out of scope. The retailer-side **Import from CSV** dialog is a placeholder
+  pending a decided CSV format. A **Vendor Exceptions** screen exists in the
+  code but is not wired into navigation in this build (its data does feed the
+  retailer-side Compliance Report, which skips waived attributes).
 
 ## Requirement authoring model — GS1 bricks, multi-brick profiles, one shared store
 
@@ -78,8 +86,11 @@ The same catalogue data is also exposed through a **Model Context Protocol (MCP)
 server** at `/api/mcp`, so the requirements and supplier-compliance data can be
 queried conversationally from any MCP client (claude.ai, Claude Desktop, ChatGPT
 developer mode). It covers the retailer side — searching GS1 categories,
-listing/inspecting attribute profiles, monitoring supplier compliance gaps, and
-authoring requirements (including multi-brick creation). Setup and usage:
+listing/inspecting attribute profiles, monitoring supplier compliance gaps,
+running compliance reports across the vendor base (`run_compliance_report`,
+against an attribute profile or a global System filter from
+`list_system_filters`), and authoring requirements (including multi-brick
+creation). Setup and usage:
 
 - `docs/mcp-getting-started.md` — connect a client and try it
 - `docs/mcp-demo-quickstart.md`, `docs/mcp-faq.md` — walkthrough and FAQ
@@ -89,7 +100,7 @@ example prompts above:
 - **Discoverability** — a `get_capabilities` tool returns a plain-English catalog
   of what's possible plus a live snapshot of the demo data (profile names,
   suppliers, categories with data), built from the store so it never drifts from
-  reality; five starter prompts are registered via the MCP prompts primitive and
+  reality; six starter prompts are registered via the MCP prompts primitive and
   surface as clickable suggestions in clients like claude.ai.
 - **Self-explaining empty results** — a read that matches nothing (e.g. an
   unknown supplier name) returns a helpful envelope (`{ matches: [], knownSuppliers:

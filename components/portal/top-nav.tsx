@@ -18,6 +18,7 @@ interface TopNavProps {
 const navLinks = [
   { id: "dashboard", label: "Dashboard" },
   { id: "attribute-profiles", label: "Attributes & Images" },
+  { id: "compliance-reports", label: "Compliance Reports" },
 ]
 
 export function TopNav({
