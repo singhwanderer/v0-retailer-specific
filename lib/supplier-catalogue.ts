@@ -540,6 +540,86 @@ export function countUncategorised(products: SupplierProduct[]): number {
   return products.filter((p) => p.state === "uncategorised").length
 }
 
+// ── Gap records ───────────────────────────────────────────────────────────────
+// The canonical expansion of a product's numeric gap count into named missing
+// attributes and image requirements. The seed's counts stay authoritative; the
+// expansion is deterministic — the first N of the brick's standard attribute
+// pool, with any overflow allocated to image requirements — so the gap detail,
+// the product-leaf pills, and any other consumer can never disagree about what
+// a gap actually is.
+
+export type GapTarget = { kind: "gs1" } | { kind: "retailer"; name: string }
+
+export type MissingAttribute = { name: string; code: string }
+export type MissingImage = { name: string; spec: string }
+
+export type GapRecords = {
+  missingAttrs: MissingAttribute[]
+  missingImages: MissingImage[]
+  /** Pool sizes, for "X of Y provided" summaries */
+  totalAttrCount: number
+  totalImageCount: number
+}
+
+export const IMAGE_REQUIREMENT_POOL: MissingImage[] = [
+  { name: "Hero Shot", spec: "pure white background, 2000 × 2000 px, square" },
+  { name: "Detail Shot", spec: "close-up of material/texture" },
+]
+
+/** Open gap count for a product against one target (0 when complete or not assessed). */
+export function getGapCount(product: SupplierProduct, target: GapTarget): number {
+  if (product.state !== "categorised") return 0
+  if (target.kind === "gs1") return product.gs1Gaps ?? 0
+  const rs = product.retailers?.find((r) => r.retailer === target.name)
+  return !rs || rs.gaps === "complete" ? 0 : rs.gaps
+}
+
+/** Stable small hash of a string — deterministic across renders and reloads. */
+function stableHash(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return h
+}
+
+export function getGapRecords(
+  product: SupplierProduct | undefined,
+  target: GapTarget
+): GapRecords {
+  const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
+  const attrPool = brick?.extendedAttributes ?? []
+  const gapCount = product ? getGapCount(product, target) : 0
+
+  // Split the opaque gap count into named attribute gaps and image-requirement
+  // gaps. A small, deterministic share (0–2) of the gaps falls to images —
+  // keyed on product + target so it never changes between renders — rather than
+  // "images only once every attribute is also missing", which would leave image
+  // requirements unreachable given the seed's modest gap counts. The two always
+  // sum back to the gap count the pills show.
+  const targetKey = target.kind === "gs1" ? "gs1" : `r:${target.name}`
+  const hash = product ? stableHash(`${product.id}|${targetKey}`) : 0
+  // Distribution across products with gaps: ~1/3 none, ~1/3 one, ~1/3 two.
+  const desiredImageGaps = gapCount === 0 ? 0 : hash % 3
+
+  let imageGapCount = Math.min(desiredImageGaps, gapCount, IMAGE_REQUIREMENT_POOL.length)
+  let attrCount = gapCount - imageGapCount
+  if (attrCount > attrPool.length) {
+    // More attribute gaps than the pool holds — push the remainder to images.
+    const extra = attrCount - attrPool.length
+    imageGapCount = Math.min(imageGapCount + extra, IMAGE_REQUIREMENT_POOL.length)
+    attrCount = attrPool.length
+  }
+
+  const missingAttrs = attrPool.slice(0, attrCount).map((a) => ({ name: a.name, code: a.code }))
+  const missingImages = IMAGE_REQUIREMENT_POOL.slice(0, imageGapCount)
+
+  return {
+    missingAttrs,
+    missingImages,
+    totalAttrCount: attrPool.length,
+    totalImageCount: IMAGE_REQUIREMENT_POOL.length,
+  }
+}
+
 // ── Completion % ──────────────────────────────────────────────────────────────
 // A product is "complete" for a target when it has zero open gaps for that
 // target (GS1 baseline: gs1Gaps === 0; a retailer: that retailer's entry reads

@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { BadgeCheck, ChevronDown, Search, X } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
-import type { RetailerStatus, SupplierProduct } from "@/lib/supplier-catalogue"
+import type { GapTarget, RetailerStatus, SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── Shared product leaf ───────────────────────────────────────────────────────
 // One product table, reached from three targets:
@@ -27,7 +27,7 @@ interface SupplierProductsProps {
   onBack: () => void
   /** Partner breadcrumb — back to this partner's selection codes (L2). Retailer target only. */
   onBackToPartner?: () => void
-  onNavigateToGapDetail: (productName: string, retailer: string) => void
+  onNavigateToGapDetail: (productId: string, target: GapTarget) => void
   /** GS1 target only — route uncategorised products to the Catalogue */
   onGoToCatalogue?: () => void
 }
@@ -37,13 +37,6 @@ type ProductRow = SupplierProduct
 const PAGE_SIZE = 8
 
 type StatusFilter = "all" | "gaps" | "complete"
-
-const CATEGORY_FILTERS = [
-  { value: "all", label: "All categories" },
-  { value: "10001333", label: "Dresses (10001333)" },
-  { value: "10005811", label: "Footwear (10005811)" },
-  { value: "uncategorised", label: "Uncategorised" },
-]
 
 // ── Compliance trigger cell (retailer target) ─────────────────────────────────
 // The view is scoped to a single partner, so this shows only that partner's
@@ -77,38 +70,113 @@ function ComplianceTrigger({
   )
 }
 
-// ── GS1 compliance cell (gs1 target) ──────────────────────────────────────────
-function Gs1Status({ row }: { row: ProductRow }) {
-  if (row.state === "uncategorised") {
+// ── Shared pill ───────────────────────────────────────────────────────────────
+// One pill for every target status. Clickable when it carries open gaps, so
+// every gap shown anywhere in the leaf drills into its gap detail.
+function StatusPill({
+  tone,
+  label,
+  onClick,
+}: {
+  tone: "green" | "amber" | "red"
+  label: string
+  onClick?: () => void
+}) {
+  const cfg = {
+    green: { bg: "#DCFCE7", text: "#15803D", dot: "#16A34A" },
+    amber: { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
+    red: { bg: "#FEE2E2", text: "#991B1B", dot: "#DC2626" },
+  }[tone]
+  const content = (
+    <>
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cfg.dot }} />
+      {label}
+    </>
+  )
+  const className = "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+  if (!onClick) {
     return (
-      <span
-        className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-        style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#DC2626" }} />
-        Cannot be assessed
-      </span>
-    )
-  }
-  if ((row.gs1Gaps ?? 0) === 0) {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
-        style={{ backgroundColor: "#DCFCE7", color: "#15803D" }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#16A34A" }} />
-        GS1 complete
+      <span className={className} style={{ backgroundColor: cfg.bg, color: cfg.text }}>
+        {content}
       </span>
     )
   }
   return (
-    <span
-      className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
-      style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+    <button
+      onClick={onClick}
+      className={`${className} hover:opacity-80 transition-opacity cursor-pointer`}
+      style={{ backgroundColor: cfg.bg, color: cfg.text }}
     >
-      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#F59E0B" }} />
-      {row.gs1Gaps} GS1 gap{row.gs1Gaps !== 1 ? "s" : ""}
-    </span>
+      {content}
+    </button>
+  )
+}
+
+// ── GS1 compliance cell (gs1 target) ──────────────────────────────────────────
+function Gs1Status({
+  row,
+  onNavigateToGapDetail,
+}: {
+  row: ProductRow
+  onNavigateToGapDetail: () => void
+}) {
+  if (row.state === "uncategorised") {
+    return <StatusPill tone="red" label="Cannot be assessed" />
+  }
+  if ((row.gs1Gaps ?? 0) === 0) {
+    return <StatusPill tone="green" label="GS1 complete" />
+  }
+  return (
+    <StatusPill
+      tone="amber"
+      label={`${row.gs1Gaps} GS1 gap${row.gs1Gaps !== 1 ? "s" : ""}`}
+      onClick={onNavigateToGapDetail}
+    />
+  )
+}
+
+// ── Compliance cell (code target) ─────────────────────────────────────────────
+// Stacked per-target pills: the GS1 baseline plus one pill per retailer with
+// open gaps (each drilling into that target's gap detail); retailers that are
+// complete collapse into a single green summary pill to keep the row quiet.
+function CodeComplianceCell({
+  row,
+  onNavigateToGapDetail,
+}: {
+  row: ProductRow
+  onNavigateToGapDetail: (target: GapTarget) => void
+}) {
+  const gs1Gaps = row.gs1Gaps ?? 0
+  const retailers = row.retailers ?? []
+  const withGaps = retailers.filter((r) => r.gaps !== "complete")
+  const completeCount = retailers.length - withGaps.length
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {gs1Gaps > 0 ? (
+        <StatusPill
+          tone="amber"
+          label={`GS1 · ${gs1Gaps} gap${gs1Gaps !== 1 ? "s" : ""}`}
+          onClick={() => onNavigateToGapDetail({ kind: "gs1" })}
+        />
+      ) : (
+        <StatusPill tone="green" label="GS1 complete" />
+      )}
+      {withGaps.map((r) => (
+        <StatusPill
+          key={r.retailer}
+          tone="amber"
+          label={`${r.retailer} · ${r.gaps}`}
+          onClick={() => onNavigateToGapDetail({ kind: "retailer", name: r.retailer })}
+        />
+      ))}
+      {completeCount > 0 && (
+        <StatusPill
+          tone="green"
+          label={`${completeCount} retailer${completeCount !== 1 ? "s" : ""} complete`}
+        />
+      )}
+    </div>
   )
 }
 
@@ -177,7 +245,6 @@ export function ScreenSupplierProducts({
   onGoToCatalogue,
 }: SupplierProductsProps) {
   const isGs1 = target.kind === "gs1"
-  const showsGs1Status = target.kind !== "retailer"
   const partnerName = target.kind === "retailer" ? target.partnerName : ""
 
   const [search, setSearch] = useState("")
@@ -200,16 +267,19 @@ export function ScreenSupplierProducts({
       return row.brickCode === categoryFilter
     }
     if (target.kind === "code") {
-      // Account-wide, locked to this one brick — no retailer dimension at all.
+      // Account-wide, locked to this one brick — compliance covers every
+      // target: the GS1 baseline plus each retailer's requirements.
       if (row.state !== "categorised" || row.brickCode !== target.brickCode) return false
       const matchesSearch =
         search.trim() === "" ||
         row.id.toLowerCase().includes(search.toLowerCase()) ||
         row.description.toLowerCase().includes(search.toLowerCase())
+      const hasAnyGap =
+        (row.gs1Gaps ?? 0) > 0 || (row.retailers ?? []).some((r) => r.gaps !== "complete")
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "gaps" && (row.gs1Gaps ?? 0) > 0) ||
-        (statusFilter === "complete" && (row.gs1Gaps ?? 0) === 0)
+        (statusFilter === "gaps" && hasAnyGap) ||
+        (statusFilter === "complete" && !hasAnyGap)
       return matchesSearch && matchesStatus
     }
     // Retailer mode: only products in this selection code's category that this
@@ -238,15 +308,38 @@ export function ScreenSupplierProducts({
   // view is scoped to categorised products this partner requires.
   const uncategorisedCount = isGs1 ? products.filter((p) => p.state === "uncategorised").length : 0
 
-  // GS1/code: attribute chips for the selected (or locked) category
+  // GS1 view: category filter derived from the categories actually present in
+  // the catalogue, instead of a hardcoded subset.
+  const categoryFilters = useMemo(() => {
+    const codes = [
+      ...new Set(
+        products
+          .filter((p) => p.state === "categorised" && p.brickCode)
+          .map((p) => p.brickCode!)
+      ),
+    ].sort()
+    return [
+      { value: "all", label: "All categories" },
+      ...codes.map((code) => ({
+        value: code,
+        label: `${getBrickByCode(code)?.brickName ?? code} (${code})`,
+      })),
+      { value: "uncategorised", label: "Uncategorised" },
+    ]
+  }, [products])
+
+  // Attribute chips stay a GS1-view explainer only — on the code drill-down
+  // they read as noise next to the per-target compliance pills.
   const activeBrick =
-    target.kind === "code"
-      ? getBrickByCode(target.brickCode)
-      : isGs1 && categoryFilter !== "all" && categoryFilter !== "uncategorised"
+    isGs1 && categoryFilter !== "all" && categoryFilter !== "uncategorised"
       ? getBrickByCode(categoryFilter)
       : undefined
 
-  const statusColHeader = showsGs1Status ? "GS1 Compliance" : "Compliance Status"
+  const statusColHeader = isGs1
+    ? "GS1 Compliance"
+    : target.kind === "code"
+    ? "Compliance"
+    : "Compliance Status"
 
   return (
     <div className="p-8 flex flex-col gap-6">
@@ -328,7 +421,7 @@ export function ScreenSupplierProducts({
               onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }}
               className="appearance-none pl-3 pr-8 py-2 rounded-md text-sm font-light outline-none bg-transparent text-[#374151]"
             >
-              {CATEGORY_FILTERS.map((c) => (
+              {categoryFilters.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
@@ -512,12 +605,24 @@ export function ScreenSupplierProducts({
                       )}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      {showsGs1Status ? (
-                        <Gs1Status row={row} />
+                      {target.kind === "code" ? (
+                        <CodeComplianceCell
+                          row={row}
+                          onNavigateToGapDetail={(t) => onNavigateToGapDetail(row.id, t)}
+                        />
+                      ) : isGs1 ? (
+                        <Gs1Status
+                          row={row}
+                          onNavigateToGapDetail={() =>
+                            onNavigateToGapDetail(row.id, { kind: "gs1" })
+                          }
+                        />
                       ) : (
                         <ComplianceTrigger
                           status={partnerStatus(row)}
-                          onNavigateToGapDetail={() => onNavigateToGapDetail(row.id, partnerName)}
+                          onNavigateToGapDetail={() =>
+                            onNavigateToGapDetail(row.id, { kind: "retailer", name: partnerName })
+                          }
                         />
                       )}
                     </td>
@@ -538,7 +643,7 @@ export function ScreenSupplierProducts({
           {target.kind === "gs1"
             ? "GS1 baseline requirements are defined per category, so this view filters by category where a retailer view filters by selection code. Requirements are maintained by GS1 and cannot be modified."
             : target.kind === "code"
-            ? "This selection code groups every product assigned to this GS1 category, account-wide. Compliance shown here is against the GS1 baseline only — per-retailer requirements are checked from that retailer's own Compliance view."
+            ? "This selection code groups every product assigned to this GS1 category, account-wide. Compliance covers every target — the GS1 baseline plus each retailer that requires the product. Click a pill with gaps to see exactly which attributes and images are missing for that target."
             : "You keep one product. Each retailer's requirements are checked against it — filling a gap once satisfies every retailer who requires it. A product must have a category before its requirements can be checked."}
         </p>
       </div>

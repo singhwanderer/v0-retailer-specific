@@ -12,12 +12,15 @@ import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-cat
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierAllSelectionCodes } from "@/components/portal/screen-supplier-all-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
-import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
+import { ScreenSupplierGapDetail, type GapDetailCrumb } from "@/components/portal/screen-supplier-gap-detail"
+import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
   SUPPLIER_PRODUCTS_SEED,
   assignCategory,
+  type GapTarget,
+  type MissingImage,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
 import {
@@ -52,7 +55,18 @@ type SupplierScreen =
   | "selection-codes"
   | "supplier-products"
   | "supplier-gap-detail"
+  | "image-upload"
   | "compliance-reports"
+
+// Which flow the gap detail was entered from — drives its breadcrumb trail and
+// which sidebar section stays highlighted.
+type GapOrigin = "partner-flow" | "gs1-view" | "code-list"
+
+type GapContext = {
+  productId: string
+  target: GapTarget
+  origin: GapOrigin
+}
 
 function DashboardPlaceholder() {
   return (
@@ -132,8 +146,12 @@ export default function RetailerPortal() {
   // L3 context
   const [activeCode, setActiveCode] = useState<{ id: string; label: string; brickCode: string } | null>(null)
 
-  // L4 context
-  const [gapProduct, setGapProduct] = useState<{ productName: string; retailer: string } | null>(null)
+  // L4 context — product + target + origin flow, so gap detail works from the
+  // partner drill-down, the GS1 view, and the account-wide code drill-down alike
+  const [gapContext, setGapContext] = useState<GapContext | null>(null)
+
+  // Image-upload WIP screen context (reached only from gap detail)
+  const [uploadImage, setUploadImage] = useState<MissingImage | null>(null)
 
   // Account-wide Selection Code List drill-down context
   const [activeAccountCode, setActiveAccountCode] = useState<{ brickCode: string; label: string } | null>(null)
@@ -239,7 +257,7 @@ export default function RetailerPortal() {
       setSupplierScreen("compliance")
       setActivePartner(null)
       setActiveCode(null)
-      setGapProduct(null)
+      setGapContext(null)
     }
     if (id === "selection-code-list") {
       handleSelectSelectionCodeList()
@@ -248,7 +266,7 @@ export default function RetailerPortal() {
       setSupplierScreen("compliance-reports")
       setActivePartner(null)
       setActiveCode(null)
-      setGapProduct(null)
+      setGapContext(null)
     }
   }
 
@@ -262,7 +280,7 @@ export default function RetailerPortal() {
     setSupplierScreen("all-selection-codes")
     setActivePartner(null)
     setActiveCode(null)
-    setGapProduct(null)
+    setGapContext(null)
     setActiveAccountCode(null)
   }
 
@@ -295,25 +313,40 @@ export default function RetailerPortal() {
     setSupplierScreen("compliance")
     setActivePartner(null)
     setActiveCode(null)
-    setGapProduct(null)
+    setGapContext(null)
   }
 
-  // ── L3 → L4 ────────────────────────────────────────────────────────────────
-  function handleNavigateToGapDetail(productName: string, retailer: string) {
-    setGapProduct({ productName, retailer })
+  // ── Any product leaf → L4 gap detail ───────────────────────────────────────
+  // The origin is whichever leaf the click came from; it decides the breadcrumb
+  // trail and where "back" leads.
+  function handleNavigateToGapDetail(productId: string, target: GapTarget) {
+    const origin: GapOrigin =
+      supplierScreen === "gs1-products"
+        ? "gs1-view"
+        : supplierScreen === "account-code-products"
+          ? "code-list"
+          : "partner-flow"
+    setGapContext({ productId, target, origin })
     setSupplierScreen("supplier-gap-detail")
   }
 
-  // ── L4 back to L3 ──────────────────────────────────────────────────────────
+  // ── L4 back to the leaf it came from ───────────────────────────────────────
   function handleBackToProducts() {
-    setSupplierScreen("supplier-products")
-    setGapProduct(null)
+    const origin = gapContext?.origin ?? "partner-flow"
+    setSupplierScreen(
+      origin === "gs1-view"
+        ? "gs1-products"
+        : origin === "code-list"
+          ? "account-code-products"
+          : "supplier-products"
+    )
+    setGapContext(null)
   }
 
   // ── L4 back to L2 (or L3 breadcrumb "partner" click) ───────────────────────
   function handleBackToPartner() {
     setSupplierScreen("selection-codes")
-    setGapProduct(null)
+    setGapContext(null)
     setActiveCode(null)
   }
 
@@ -322,7 +355,43 @@ export default function RetailerPortal() {
     setSupplierScreen("compliance")
     setActivePartner(null)
     setActiveCode(null)
-    setGapProduct(null)
+    setGapContext(null)
+  }
+
+  // ── Gap detail breadcrumb trail, by origin ─────────────────────────────────
+  function buildGapBreadcrumbs(): GapDetailCrumb[] {
+    switch (gapContext?.origin) {
+      case "gs1-view":
+        return [
+          { label: "Compliance", onClick: handleBackToPartnerList },
+          { label: "GS1 Standard", onClick: handleBackToProducts },
+        ]
+      case "code-list":
+        return [
+          { label: "Selection Code List", onClick: handleSelectSelectionCodeList },
+          {
+            label: activeAccountCode?.label ?? "Selection Code",
+            onClick: handleBackToProducts,
+          },
+        ]
+      default:
+        return [
+          { label: "Compliance", onClick: handleBackToPartnerList },
+          { label: activePartner?.name ?? "Retailer", onClick: handleBackToPartner },
+          { label: `Code ${activeCode?.label ?? ""}`, onClick: handleBackToProducts },
+        ]
+    }
+  }
+
+  // ── Gap detail → image-upload WIP screen, and back ─────────────────────────
+  function handleOpenImageUpload(image: MissingImage) {
+    setUploadImage(image)
+    setSupplierScreen("image-upload")
+  }
+
+  function handleBackFromImageUpload() {
+    setUploadImage(null)
+    setSupplierScreen("supplier-gap-detail")
   }
 
   // The active profile's full brick set — from the shared list when we can match
@@ -342,13 +411,19 @@ export default function RetailerPortal() {
   // Map supplier screens to their sidebar item for the highlight. Catalogue has
   // no nav entry of its own — it now always presents as reached via Selection
   // Code List (its breadcrumb says so too), regardless of which banner sent it
-  // there, so it highlights the same section as the account-wide screens.
+  // there, so it highlights the same section as the account-wide screens. Gap
+  // detail (and the image-upload screen behind it) highlights whichever flow
+  // it was entered from.
+  const gapFlowIsCodeList =
+    (supplierScreen === "supplier-gap-detail" || supplierScreen === "image-upload") &&
+    gapContext?.origin === "code-list"
   const supplierActiveScreen =
     supplierScreen === "compliance-reports"
       ? "compliance-reports"
       : supplierScreen === "catalogue" ||
           supplierScreen === "all-selection-codes" ||
-          supplierScreen === "account-code-products"
+          supplierScreen === "account-code-products" ||
+          gapFlowIsCodeList
         ? "selection-code-list"
         : "supplier-compliance"
 
@@ -548,21 +623,31 @@ export default function RetailerPortal() {
                 />
               )}
 
-              {/* L4 — Gap Detail */}
-              {supplierScreen === "supplier-gap-detail" &&
-                gapProduct &&
-                activePartner &&
-                activeCode && (
-                  <ScreenSupplierGapDetail
-                    productName={gapProduct.productName}
-                    retailer={gapProduct.retailer}
-                    selectionCode={activeCode.label}
-                    products={supplierProducts}
-                    onBackToProducts={handleBackToProducts}
-                    onBackToPartner={handleBackToPartner}
-                    onBackToPartnerList={handleBackToPartnerList}
-                  />
-                )}
+              {/* L4 — Gap Detail (reached from the partner flow, the GS1 view,
+                  or the account-wide code drill-down) */}
+              {supplierScreen === "supplier-gap-detail" && gapContext && (
+                <ScreenSupplierGapDetail
+                  productId={gapContext.productId}
+                  target={gapContext.target}
+                  products={supplierProducts}
+                  breadcrumbs={buildGapBreadcrumbs()}
+                  onUploadImage={handleOpenImageUpload}
+                />
+              )}
+
+              {/* Image upload — WIP signpost reached from a missing image
+                  requirement on the gap detail */}
+              {supplierScreen === "image-upload" && gapContext && uploadImage && (
+                <ScreenSupplierImageUpload
+                  productId={gapContext.productId}
+                  products={supplierProducts}
+                  targetLabel={
+                    gapContext.target.kind === "gs1" ? "GS1 Standard" : gapContext.target.name
+                  }
+                  image={uploadImage}
+                  onBack={handleBackFromImageUpload}
+                />
+              )}
             </>
           )}
         </main>
