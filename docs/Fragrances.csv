@@ -1,0 +1,74 @@
+﻿,10000672,10000365
+Fragrances,Cosmetics/Fragrances Variety Packs,Fragrances
+Advertised Origin,E,E
+Aerosol Product,E,E
+Beauty Area of Use,,
+Beauty Treatment Specialty,,
+Beauty Type,E,E
+Boxed for Gift Giving,,
+Brand Name             ,E,E
+Chemical Certifications,,
+Circularity Certifications,,
+Color Extended Description,,
+Consumer Available Date,,
+Consumer Item Weight,,
+Consumer Life Stage,,
+Consumer Package Depth,,
+Consumer Package Gross Weight,,
+Consumer Package Height,,
+Consumer Package Width,,
+Consumer Product Capacity or Volume,E,E
+Consumer Quantity of Units in Consumer Package,,
+Corporate/Philanthropic Certifications,,
+Country of Origin,E,E
+CPSIA  Flag,,
+Discontinue Date,,
+Does Not Contain,,
+Features – Benefits – Marketing Message,E,E
+First Avail Ship Date,,
+First Order Date,,
+Formulation,E,E
+Full Product Name,,
+Gender,E,E
+Global Product Classification (GPC),E,E
+Harmonized Tariff Schedule Code,E,E
+Hazardous Material Class Code,E,E
+Hazardous Material Description,,
+Holiday/Event,,
+Hypoallergenic,,
+Ingredients,,
+Inner Pack Quantity,,
+Key Active Ingredient,,
+Lead Time,,
+Marked Retail Price,,
+Material Country of Origin,,
+Min Order Quantity,,
+Occasion,,
+Oil Free,,
+Order Quantity Multiple,,
+Prop 65,E,E
+Refillable,E,E
+Re-orderable ,,
+Responsible Manufacturing,,
+Scent Type,E,E
+Selling Channel,,
+Shippable Package/Carton,,
+Skin Type,,
+Social Certifications,,
+Special Handling Code,,
+Special Item Code,,
+SPF Rating,,
+Supplemental Circularity Certifications,,
+Supplemental Corporate/Philanthropic,,
+Supplemental Packaging Certifications,,
+Supplemental Raw Material Certifications,,
+Supplemental Traceability Programs ,,
+Supplier Suggested Retail,,
+Supplier Wholesale Price,,
+Supply Type,,
+Sustainable Materials,,
+Sustainable Packaging,,
+Vendor Collection Name,,
+Water Repellent,,
+Wrinkle Resistant,,
+TOTALS,=COUNTA(B3:B73),=COUNTA(C3:C73)

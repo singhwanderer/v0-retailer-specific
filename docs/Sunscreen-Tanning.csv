@@ -1,0 +1,75 @@
+﻿,10000814,10000723,10000373,10000388,10000731,10000355
+Tanning,Skin Tanning Products Other,Skin Tanning Products Variety Packs,Sun Protection Products,Sun Tan Accelerator Products,Sunless Tanning - Oral (Non Powered),Sunless Tanning - Topical (Non Powered)
+Advertised Origin,E,E,E,E,E,E
+Aerosol Product,E,E,E,E,E,E
+Beauty Area of Use,E,E,E,E,E,E
+Beauty Treatment Specialty,E,E,E,E,E,E
+Beauty Type,E,E,E,E,E,E
+Boxed for Gift Giving,,,,,,
+Brand Name             ,E,E,E,E,E,E
+Chemical Certifications,,,,,,
+Circularity Certifications,,,,,,
+Color Extended Description,,,,,,
+Consumer Available Date,,,,,,
+Consumer Item Weight,,,,,,
+Consumer Life Stage,,,,,,
+Consumer Package Depth,,,,,,
+Consumer Package Gross Weight,,,,,,
+Consumer Package Height,,,,,,
+Consumer Package Width,,,,,,
+Consumer Product Capacity or Volume,E,E,E,E,E,E
+Consumer Quantity of Units in Consumer Package,,,,,,
+Corporate/Philanthropic Certifications,,,,,,
+Country of Origin,E,E,E,E,E,E
+CPSIA  Flag,,,,,,
+Discontinue Date,,,,,,
+Does Not Contain,E,E,E,E,E,E
+Features – Benefits – Marketing Message,E,E,E,E,E,E
+First Avail Ship Date,,,,,,
+First Order Date,,,,,,
+Formulation,E,E,E,E,E,E
+Full Product Name,,,,,,
+Gender,E,E,E,E,E,E
+Global Product Classification (GPC),E,E,E,E,E,E
+Harmonized Tariff Schedule Code,E,E,E,E,E,E
+Hazardous Material Class Code,,,,,,
+Hazardous Material Description,,,,,,
+Holiday/Event,,,,,,
+Hypoallergenic,E,E,E,E,E,E
+Ingredients,,,,,,
+Inner Pack Quantity,,,,,,
+Key Active Ingredient,E,E,E,E,E,E
+Lead Time,,,,,,
+Marked Retail Price,,,,,,
+Material Country of Origin,,,,,,
+Min Order Quantity,,,,,,
+Occasion,,,,,,
+Oil Free,,,,,,
+Order Quantity Multiple,,,,,,
+Prop 65,E,E,E,E,E,E
+Raw Materials Certifications,,,,,,
+Refillable,,,,,,
+Re-orderable ,,,,,,
+Responsible Manufacturing,,,,,,
+Scent Type,,,,,,
+Selling Channel,,,,,,
+Shippable Package/Carton,,,,,,
+Skin Type,,,,,,
+Social Certifications,,,,,,
+Special Handling Code,,,,,,
+Special Item Code,,,,,,
+SPF Rating,E,E,E,E,E,E
+Supplemental Circularity Certifications,,,,,,
+Supplemental Corporate/Philanthropic,,,,,,
+Supplemental Packaging Certifications,,,,,,
+Supplemental Raw Material Certifications,,,,,,
+Supplemental Traceability Programs ,,,,,,
+Supplier Suggested Retail,,,,,,
+Supplier Wholesale Price,,,,,,
+Supply Type,,,,,,
+Sustainable Materials,,,,,,
+Sustainable Packaging,,,,,,
+Vendor Collection Name,,,,,,
+Water Repellent,,,,,,
+Wrinkle Resistant,,,,,,
+TOTALS,=COUNTA(B3:B74),=COUNTA(C3:C74),=COUNTA(D3:D74),=COUNTA(E3:E74),=COUNTA(F3:F74),=COUNTA(G3:G74)
