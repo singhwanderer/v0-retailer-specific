@@ -1,73 +1,28 @@
 "use client"
 
+import { BadgeCheck } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
-import type { SupplierProduct } from "@/lib/supplier-catalogue"
+import {
+  getGapRecords,
+  IMAGE_REQUIREMENT_POOL,
+  type GapTarget,
+  type MissingImage,
+  type SupplierProduct,
+} from "@/lib/supplier-catalogue"
+
+export type GapDetailCrumb = { label: string; onClick: () => void }
 
 interface GapDetailProps {
-  productName: string
-  retailer: string
-  selectionCode: string
+  /** Product ID in the shared catalogue */
+  productId: string
+  /** Compliance target this detail is scoped to — a retailer, or the GS1 baseline */
+  target: GapTarget
   /** Shared supplier catalogue — the one source of truth */
   products: SupplierProduct[]
-  onBackToProducts: () => void
-  onBackToPartner: () => void
-  onBackToPartnerList: () => void
-}
-
-// ── Data shapes ───────────────────────────────────────────────────────────────
-
-type MissingAttribute = {
-  retailerLabel: string
-  tgcName: string
-  tgcCode: string
-}
-
-type ImageRow = {
-  name: string
-  provided: boolean
-  guidanceSpec?: string
-}
-
-// ── Derivation ────────────────────────────────────────────────────────────────
-// The gap detail is built from the shared product store, so it always matches
-// the gap count the product list showed for this product + retailer. The
-// retailer's open-gap number is allocated first to missing attributes (drawn
-// from the product's GS1 category), then to image requirements — so a product
-// with 3 gaps here shows exactly 3, whichever retailer sent you.
-
-const IMAGE_POOL: { name: string; spec: string }[] = [
-  { name: "Hero Shot", spec: "pure white background, 2000 × 2000 px, square" },
-  { name: "Detail Shot", spec: "close-up of material/texture" },
-]
-
-function deriveGapData(product: SupplierProduct | undefined, retailer: string) {
-  const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
-  const attrPool = brick?.extendedAttributes ?? []
-  const rs = product?.retailers?.find((r) => r.retailer === retailer)
-  const gapCount = !rs || rs.gaps === "complete" ? 0 : rs.gaps
-
-  const missingCount = Math.min(gapCount, attrPool.length)
-  const missingAttrs: MissingAttribute[] = attrPool.slice(0, missingCount).map((a) => ({
-    retailerLabel: a.name,
-    tgcName: a.name,
-    tgcCode: a.code,
-  }))
-
-  // Any gaps beyond the attribute pool fall to image requirements.
-  const imageGaps = Math.min(gapCount - missingCount, IMAGE_POOL.length)
-  const imageRows: ImageRow[] = IMAGE_POOL.map((img, i) => ({
-    name: img.name,
-    provided: i >= imageGaps,
-    guidanceSpec: `${retailer} spec: ${img.spec}. Guidance only — not verified by the system.`,
-  }))
-
-  return {
-    productDescription: product?.description ?? "",
-    categoryLabel: brick?.brickName ?? "Uncategorised",
-    missingAttrs,
-    imageRows,
-    totalAttrCount: attrPool.length,
-  }
+  /** Ancestor crumbs (the product itself is appended as the terminal crumb) */
+  breadcrumbs: GapDetailCrumb[]
+  /** Open the image-upload flow for one missing image requirement */
+  onUploadImage: (image: MissingImage) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -103,23 +58,29 @@ function SummaryPill({ complete, label }: { complete: boolean; label: string }) 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ScreenSupplierGapDetail({
-  productName,
-  retailer,
-  selectionCode,
+  productId,
+  target,
   products,
-  onBackToProducts,
-  onBackToPartner,
-  onBackToPartnerList,
+  breadcrumbs,
+  onUploadImage,
 }: GapDetailProps) {
-  // productName is the product ID passed from the product leaf.
-  const product = products.find((p) => p.id === productName)
-  const { productDescription, categoryLabel, missingAttrs, imageRows, totalAttrCount } =
-    deriveGapData(product, retailer)
+  const product = products.find((p) => p.id === productId)
+  const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
+  const categoryLabel = brick?.brickName ?? "Uncategorised"
+  const productDescription = product?.description ?? ""
+
+  const isGs1 = target.kind === "gs1"
+  const targetLabel = isGs1 ? "GS1 Standard" : target.name
+
+  // Canonical gap records — the same derivation every other screen uses, so the
+  // named gaps here always add up to the count that was clicked.
+  const { missingAttrs, missingImages, totalAttrCount, totalImageCount } =
+    getGapRecords(product, target)
+  const missingImageNames = new Set(missingImages.map((img) => img.name))
 
   const providedAttrCount = totalAttrCount - missingAttrs.length
-  const providedImageCount = imageRows.filter((r) => r.provided).length
-  const totalImageCount = imageRows.length
-  const gapCount = missingAttrs.length + (totalImageCount - providedImageCount)
+  const providedImageCount = totalImageCount - missingImages.length
+  const gapCount = missingAttrs.length + missingImages.length
   const isComplete = gapCount === 0
 
   return (
@@ -127,40 +88,39 @@ export function ScreenSupplierGapDetail({
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm flex-wrap">
-        <button
-          onClick={onBackToPartnerList}
-          className="font-light hover:underline"
-          style={{ color: "#0168B3" }}
-        >
-          Compliance
-        </button>
-        <span style={{ color: "#9CA3AF" }}>›</span>
-        <button
-          onClick={onBackToPartner}
-          className="font-light hover:underline"
-          style={{ color: "#0168B3" }}
-        >
-          {retailer}
-        </button>
-        <span style={{ color: "#9CA3AF" }}>›</span>
-        <button
-          onClick={onBackToProducts}
-          className="font-light hover:underline"
-          style={{ color: "#0168B3" }}
-        >
-          Code {selectionCode}
-        </button>
-        <span style={{ color: "#9CA3AF" }}>›</span>
-        <span className="font-light text-[#6B7280]">{productDescription || productName}</span>
+        {breadcrumbs.map((crumb) => (
+          <span key={crumb.label} className="flex items-center gap-1.5">
+            <button
+              onClick={crumb.onClick}
+              className="font-light hover:underline"
+              style={{ color: "#0168B3" }}
+            >
+              {crumb.label}
+            </button>
+            <span style={{ color: "#9CA3AF" }}>›</span>
+          </span>
+        ))}
+        <span className="font-light text-[#6B7280]">{productDescription || productId}</span>
       </nav>
 
       {/* Header */}
       <div className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold text-[#111827]">
-          Requirements Status &mdash; {retailer}
-        </h1>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-xl font-semibold text-[#111827]">
+            Requirements Status &mdash; {targetLabel}
+          </h1>
+          {isGs1 && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+              style={{ backgroundColor: "#EFF6FF", color: "#0168B3" }}
+            >
+              <BadgeCheck className="w-3 h-3" />
+              Baseline
+            </span>
+          )}
+        </div>
         <p className="text-sm font-light text-[#6B7280]">
-          {productDescription || productName} &middot; {categoryLabel}
+          {productDescription || productId} &middot; {categoryLabel}
         </p>
 
         {/* Summary strip */}
@@ -208,7 +168,7 @@ export function ScreenSupplierGapDetail({
               <tbody>
                 {missingAttrs.map((attr, idx) => (
                   <tr
-                    key={attr.tgcCode}
+                    key={attr.code}
                     style={{
                       borderBottom:
                         idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
@@ -218,9 +178,9 @@ export function ScreenSupplierGapDetail({
                       <Dot color="#F59E0B" />
                     </td>
                     <td className="px-4 py-3 align-middle">
-                      <span className="font-medium text-[#111827]">{attr.retailerLabel}</span>
+                      <span className="font-medium text-[#111827]">{attr.name}</span>
                       <span className="ml-2 text-xs font-light text-[#9CA3AF]">
-                        TGC: {attr.tgcName} ({attr.tgcCode})
+                        TGC: {attr.name} ({attr.code})
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right align-middle">
@@ -241,7 +201,7 @@ export function ScreenSupplierGapDetail({
           className="rounded-lg overflow-hidden"
           style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
         >
-          {imageRows.every((r) => r.provided) ? (
+          {missingImages.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-3">
               <Dot color="#16A34A" />
               <span className="text-sm font-light" style={{ color: "#15803D" }}>
@@ -251,50 +211,53 @@ export function ScreenSupplierGapDetail({
           ) : (
             <table className="w-full text-sm">
               <tbody>
-                {imageRows.map((img, idx) => (
-                  <tr
-                    key={img.name}
-                    style={{
-                      borderBottom:
-                        idx < imageRows.length - 1 ? "1px solid #F3F4F6" : undefined,
-                    }}
-                  >
-                    <td className="px-4 py-3 w-8 align-top pt-3.5">
-                      <Dot color={img.provided ? "#16A34A" : "#F59E0B"} />
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <span className="font-medium text-[#111827] block">{img.name}</span>
-                      {img.guidanceSpec && (
+                {IMAGE_REQUIREMENT_POOL.map((img, idx) => {
+                  const provided = !missingImageNames.has(img.name)
+                  return (
+                    <tr
+                      key={img.name}
+                      style={{
+                        borderBottom:
+                          idx < IMAGE_REQUIREMENT_POOL.length - 1
+                            ? "1px solid #F3F4F6"
+                            : undefined,
+                      }}
+                    >
+                      <td className="px-4 py-3 w-8 align-top pt-3.5">
+                        <Dot color={provided ? "#16A34A" : "#F59E0B"} />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <span className="font-medium text-[#111827] block">{img.name}</span>
                         <span
                           className="text-[11px] font-light leading-relaxed block mt-0.5"
                           style={{ color: "#9CA3AF" }}
                         >
-                          {img.guidanceSpec}
+                          {targetLabel} spec: {img.spec}. Guidance only &mdash; not verified by
+                          the system.
                         </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <span
-                        className="text-xs font-light"
-                        style={{ color: img.provided ? "#15803D" : "#92400E" }}
-                      >
-                        {img.provided ? "Image provided" : "Required image not provided"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right align-top">
-                      {!img.provided && (
-                        <button
-                          className="px-3 py-1.5 rounded-md text-xs font-medium text-white cursor-not-allowed opacity-60"
-                          style={{ backgroundColor: "#0168B3" }}
-                          title="Out of scope for this prototype"
-                          disabled
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <span
+                          className="text-xs font-light"
+                          style={{ color: provided ? "#15803D" : "#92400E" }}
                         >
-                          Upload Image
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {provided ? "Image provided" : "Required image not provided"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right align-top">
+                        {!provided && (
+                          <button
+                            onClick={() => onUploadImage(img)}
+                            className="px-3 py-1.5 rounded-md text-xs font-medium text-white hover:opacity-90 transition-opacity"
+                            style={{ backgroundColor: "#0168B3" }}
+                          >
+                            Upload Image
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
@@ -306,10 +269,11 @@ export function ScreenSupplierGapDetail({
         className="text-[11px] font-light leading-relaxed"
         style={{ color: "#9CA3AF" }}
       >
-        This shows the attributes and image types {retailer} requires that are not yet on your
-        product. You keep one product &mdash; filling a gap adds it to that product and satisfies
-        every retailer who requires it. Image requirements are confirmed as a matching image type
-        being present; image content is not verified.
+        {isGs1
+          ? "This shows the GS1 standard attributes and image types for this product's category that are not yet on your product. Filling a baseline gap advances every retailer at once."
+          : `This shows the attributes and image types ${targetLabel} requires that are not yet on your product. You keep one product — filling a gap adds it to that product and satisfies every retailer who requires it.`}{" "}
+        Image requirements are confirmed as a matching image type being present; image content is
+        not verified.
       </p>
     </div>
   )
