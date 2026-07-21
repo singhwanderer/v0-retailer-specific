@@ -16,6 +16,8 @@ import {
   getSupplierCompliance,
   listAttributeProfiles,
   listMySuppliers,
+  listSystemFilters,
+  runComplianceReport,
   searchGs1Bricks,
   setImageRequirement,
 } from "@/lib/mcp/tools"
@@ -68,6 +70,25 @@ const handler = createMcpHandler(
       "Get compliance detail for one of your suppliers by name: category, product counts, and open gaps. If the name doesn't match a known supplier (including if it's actually another retail partner's name), returns the list of suppliers that do have data.",
       { supplier: z.string().describe("Supplier name, e.g. 'J.Renée' or 'Nike'") },
       async ({ supplier }) => asText(getSupplierCompliance(supplier))
+    )
+
+    server.tool(
+      "list_system_filters",
+      "List the global System attribute filters (e.g. GS1 Core Scorecard, GS1 Extended Scorecard). These are standard rule sets configured platform-wide: suppliers and retailers running the same System filter evaluate the exact same rules. Use the returned ids with run_compliance_report.",
+      {},
+      async () => asText(listSystemFilters())
+    )
+
+    server.tool(
+      "run_compliance_report",
+      "Run a defensive compliance report across your vendor base (read-only, mock data, computed on demand — the portal UI keeps its own report queue). Scan against either one of your attribute profiles (profileName), all your active profiles (default), or a global System filter (systemFilterId from list_system_filters). Optionally scope to a single supplier. Returns overall compliance %, ranked missing attributes, per-category breakdown, and per-vendor rows. Attributes waived by an Active vendor exception are not counted as gaps.",
+      {
+        systemFilterId: z.string().optional().describe("A System filter id from list_system_filters, e.g. 'gs1-core'. Mutually exclusive with profileName."),
+        profileName: z.string().optional().describe("One of your attribute profile names, e.g. 'Footwear'. Omit (and omit systemFilterId) to scan against all active profiles."),
+        supplier: z.string().optional().describe("Scope the report to one supplier by name, e.g. 'J.Renée'. Omit for all vendors."),
+        maxAttributes: z.number().int().min(1).max(999).optional().describe("Maximum attributes to report in the ranked missing list (legacy semantics: 999 = all). Default 10."),
+      },
+      async (args) => asText(runComplianceReport(args))
     )
 
     // ── Writes (in-memory demo store) ───────────────────────────────────────
@@ -146,6 +167,15 @@ const handler = createMcpHandler(
       async () =>
         prompt(
           "I want to audit one of my suppliers in TGC. Ask me which supplier, then show their compliance — category, product counts, and open gaps. If the name doesn't match one of my suppliers, tell me which suppliers do have data."
+        )
+    )
+
+    server.prompt(
+      "run-compliance-report",
+      "Run a compliance report across your vendor base against a profile or a System scorecard.",
+      async () =>
+        prompt(
+          "Run a compliance report across my vendor base in TGC. Ask me whether to scan against one of my attribute profiles or a global System filter (list them with list_system_filters — e.g. GS1 Core Scorecard), then run it and summarize the worst vendors and the top missing attributes from the tool result."
         )
     )
 

@@ -9,6 +9,7 @@ import {
   type TargetCompletion,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
+import { PARTNERS } from "@/lib/partner-filters"
 
 // ── Merged Compliance list ────────────────────────────────────────────────────
 // Evolved from the former Trading Partners screen: the same list of retailers
@@ -21,22 +22,6 @@ interface SupplierComplianceProps {
   onSelectGs1: () => void
   onSelectPartner: (partnerId: string, partnerName: string) => void
 }
-
-type Partner = {
-  id: string
-  name: string
-  /** Retailer-specific attributes required on top of the GS1 baseline */
-  extras: number
-}
-
-const PARTNERS: Partner[] = [
-  { id: "dillards", name: "Dillard's", extras: 3 },
-  { id: "belk", name: "Belk", extras: 1 },
-  { id: "nordstrom", name: "Nordstrom", extras: 5 },
-  { id: "macys", name: "Macy's", extras: 2 },
-  { id: "saks", name: "Saks Fifth Avenue", extras: 6 },
-  { id: "bloomingdales", name: "Bloomingdale's", extras: 4 },
-]
 
 // Reused from the former Trading Partners screen — the retailer-row status pill.
 function ComplianceSummary({ gaps, complete, total }: { gaps: number; complete: number; total: number }) {

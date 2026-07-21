@@ -26,6 +26,8 @@ import {
   describeProfileAttributes,
   findProfileForBrick,
 } from "@/lib/mcp/attribute-assembly"
+import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
+import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
 
 const DEMO_NOTE =
   "Demo prototype: this change is stored in the demo server's in-memory data (mock data only, resets periodically). In production this would persist to TGC."
@@ -107,6 +109,85 @@ export function getSupplierCompliance(supplier: string) {
   return matches
 }
 
+/** The global System attribute filters both sides of the network can run. */
+export function listSystemFilters() {
+  return SYSTEM_FILTERS.map(({ id, name, description, scope }) => ({ id, name, description, scope }))
+}
+
+/**
+ * Run a defensive Compliance Report across the retailer's vendor base —
+ * the same engine the portal's retailer Compliance Reports screen uses.
+ * Stateless read: computed on demand from current data; the portal UI keeps
+ * its own report queue, so nothing is persisted here.
+ */
+export function runComplianceReport(args: {
+  systemFilterId?: string
+  profileName?: string
+  supplier?: string
+  maxAttributes?: number
+}) {
+  const { systemFilterId, profileName, supplier, maxAttributes } = args
+
+  if (systemFilterId && profileName) {
+    return { error: "Choose ONE filter mode: either systemFilterId (a global System filter) or profileName (one of your attribute profiles). Omit both to scan against all your active profiles." }
+  }
+
+  let filter: ReportFilterRef
+  let filterLabel: string
+  let resolvedProfile: string = "all-active"
+
+  if (systemFilterId) {
+    const sys = getSystemFilter(systemFilterId)
+    if (!sys) {
+      return { error: `Unknown system filter "${systemFilterId}". Valid ids: ${SYSTEM_FILTERS.map((f) => f.id).join(", ")}.` }
+    }
+    filter = { kind: "system", id: sys.id as SystemFilterId }
+    filterLabel = sys.name
+  } else {
+    const { profiles } = getStore()
+    if (profileName) {
+      const match = profiles.find((p) => p.name.toLowerCase() === profileName.toLowerCase().trim())
+      if (!match) {
+        return { error: `No attribute profile named "${profileName}". Your profiles: ${profiles.map((p) => p.name).join(", ")}.` }
+      }
+      resolvedProfile = match.name
+    }
+    filter = { kind: "account", retailer: "Dillard's" }
+    filterLabel = profileName ? resolvedProfile : "All active profiles"
+  }
+
+  let vendorScope: string = "all"
+  if (supplier) {
+    const q = supplier.toLowerCase().trim()
+    const match = RETAILER_SUPPLIERS.find((s) => s.supplier.toLowerCase().includes(q))
+    if (!match) {
+      const known = knownSuppliers()
+      return {
+        knownSuppliers: known,
+        note: `No supplier matched "${supplier}". Suppliers trading under your retailer account: ${known.join(", ")}. (Other retail partners' data is not available through this connector.)`,
+      }
+    }
+    vendorScope = match.supplier
+  }
+
+  const result = runRetailerReport(
+    RETAILER_SUPPLIERS,
+    getStore().profiles,
+    filter,
+    resolvedProfile,
+    vendorScope,
+    { maxAttributes: maxAttributes ?? 10, ignoreDiscontinued: true }
+  )
+
+  return {
+    filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
+    vendorScope: vendorScope === "all" ? "All vendors" : vendorScope,
+    ...result,
+    demo_note:
+      "Computed on demand from mock demo data; nothing is persisted — the portal UI keeps its own report queue. Attributes waived by an Active vendor exception are not counted as gaps.",
+  }
+}
+
 // Plain-English catalog of what this connector can do, plus a live snapshot of
 // the demo data so the model can answer "what can I ask?" without guessing.
 // Built from the store, so it never drifts from the actual seeded data.
@@ -139,6 +220,15 @@ export function getCapabilities() {
           "List all my suppliers and their compliance status.",
         ],
       },
+      runComplianceReports: {
+        summary:
+          "Run a compliance report across your vendor base — against one of your attribute profiles or a global System filter (e.g. the GS1 Core Scorecard).",
+        examples: [
+          "Run a GS1 Core scorecard across my vendor base.",
+          "Run a compliance report on J.Renée using my Footwear profile.",
+          "Which attributes are my vendors missing most often?",
+        ],
+      },
       authorRequirements: {
         summary: "Create and extend requirement profiles conversationally (writes to the demo store).",
         examples: [
@@ -163,6 +253,7 @@ export function getCapabilities() {
       mySuppliers: knownSuppliers(),
       categoriesWithSupplierData: categoriesWithData,
       gs1Segments: getSegments(),
+      systemFilters: SYSTEM_FILTERS.map((f) => f.id),
     },
     note: "All data is mock/demo and watermarked; write tools store changes in memory only and reset periodically. Out of scope in this demo: supplier-side tools, sales/logistics, and anything outside retailer requirements + supplier compliance.",
   }

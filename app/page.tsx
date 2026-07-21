@@ -13,6 +13,8 @@ import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplie
 import { ScreenSupplierAllSelectionCodes } from "@/components/portal/screen-supplier-all-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
 import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
+import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
+import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
   SUPPLIER_PRODUCTS_SEED,
   assignCategory,
@@ -20,10 +22,17 @@ import {
 } from "@/lib/supplier-catalogue"
 import {
   ATTRIBUTE_PROFILES,
+  RETAILER_SUPPLIERS,
   getProfileBricks,
   type AttributeProfile,
   type ProfileBrick,
 } from "@/lib/retailer-requirements"
+import {
+  buildReportFileName,
+  runRetailerReport,
+  runSupplierReport,
+  type ReportRequest,
+} from "@/lib/compliance-report"
 
 type Perspective = "retailer" | "supplier"
 
@@ -32,6 +41,7 @@ type RetailerScreen =
   | "attribute-profiles"
   | "vendor-exceptions"
   | "profile-detail"
+  | "compliance-reports"
 
 type SupplierScreen =
   | "compliance"
@@ -42,6 +52,7 @@ type SupplierScreen =
   | "selection-codes"
   | "supplier-products"
   | "supplier-gap-detail"
+  | "compliance-reports"
 
 function DashboardPlaceholder() {
   return (
@@ -144,6 +155,66 @@ export default function RetailerPortal() {
     setSupplierScreen("catalogue")
   }
 
+  // ── Compliance Reports ──────────────────────────────────────────────────────
+  // One queue per persona so the two sides' report histories stay independent.
+  // Results are computed eagerly from the LIVE catalogue/profile state (so
+  // categorising a product or creating a profile changes the next run), then
+  // revealed when the simulated run flips to Complete. The setTimeout has no
+  // cleanup on purpose: this component never unmounts, and the queues live
+  // here so a perspective switch mid-run is harmless.
+  const [supplierReports, setSupplierReports] = useState<ReportRequest[]>([])
+  const [retailerReports, setRetailerReports] = useState<ReportRequest[]>([])
+
+  function handleRunReport(side: "supplier" | "retailer", payload: ReportRequestPayload): string {
+    const setReports = side === "supplier" ? setSupplierReports : setRetailerReports
+    const queue = side === "supplier" ? supplierReports : retailerReports
+    const requestedBy = side === "supplier" ? "J.Renée" : "Dillard's"
+    const id = `RPT-${String(queue.length + 1).padStart(3, "0")}`
+
+    const result =
+      side === "supplier"
+        ? runSupplierReport(supplierProducts, payload.filter, payload.options)
+        : runRetailerReport(
+            RETAILER_SUPPLIERS,
+            profiles,
+            payload.filter,
+            payload.profileName ?? "all-active",
+            payload.vendorScope ?? "all",
+            payload.options
+          )
+
+    const report: ReportRequest = {
+      id,
+      side,
+      filter: payload.filter,
+      filterLabel: payload.filterLabel,
+      profileName: payload.profileName,
+      vendorScope: payload.vendorScope,
+      options: payload.options,
+      requestedBy,
+      requestedAt: new Date().toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      status: "Running",
+      fileName: buildReportFileName(requestedBy, payload.filterLabel),
+      result,
+    }
+    setReports((prev) => [report, ...prev])
+
+    // Brief simulated run — deterministic per id, ~1.4–2.2s for demo feel.
+    const delay = 1400 + (id.charCodeAt(id.length - 1) % 3) * 400
+    setTimeout(() => {
+      setReports((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: "Complete" as const, durationMs: delay } : r))
+      )
+    }, delay)
+
+    return id
+  }
+
   // ── Perspective switch ──────────────────────────────────────────────────────
   function handlePerspectiveChange(p: Perspective) {
     setPerspective(p)
@@ -155,7 +226,8 @@ export default function RetailerPortal() {
     if (
       id === "dashboard" ||
       id === "attribute-profiles" ||
-      id === "vendor-exceptions"
+      id === "vendor-exceptions" ||
+      id === "compliance-reports"
     ) {
       setRetailerScreen(id as RetailerScreen)
     }
@@ -171,6 +243,12 @@ export default function RetailerPortal() {
     }
     if (id === "selection-code-list") {
       handleSelectSelectionCodeList()
+    }
+    if (id === "compliance-reports") {
+      setSupplierScreen("compliance-reports")
+      setActivePartner(null)
+      setActiveCode(null)
+      setGapProduct(null)
     }
   }
 
@@ -266,11 +344,13 @@ export default function RetailerPortal() {
   // Code List (its breadcrumb says so too), regardless of which banner sent it
   // there, so it highlights the same section as the account-wide screens.
   const supplierActiveScreen =
-    supplierScreen === "catalogue" ||
-    supplierScreen === "all-selection-codes" ||
-    supplierScreen === "account-code-products"
-      ? "selection-code-list"
-      : "supplier-compliance"
+    supplierScreen === "compliance-reports"
+      ? "compliance-reports"
+      : supplierScreen === "catalogue" ||
+          supplierScreen === "all-selection-codes" ||
+          supplierScreen === "account-code-products"
+        ? "selection-code-list"
+        : "supplier-compliance"
 
   const activeScreen =
     perspective === "retailer" ? retailerActiveScreen : supplierActiveScreen
@@ -358,6 +438,19 @@ export default function RetailerPortal() {
               )}
               
               {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
+
+              {/* Defensive compliance scanning — the retailer's own filters
+                  (or a System filter) across its vendor base */}
+              {retailerScreen === "compliance-reports" && (
+                <ScreenComplianceReports
+                  side="retailer"
+                  accent="#0168B3"
+                  requestedBy="Dillard's"
+                  reports={retailerReports}
+                  profiles={profiles}
+                  onRequestReport={(p) => handleRunReport("retailer", p)}
+                />
+              )}
             </>
           )}
 
@@ -440,6 +533,18 @@ export default function RetailerPortal() {
                   onBack={handleBackToCompliance}
                   onBackToPartner={handleBackToPartner}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
+                />
+              )}
+
+              {/* Proactive compliance scanning — any retailer's account filter
+                  (or a System filter) against the supplier's own catalogue */}
+              {supplierScreen === "compliance-reports" && (
+                <ScreenComplianceReports
+                  side="supplier"
+                  accent="#15803D"
+                  requestedBy="J.Renée"
+                  reports={supplierReports}
+                  onRequestReport={(p) => handleRunReport("supplier", p)}
                 />
               )}
 
