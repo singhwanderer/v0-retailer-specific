@@ -107,6 +107,7 @@ export function ScreenSupplierGapDetail({
   const isComplete = gapCount === 0
 
   return (
+    <>
     <div className="p-8 flex flex-col gap-6 max-w-3xl">
 
       {/* Breadcrumb */}
@@ -174,7 +175,15 @@ export function ScreenSupplierGapDetail({
 
       {/* Section A — Missing Attributes */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-[#111827]">Missing Attributes</h2>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold text-[#111827]">Missing Attributes</h2>
+          {missingAttrs.length > 0 && (
+            <p className="text-xs font-light text-[#6B7280]">
+              Pick a value from the GS1 standard list to fill an attribute. It applies to every
+              GTIN within this product.
+            </p>
+          )}
+        </div>
         <div
           className="rounded-lg overflow-hidden"
           style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
@@ -189,28 +198,48 @@ export function ScreenSupplierGapDetail({
           ) : (
             <table className="w-full text-sm">
               <tbody>
-                {missingAttrs.map((attr, idx) => (
-                  <tr
-                    key={attr.code}
-                    style={{
-                      borderBottom:
-                        idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
-                    }}
-                  >
-                    <td className="px-4 py-3 w-8 align-middle">
-                      <Dot color="#F59E0B" />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <span className="font-medium text-[#111827]">{attr.name}</span>
-                      <span className="ml-2 text-xs font-light text-[#9CA3AF]">
-                        TGC: {attr.name} ({attr.code})
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right align-middle">
-                      <span className="text-xs font-light text-[#92400E]">Not provided</span>
-                    </td>
-                  </tr>
-                ))}
+                {missingAttrs.map((attr, idx) => {
+                  const allowedValues = getAllowedValues(attr.code)
+                  return (
+                    <tr
+                      key={attr.code}
+                      style={{
+                        borderBottom:
+                          idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
+                      }}
+                    >
+                      <td className="px-4 py-3 w-8 align-middle">
+                        <Dot color="#F59E0B" />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <span className="font-medium text-[#111827]">{attr.name}</span>
+                        <span className="ml-2 text-xs font-light text-[#9CA3AF]">
+                          TGC: {attr.name} ({attr.code})
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right align-middle w-56">
+                        <Select
+                          value=""
+                          onValueChange={(value) => setPendingFill({ attr, value })}
+                        >
+                          <SelectTrigger
+                            className="ml-auto h-8 w-52 text-xs"
+                            aria-label={`Select a value for ${attr.name}`}
+                          >
+                            <SelectValue placeholder="Select a value…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allowedValues.map((v) => (
+                              <SelectItem key={v} value={v} className="text-xs">
+                                {v}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
@@ -299,5 +328,18 @@ export function ScreenSupplierGapDetail({
         not verified.
       </p>
     </div>
+
+    <ConfirmFillAttributeModal
+      open={pendingFill !== null}
+      attributeName={pendingFill?.attr.name ?? ""}
+      value={pendingFill?.value ?? ""}
+      onCancel={() => setPendingFill(null)}
+      onViewGtins={() => onViewGtins(productId)}
+      onConfirm={() => {
+        if (pendingFill) onFillAttribute(productId, pendingFill.attr.code, pendingFill.value)
+        setPendingFill(null)
+      }}
+    />
+    </>
   )
 }

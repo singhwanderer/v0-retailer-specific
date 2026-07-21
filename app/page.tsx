@@ -19,6 +19,7 @@ import type { ReportRequestPayload } from "@/components/portal/report-request-mo
 import {
   SUPPLIER_PRODUCTS_SEED,
   assignCategory,
+  fillAttribute,
   type GapTarget,
   type MissingImage,
   type SupplierProduct,
@@ -394,6 +395,21 @@ export default function RetailerPortal() {
     setSupplierScreen("supplier-gap-detail")
   }
 
+  // ── Fill a missing attribute from the gap detail ───────────────────────────
+  // Persists the supplier-supplied value into the shared catalogue. Because a
+  // filled attribute is a product-level fact, gap counts drop for every target
+  // at once — the gap detail, the compliance list, and the requirements drawer
+  // all reflect it live.
+  function handleFillAttribute(productId: string, attributeCode: string, value: string) {
+    setSupplierProducts((prev) => fillAttribute(prev, productId, attributeCode, value))
+  }
+
+  // The GTIN list is an existing, out-of-scope screen. Route to the catalogue
+  // view as the nearest in-app destination (it always renders on its own).
+  function handleViewGtins(_productId: string) {
+    setSupplierScreen("catalogue")
+  }
+
   // The active profile's full brick set — from the shared list when we can match
   // it by name, otherwise the single brick we navigated in with. Screen 2 reads
   // each brick's attributes itself (they're brick-scoped, not merged here).
@@ -632,6 +648,8 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   breadcrumbs={buildGapBreadcrumbs()}
                   onUploadImage={handleOpenImageUpload}
+                  onFillAttribute={handleFillAttribute}
+                  onViewGtins={handleViewGtins}
                 />
               )}
 
