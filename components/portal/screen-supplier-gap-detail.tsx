@@ -1,14 +1,25 @@
 "use client"
 
+import { useState } from "react"
 import { BadgeCheck } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import {
   getGapRecords,
   IMAGE_REQUIREMENT_POOL,
   type GapTarget,
+  type MissingAttribute,
   type MissingImage,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
+import { getAllowedValues } from "@/lib/gs1-attribute-values"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { ConfirmFillAttributeModal } from "@/components/portal/confirm-fill-attribute-modal"
 
 export type GapDetailCrumb = { label: string; onClick: () => void }
 
@@ -23,6 +34,10 @@ interface GapDetailProps {
   breadcrumbs: GapDetailCrumb[]
   /** Open the image-upload flow for one missing image requirement */
   onUploadImage: (image: MissingImage) => void
+  /** Persist a supplier-supplied attribute value to the shared catalogue */
+  onFillAttribute: (productId: string, attributeCode: string, value: string) => void
+  /** Jump to the (out-of-scope) GTIN list for this product */
+  onViewGtins: (productId: string) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,11 +78,19 @@ export function ScreenSupplierGapDetail({
   products,
   breadcrumbs,
   onUploadImage,
+  onFillAttribute,
+  onViewGtins,
 }: GapDetailProps) {
   const product = products.find((p) => p.id === productId)
   const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
   const categoryLabel = brick?.brickName ?? "Uncategorised"
   const productDescription = product?.description ?? ""
+
+  // A value the supplier has chosen but not yet confirmed — drives the confirm
+  // modal. Cleared on confirm or cancel.
+  const [pendingFill, setPendingFill] = useState<{ attr: MissingAttribute; value: string } | null>(
+    null
+  )
 
   const isGs1 = target.kind === "gs1"
   const targetLabel = isGs1 ? "GS1 Standard" : target.name

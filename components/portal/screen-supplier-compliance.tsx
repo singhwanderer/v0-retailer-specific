@@ -1,6 +1,7 @@
 "use client"
 
-import { BadgeCheck } from "lucide-react"
+import { useState } from "react"
+import { BadgeCheck, ListChecks } from "lucide-react"
 import {
   countBaselineGaps,
   countUncategorised,
@@ -10,6 +11,8 @@ import {
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
 import { PARTNERS } from "@/lib/partner-filters"
+import { RequirementsDrawer } from "@/components/portal/requirements-drawer"
+import type { RequirementTarget } from "@/lib/compliance-requirements"
 
 // ── Merged Compliance list ────────────────────────────────────────────────────
 // Evolved from the former Trading Partners screen: the same list of retailers
@@ -99,11 +102,30 @@ function Pill({ tone, label }: { tone: "green" | "amber" | "red"; label: string 
   )
 }
 
+// "View requirements" affordance shown on every compliance row — opens the
+// requirement drawer for that target (Point 2 of the brainstorm: requirements
+// reachable per row, no drilling to a selection code).
+function RequirementsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border hover:bg-[#F4F6F8] transition-colors"
+      style={{ borderColor: "#E0E4E8", color: "#0168B3" }}
+    >
+      <ListChecks className="w-3.5 h-3.5" />
+      View requirements
+    </button>
+  )
+}
+
 export function ScreenSupplierCompliance({
   products,
   onSelectGs1,
   onSelectPartner,
 }: SupplierComplianceProps) {
+  // Requirements drawer — opened per row; null target keeps it closed.
+  const [drawerTarget, setDrawerTarget] = useState<RequirementTarget | null>(null)
+
   // GS1 row-zero status derived live from the shared catalogue
   const gs1Stats = {
     uncategorised: countUncategorised(products),
@@ -112,6 +134,7 @@ export function ScreenSupplierCompliance({
   const gs1Completion = getTargetCompletion(products, "gs1")
 
   return (
+    <>
     <div className="p-8 flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
@@ -166,8 +189,13 @@ export function ScreenSupplierCompliance({
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-3 font-light text-[#6B7280] align-middle">
-                Standard attributes per category
+              <td className="px-4 py-3 align-middle">
+                <div className="flex flex-col items-start gap-1">
+                  <RequirementsButton onClick={() => setDrawerTarget({ kind: "gs1" })} />
+                  <span className="text-[10px] font-light" style={{ color: "#9CA3AF" }}>
+                    Standard attributes per category
+                  </span>
+                </div>
               </td>
               <td className="px-4 py-3 align-middle">
                 <ReadinessCell completion={gs1Completion} />
@@ -222,8 +250,15 @@ export function ScreenSupplierCompliance({
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-light text-[#6B7280] align-middle tabular-nums">
-                    {summary.codes} Product/Selection Code{summary.codes !== 1 ? "s" : ""}
+                  <td className="px-4 py-3 align-middle">
+                    <div className="flex flex-col items-start gap-1">
+                      <RequirementsButton
+                        onClick={() => setDrawerTarget({ kind: "retailer", name: partner.name })}
+                      />
+                      <span className="text-[10px] font-light tabular-nums" style={{ color: "#9CA3AF" }}>
+                        {summary.codes} Product/Selection Code{summary.codes !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 align-middle">
                     <ReadinessCell completion={completion} />
@@ -257,5 +292,13 @@ export function ScreenSupplierCompliance({
         </p>
       </div>
     </div>
+
+    <RequirementsDrawer
+      open={drawerTarget !== null}
+      onOpenChange={(open) => !open && setDrawerTarget(null)}
+      target={drawerTarget}
+      products={products}
+    />
+    </>
   )
 }
