@@ -6,11 +6,11 @@ import { WelcomeOverlay } from "@/components/portal/welcome-overlay"
 import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
-import { getBrickByCode } from "@/lib/gs1-standard-library"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
 import { ScreenSupplierCompliance } from "@/components/portal/screen-supplier-compliance"
 import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-catalogue"
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
+import { ScreenSupplierAllSelectionCodes } from "@/components/portal/screen-supplier-all-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
 import { ScreenSupplierGapDetail } from "@/components/portal/screen-supplier-gap-detail"
 import {
@@ -37,6 +37,8 @@ type SupplierScreen =
   | "compliance"
   | "gs1-products"
   | "catalogue"
+  | "all-selection-codes"
+  | "account-code-products"
   | "selection-codes"
   | "supplier-products"
   | "supplier-gap-detail"
@@ -122,12 +124,19 @@ export default function RetailerPortal() {
   // L4 context
   const [gapProduct, setGapProduct] = useState<{ productName: string; retailer: string } | null>(null)
 
+  // Account-wide Selection Code List drill-down context
+  const [activeAccountCode, setActiveAccountCode] = useState<{ brickCode: string; label: string } | null>(null)
+
   // Manual categorisation — mutates the shared store so every screen reflects it
   function handleAssignCategory(ids: Set<string>, brickCode: string) {
     setSupplierProducts((prev) => assignCategory(prev, ids, brickCode))
   }
 
-  // Open the Catalogue with the uncategorised products pre-selected
+  // Open the Catalogue with the uncategorised products pre-selected. Reached
+  // either from the GS1 row's banner (Compliance) or the "Uncategorised" row
+  // zero on the account-wide Selection Code List — either way, Catalogue's own
+  // back-breadcrumb always returns to the Selection Code List (it no longer
+  // has its own nav entry).
   function goToCatalogueWithUncategorised() {
     setCataloguePreselect(
       supplierProducts.filter((p) => p.state === "uncategorised").map((p) => p.id)
@@ -160,18 +169,35 @@ export default function RetailerPortal() {
       setActiveCode(null)
       setGapProduct(null)
     }
-    if (id === "supplier-catalogue") {
-      setSupplierScreen("catalogue")
-      setCataloguePreselect([]) // direct nav — no pre-selection
-      setActivePartner(null)
-      setActiveCode(null)
-      setGapProduct(null)
+    if (id === "selection-code-list") {
+      handleSelectSelectionCodeList()
     }
   }
 
   // ── Compliance list → GS1 row zero ──────────────────────────────────────────
   function handleSelectGs1() {
     setSupplierScreen("gs1-products")
+  }
+
+  // ── Sidebar "Selection Code List" → the account-wide L1 nav root ───────────
+  function handleSelectSelectionCodeList() {
+    setSupplierScreen("all-selection-codes")
+    setActivePartner(null)
+    setActiveCode(null)
+    setGapProduct(null)
+    setActiveAccountCode(null)
+  }
+
+  // ── Account-wide Selection Code List → its Product List drill-down ─────────
+  function handleSelectAccountCode(brickCode: string, label: string) {
+    setActiveAccountCode({ brickCode, label })
+    setSupplierScreen("account-code-products")
+  }
+
+  // ── Back to the account-wide Selection Code List ────────────────────────────
+  function handleBackToSelectionCodeList() {
+    setSupplierScreen("all-selection-codes")
+    setActiveAccountCode(null)
   }
 
   // ── L1 → L2 ────────────────────────────────────────────────────────────────
@@ -222,7 +248,8 @@ export default function RetailerPortal() {
   }
 
   // The active profile's full brick set — from the shared list when we can match
-  // it by name, otherwise the single brick we navigated in with.
+  // it by name, otherwise the single brick we navigated in with. Screen 2 reads
+  // each brick's attributes itself (they're brick-scoped, not merged here).
   const activeProfile = profiles.find((p) => p.name === activeCategoryName)
   const activeBricks: ProfileBrick[] = activeProfile
     ? getProfileBricks(activeProfile)
@@ -230,40 +257,20 @@ export default function RetailerPortal() {
     ? [{ code: activeBrick.code, name: activeBrick.name }]
     : []
 
-  // Pre-compute extended rows for Screen 2 as the union of every mapped brick's
-  // standard attributes, deduped by attribute code.
-  const activeBrickExtendedRows = activeBricks.length
-    ? (() => {
-        const seen = new Set<string>()
-        const rows: {
-          retailerName: string
-          tgcGs1Name: string
-          guidance: string
-          source: "standard"
-        }[] = []
-        for (const b of activeBricks) {
-          for (const attr of getBrickByCode(b.code)?.extendedAttributes ?? []) {
-            if (seen.has(attr.code)) continue
-            seen.add(attr.code)
-            rows.push({
-              retailerName: attr.name,
-              tgcGs1Name: `${attr.name} (${attr.code})`,
-              guidance: "",
-              source: "standard",
-            })
-          }
-        }
-        return rows
-      })()
-    : undefined
-
   // ── Active sidebar item ─────────────────────────────────────────────────────
   const retailerActiveScreen =
     retailerScreen === "profile-detail" ? "attribute-profiles" : retailerScreen
 
-  // Map supplier screens to their sidebar item for the highlight
+  // Map supplier screens to their sidebar item for the highlight. Catalogue has
+  // no nav entry of its own — it now always presents as reached via Selection
+  // Code List (its breadcrumb says so too), regardless of which banner sent it
+  // there, so it highlights the same section as the account-wide screens.
   const supplierActiveScreen =
-    supplierScreen === "catalogue" ? "supplier-catalogue" : "supplier-compliance"
+    supplierScreen === "catalogue" ||
+    supplierScreen === "all-selection-codes" ||
+    supplierScreen === "account-code-products"
+      ? "selection-code-list"
+      : "supplier-compliance"
 
   const activeScreen =
     perspective === "retailer" ? retailerActiveScreen : supplierActiveScreen
@@ -345,7 +352,6 @@ export default function RetailerPortal() {
                   brickMapping={activeBrick ? { code: activeBrick.code, name: activeBrick.name } : null}
                   initialBricks={activeBricks}
                   initialCategoryName={activeCategoryName}
-                  initialBrickExtendedRows={activeBrickExtendedRows}
                   initialStatus={activeStatus}
                   onUpdateProfile={handleUpdateProfile}
                 />
@@ -384,6 +390,30 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   initialSelectedIds={cataloguePreselect}
                   onAssignCategory={handleAssignCategory}
+                  onBack={handleBackToSelectionCodeList}
+                />
+              )}
+
+              {/* Account-wide Selection Code List — the real nav entry point */}
+              {supplierScreen === "all-selection-codes" && (
+                <ScreenSupplierAllSelectionCodes
+                  products={supplierProducts}
+                  onSelectUncategorised={goToCatalogueWithUncategorised}
+                  onSelectCode={handleSelectAccountCode}
+                />
+              )}
+
+              {/* Account-wide code drill-down (shared product leaf, kind:"code") */}
+              {supplierScreen === "account-code-products" && activeAccountCode && (
+                <ScreenSupplierProducts
+                  target={{
+                    kind: "code",
+                    brickCode: activeAccountCode.brickCode,
+                    label: activeAccountCode.label,
+                  }}
+                  products={supplierProducts}
+                  onBack={handleBackToSelectionCodeList}
+                  onNavigateToGapDetail={handleNavigateToGapDetail}
                 />
               )}
 

@@ -1,6 +1,6 @@
 # TGC MCP Connector — Connection Guide & FAQ
 
-Companion to `docs/mcp-concept.md` (the strategy) and `docs/mcp-demo-quickstart.md` (the short card). This is the full guide: how to connect, what the API URL is, how the end-to-end create flow works — including mandatory fields and drop-down options — and answers to the questions people ask.
+Companion to the README's "Conversational access (MCP)" section (the concept) and `docs/mcp-demo-quickstart.md` (the short card). This is the full guide: how to connect, what the API URL is, how the end-to-end create flow works — including mandatory fields and drop-down options — and answers to the questions people ask.
 
 ---
 
@@ -103,7 +103,7 @@ Three non-negotiables before real data: OAuth 2.1 + PKCE per the MCP auth spec; 
 Any MCP client: claude.ai, Claude Desktop, ChatGPT (developer mode), Microsoft Copilot Studio, Cursor, and a growing list. That's the strategic argument for a protocol over a bespoke chatbot API — one integration, every assistant.
 
 **Q: Can suppliers use it too?**
-The current tool set is retailer-first, but the supplier tools (`get_my_compliance`, `get_retailer_requirements`, `explain_gap`) are specified in `docs/mcp-concept.md` as Phase 2 — same server, different token scope.
+The current tool set is retailer-first. Supplier-side tools (e.g. `get_my_compliance`, `get_retailer_requirements`, `explain_gap`) are a natural later phase on the same server, with a different token scope — not built in this prototype.
 
 **Q: Does it cost anything to run?**
 The demo runs on the existing Vercel project (serverless, no LLM key — the connecting user's own AI does the reasoning). At scale, MCP calls are just API events; the commercial question of metering them like network events is flagged in the concept doc.

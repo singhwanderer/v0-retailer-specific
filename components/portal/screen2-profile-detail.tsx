@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Pencil,
   Plus,
-  Search,
   X,
   CheckCircle,
 } from "lucide-react"
@@ -20,28 +19,32 @@ import {
 import type { AttributeProfile, ProfileBrick } from "@/lib/retailer-requirements"
 import { getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
+import { ProfileBrickSelector } from "@/components/portal/profile-brick-selector"
+import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
+import {
+  BASELINE_CORE_ATTRIBUTES,
+  type AttributeRequirement,
+  type ImageRequirement,
+} from "@/lib/mcp/store"
+import { assembleBrickAttributes, describeProfileAttributes, type BrickAttributeSet } from "@/lib/mcp/attribute-assembly"
+import { addAttributeRequirement, setImageRequirement, updateAttributeRequirement } from "@/lib/mcp/tools"
 
 function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface AttributeRow {
-  retailerName: string
-  tgcGs1Name: string
-  guidance: string
-  /** Whether this attribute was inherited from the GS1 standard brick or added by the retailer */
-  source: "standard" | "custom"
-}
+type ProfileStatus = "Active" | "Draft"
 
-interface ImageRequirementRow {
-  requirementName: string
-  format: string
-  background: string
-  minDimensions: string
-  maxFileSize: string
-  shapeCrop: string
-  guidanceNote: string
+// The attribute set shown when a requirement has no GS1 brick mapped yet (the
+// Screen 1 "skip" path) — baseline core only, nothing to add/edit against
+// since there's no brick code to key the store by.
+const EMPTY_ATTRS: BrickAttributeSet = {
+  brickCode: "",
+  brickName: "",
+  segment: undefined,
+  coreAttributes: BASELINE_CORE_ATTRIBUTES,
+  extendedAttributes: [],
+  imageRequirements: [],
 }
 
 // ── GS1 catalogue (mock) ──────────────────────────────────────────────────────
@@ -234,16 +237,16 @@ function EditAttributeDialog({
   onSave,
 }: {
   open: boolean
-  row: AttributeRow | null
+  row: AttributeRequirement | null
   onClose: () => void
-  onSave: (updated: AttributeRow) => void
+  onSave: (gs1Name: string, updates: { name: string; guidance: string }) => void
 }) {
-  const [retailerName, setRetailerName] = useState(row?.retailerName ?? "")
+  const [name, setName] = useState(row?.name ?? "")
   const [guidance, setGuidance] = useState(row?.guidance ?? "")
 
   function handleSave() {
-    if (!row || !retailerName.trim()) return
-    onSave({ ...row, retailerName: retailerName.trim(), guidance: guidance.trim() })
+    if (!row || !name.trim()) return
+    onSave(row.gs1Name, { name: name.trim(), guidance: guidance.trim() })
     onClose()
   }
 
@@ -263,7 +266,7 @@ function EditAttributeDialog({
               className="px-3 py-2 rounded-md text-sm"
               style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
             >
-              {row?.tgcGs1Name}
+              {row?.gs1Name}
             </div>
           </div>
           {/* Retailer label — editable */}
@@ -273,8 +276,8 @@ function EditAttributeDialog({
             </label>
             <input
               autoFocus
-              value={retailerName}
-              onChange={(e) => setRetailerName(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSave() }}
               className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827]"
               style={{ borderColor: "#E0E4E8" }}
@@ -305,7 +308,7 @@ function EditAttributeDialog({
           </button>
           <button
             onClick={handleSave}
-            disabled={!retailerName.trim()}
+            disabled={!name.trim()}
             className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
             style={{ backgroundColor: "#0168B3" }}
           >
@@ -345,8 +348,8 @@ function AttributeTable({
   onEditRow,
   showSourceTags = false,
 }: {
-  rows: AttributeRow[]
-  onEditRow: (idx: number) => void
+  rows: AttributeRequirement[]
+  onEditRow: (row: AttributeRequirement) => void
   showSourceTags?: boolean
 }) {
   return (
@@ -369,13 +372,13 @@ function AttributeTable({
         <tbody>
           {rows.map((row, idx) => (
             <tr
-              key={idx}
+              key={row.gs1Name}
               style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
               className="group hover:bg-[#F4F6F8]/40 transition-colors"
             >
               <td className="px-4 py-2.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-[#111827]">{row.retailerName}</span>
+                  <span className="font-medium text-[#111827]">{row.name}</span>
                   {showSourceTags && <SourcePill source={row.source} />}
                 </div>
               </td>
@@ -383,14 +386,14 @@ function AttributeTable({
                 className="px-4 py-2.5 text-xs"
                 style={{ color: "#6B7280", backgroundColor: "#F9FAFB" }}
               >
-                {row.tgcGs1Name}
+                {row.gs1Name}
               </td>
               <td className="px-4 py-2.5 text-xs leading-relaxed" style={{ color: "#6B7280" }}>
                 {row.guidance ? row.guidance : <span style={{ color: "#D1D5DB" }}>—</span>}
               </td>
               <td className="px-4 py-2.5 text-right">
                 <button
-                  onClick={() => onEditRow(idx)}
+                  onClick={() => onEditRow(row)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#0168B3]"
                   title="Edit row"
                 >
@@ -416,11 +419,11 @@ function EditImageRequirementDialog({
   onSave,
 }: {
   open: boolean
-  row: ImageRequirementRow | null
+  row: ImageRequirement | null
   onClose: () => void
-  onSave: (updated: ImageRequirementRow) => void
+  onSave: (updated: ImageRequirement) => void
 }) {
-  const empty: ImageRequirementRow = {
+  const empty: ImageRequirement = {
     requirementName: "",
     format: "",
     background: "",
@@ -429,13 +432,13 @@ function EditImageRequirementDialog({
     shapeCrop: "",
     guidanceNote: "",
   }
-  const [form, setForm] = useState<ImageRequirementRow>(row ?? empty)
+  const [form, setForm] = useState<ImageRequirement>(row ?? empty)
 
   function handleOpen() {
     setForm(row ?? empty)
   }
 
-  function set(key: keyof ImageRequirementRow, value: string) {
+  function set(key: keyof ImageRequirement, value: string) {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
@@ -445,7 +448,7 @@ function EditImageRequirementDialog({
     onClose()
   }
 
-  const fields: { key: keyof ImageRequirementRow; label: string; placeholder: string }[] = [
+  const fields: { key: keyof ImageRequirement; label: string; placeholder: string }[] = [
     { key: "requirementName", label: "Requirement Name", placeholder: "e.g. Hero Shot" },
     { key: "format", label: "Format", placeholder: "e.g. JPEG" },
     { key: "background", label: "Background", placeholder: "e.g. Pure white (#FFFFFF)" },
@@ -474,7 +477,7 @@ function EditImageRequirementDialog({
             <div key={key} className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#6B7280]">{label}</label>
               <input
-                value={form[key]}
+                value={form[key] ?? ""}
                 onChange={(e) => set(key, e.target.value)}
                 placeholder={placeholder}
                 className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
@@ -510,8 +513,8 @@ function ImageRequirementsTable({
   rows,
   onEditRow,
 }: {
-  rows: ImageRequirementRow[]
-  onEditRow: (idx: number) => void
+  rows: ImageRequirement[]
+  onEditRow: (row: ImageRequirement) => void
 }) {
   return (
     <>
@@ -529,7 +532,7 @@ function ImageRequirementsTable({
           <tbody>
             {rows.map((row, idx) => (
               <tr
-                key={idx}
+                key={row.requirementName}
                 style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
                 className="group hover:bg-[#F4F6F8]/40 transition-colors"
               >
@@ -544,7 +547,7 @@ function ImageRequirementsTable({
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   <button
-                    onClick={() => onEditRow(idx)}
+                    onClick={() => onEditRow(row)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#0168B3]"
                     title="Edit row"
                   >
@@ -617,6 +620,10 @@ function AttributeGroup({
 }
 
 // ── Add Attribute Dialog ──────────────────────────────────────────────────────
+// A genuinely custom attribute — free-text name + optional guidance, mirroring
+// add_attribute_requirement's own parameters. Standard/GS1 attributes are
+// already present automatically (assembled from the brick), so this is for
+// requirements beyond the GS1 standard, not a picker over it.
 type AddAttrTarget = "core" | "extended" | null
 
 function AddAttributeDialog({
@@ -626,141 +633,60 @@ function AddAttributeDialog({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (row: AttributeRow) => void
+  onAdd: (input: { name: string; guidance: string }) => void
 }) {
-  const [query, setQuery] = useState("")
-  const [selected, setSelected] = useState<{ name: string; code: string } | null>(null)
-  const [retailerLabel, setRetailerLabel] = useState("")
+  const [name, setName] = useState("")
   const [guidance, setGuidance] = useState("")
 
-  const filtered = gs1Catalogue.filter((item) =>
-    item.name.toLowerCase().includes(query.toLowerCase())
-  )
-
   function handleClose() {
-    setQuery("")
-    setSelected(null)
-    setRetailerLabel("")
+    setName("")
     setGuidance("")
     onClose()
   }
 
   function handleAdd() {
-    if (!selected || !retailerLabel.trim()) return
-    onAdd({
-      retailerName: retailerLabel.trim(),
-      tgcGs1Name: selected.code !== selected.name
-        ? `${selected.name} (${selected.code})`
-        : selected.name,
-      guidance: guidance.trim(),
-      source: "custom",
-    })
+    if (!name.trim()) return
+    onAdd({ name: name.trim(), guidance: guidance.trim() })
     handleClose()
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold text-[#111827]">
             Add Attribute
           </DialogTitle>
         </DialogHeader>
-
-        {!selected ? (
-          /* Step 1 — search */
-          <div className="flex flex-col gap-3 py-2">
-            <div
-              className="flex items-center gap-2 px-3 py-2 rounded-md border"
+        <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[#111827]">
+              Attribute Name <span style={{ color: "#DC2626" }}>*</span>
+            </label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd() }}
+              placeholder="e.g. Care Instructions"
+              className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
               style={{ borderColor: "#E0E4E8" }}
-            >
-              <Search className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} />
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search attribute name (e.g. Heel Type, Closure, Fabric)"
-                className="flex-1 text-sm outline-none bg-transparent text-[#111827] placeholder:text-[#9CA3AF]"
-              />
-            </div>
-            <div
-              className="rounded-md border overflow-hidden"
-              style={{ borderColor: "#E0E4E8", maxHeight: 280, overflowY: "auto" }}
-            >
-              {filtered.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-[#9CA3AF]">No matches found.</p>
-              ) : (
-                filtered.map((item) => (
-                  <button
-                    key={item.code}
-                    onClick={() => setSelected(item)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-[#F4F6F8] transition-colors"
-                    style={{ borderBottom: "1px solid #F3F4F6" }}
-                  >
-                    <span className="text-sm font-medium text-[#111827]">{item.name}</span>
-                    <span className="text-xs" style={{ color: "#9CA3AF" }}>{item.code}</span>
-                  </button>
-                ))
-              )}
-            </div>
+            />
           </div>
-        ) : (
-          /* Step 2 — configure */
-          <div className="flex flex-col gap-4 py-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#6B7280]">TGC Attribute Name</label>
-              <div
-                className="px-3 py-2 rounded-md text-sm"
-                style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
-              >
-                {selected.name}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#6B7280]">GS1 Code</label>
-              <div
-                className="px-3 py-2 rounded-md text-sm font-mono"
-                style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
-              >
-                {selected.code}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#111827]">
-                Your label for this attribute <span style={{ color: "#DC2626" }}>*</span>
-              </label>
-              <input
-                autoFocus
-                value={retailerLabel}
-                onChange={(e) => setRetailerLabel(e.target.value)}
-                placeholder="e.g. Boot Heel Type"
-                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827]"
-                style={{ borderColor: "#E0E4E8" }}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#6B7280]">
-                Supplier Guidance Note (optional)
-              </label>
-              <textarea
-                value={guidance}
-                onChange={(e) => setGuidance(e.target.value)}
-                rows={2}
-                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 resize-none text-[#111827] placeholder:text-[#9CA3AF]"
-                style={{ borderColor: "#E0E4E8" }}
-                placeholder="Optional note shown to suppliers"
-              />
-            </div>
-            <button
-              onClick={() => setSelected(null)}
-              className="self-start text-xs hover:underline"
-              style={{ color: "#6B7280" }}
-            >
-              ← Back to search
-            </button>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[#6B7280]">
+              Supplier Guidance Note (optional)
+            </label>
+            <textarea
+              value={guidance}
+              onChange={(e) => setGuidance(e.target.value)}
+              rows={2}
+              className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 resize-none text-[#111827] placeholder:text-[#9CA3AF]"
+              style={{ borderColor: "#E0E4E8" }}
+              placeholder="Optional note shown to suppliers"
+            />
           </div>
-        )}
-
+        </div>
         <DialogFooter>
           <button
             onClick={handleClose}
@@ -769,16 +695,14 @@ function AddAttributeDialog({
           >
             Cancel
           </button>
-          {selected && (
-            <button
-              onClick={handleAdd}
-              disabled={!retailerLabel.trim()}
-              className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
-              style={{ backgroundColor: "#0168B3" }}
-            >
-              Add to category
-            </button>
-          )}
+          <button
+            onClick={handleAdd}
+            disabled={!name.trim()}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: "#0168B3" }}
+          >
+            Add to category
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -793,9 +717,9 @@ function AddImageRequirementDialog({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (row: ImageRequirementRow) => void
+  onAdd: (row: ImageRequirement) => void
 }) {
-  const empty: ImageRequirementRow = {
+  const empty: ImageRequirement = {
     requirementName: "",
     format: "",
     background: "",
@@ -804,9 +728,9 @@ function AddImageRequirementDialog({
     shapeCrop: "",
     guidanceNote: "",
   }
-  const [form, setForm] = useState<ImageRequirementRow>(empty)
+  const [form, setForm] = useState<ImageRequirement>(empty)
 
-  function set(key: keyof ImageRequirementRow, value: string) {
+  function set(key: keyof ImageRequirement, value: string) {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
@@ -821,7 +745,7 @@ function AddImageRequirementDialog({
     handleClose()
   }
 
-  const fields: { key: keyof ImageRequirementRow; label: string; placeholder: string }[] = [
+  const fields: { key: keyof ImageRequirement; label: string; placeholder: string }[] = [
     { key: "requirementName", label: "Requirement Name", placeholder: "e.g. Hero Shot" },
     { key: "format", label: "Format", placeholder: "e.g. JPEG" },
     { key: "background", label: "Background", placeholder: "e.g. Pure white (#FFFFFF)" },
@@ -844,7 +768,7 @@ function AddImageRequirementDialog({
             <div key={key} className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#6B7280]">{label}</label>
               <input
-                value={form[key]}
+                value={form[key] ?? ""}
                 onChange={(e) => set(key, e.target.value)}
                 placeholder={placeholder}
                 className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
@@ -881,6 +805,7 @@ function CategorySummaryCard({
   extendedCount,
   imageCount,
   bricks,
+  selectedBrickCode,
   categoryName,
   onAddCategory,
 }: {
@@ -888,10 +813,12 @@ function CategorySummaryCard({
   extendedCount: number
   imageCount: number
   bricks: ProfileBrick[]
+  selectedBrickCode: string
   categoryName: string
   onAddCategory: () => void
 }) {
   const hasBricks = bricks.length > 0
+  const scopedSuffix = bricks.length > 1 ? " (this category)" : ""
   return (
     <div
       className="rounded-lg border bg-white overflow-hidden"
@@ -925,8 +852,13 @@ function CategorySummaryCard({
             <div className="flex flex-col gap-1.5">
               {bricks.map((b) => {
                 const segment = getBrickByCode(b.code)?.segment
+                const isActive = b.code === selectedBrickCode
                 return (
-                  <div key={b.code} className="flex items-baseline justify-between gap-2">
+                  <div
+                    key={b.code}
+                    className="flex items-baseline justify-between gap-2 rounded px-1.5 py-0.5"
+                    style={isActive ? { backgroundColor: "#DBEAFE" } : undefined}
+                  >
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-semibold text-[#111827] truncate">{b.name}</span>
                       <span className="text-[10px] font-mono" style={{ color: "#6B7280" }}>{b.code}</span>
@@ -951,9 +883,9 @@ function CategorySummaryCard({
         {/* Stats 1×3 */}
         <div className="flex flex-col gap-3">
           {[
-            { label: "Core Attributes Required", value: String(coreCount) },
-            { label: "Extended Attributes Required", value: String(extendedCount) },
-            { label: "Image Requirements Required", value: String(imageCount) },
+            { label: `Core Attributes Required${scopedSuffix}`, value: String(coreCount) },
+            { label: `Extended Attributes Required${scopedSuffix}`, value: String(extendedCount) },
+            { label: `Image Requirements Required${scopedSuffix}`, value: String(imageCount) },
           ].map(({ label, value }) => (
             <div
               key={label}
@@ -1022,8 +954,8 @@ function AddGs1CategoryDialog({
           </DialogTitle>
         </DialogHeader>
         <p className="text-xs leading-relaxed pb-1" style={{ color: "#6B7280" }}>
-          Map another GS1 standard category to this requirement. Its standard extended
-          attributes will be added to the requirement.
+          Map another GS1 standard category to this requirement. It keeps its own standard
+          extended attributes — nothing is merged with the requirement&apos;s other categories.
         </p>
         <Gs1BrickPicker selected={candidate} onSelect={setCandidate} excludeCodes={excludeCodes} />
         <DialogFooter>
@@ -1048,66 +980,14 @@ function AddGs1CategoryDialog({
   )
 }
 
-// ── Cross-category confirmation ───────────────────────────────────────────────
-// A requirement is ideally one category (GS1 segment). Adding a brick from a
-// different segment is allowed, but flagged so it's a deliberate choice.
-function ConfirmMixedCategoryModal({
-  candidate,
-  currentSegment,
-  onClose,
-  onConfirm,
-}: {
-  candidate: Gs1Brick | null
-  currentSegment: string | undefined
-  onClose: () => void
-  onConfirm: () => void
-}) {
-  if (!candidate) return null
-  return (
-    <Dialog open={candidate !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-[#111827]">
-            Different category
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm leading-relaxed py-2" style={{ color: "#6B7280" }}>
-          <span className="font-medium text-[#111827]">{candidate.brickName}</span> belongs to the{" "}
-          <span className="font-medium text-[#111827]">{candidate.segment}</span> category, but this
-          requirement is currently <span className="font-medium text-[#111827]">{currentSegment}</span>.
-          Requirements usually cover a single category. Add it anyway?
-        </p>
-        <DialogFooter>
-          <button
-            onClick={onClose}
-            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
-            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => { onConfirm(); onClose() }}
-            className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: "#D97706" }}
-          >
-            Add anyway
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 // ── Main Screen 2 ─────────────────────────────────────────────────────────────
 interface Screen2Props {
   onBack: () => void
   brickMapping?: { code: string; name: string } | null
-  /** All GS1 bricks mapped to this requirement (union drives extended rows) */
+  /** All GS1 bricks mapped to this requirement */
   initialBricks?: ProfileBrick[]
   /** The retailer's internal category name typed in Step 1 of the Create flow */
   initialCategoryName?: string
-  /** Standard extended attributes seeded from the GS1 brick, if one was selected */
-  initialBrickExtendedRows?: AttributeRow[]
   /** The profile's status when opened — drives the status pill shown here */
   initialStatus?: ProfileStatus
   /** Persist a status/name/actions change back to the shared profile list (Screen 1) */
@@ -1119,7 +999,6 @@ export function Screen2ProfileDetail({
   brickMapping,
   initialBricks,
   initialCategoryName,
-  initialBrickExtendedRows,
   initialStatus,
   onUpdateProfile,
 }: Screen2Props) {
@@ -1139,6 +1018,22 @@ export function Screen2ProfileDetail({
       ? [{ code: brickMapping.code, name: brickMapping.name }]
       : []
   const [bricks, setBricks] = useState<ProfileBrick[]>(seedBricks)
+
+  // Which of the profile's own bricks is currently shown/edited.
+  const [selectedBrickCode, setSelectedBrickCode] = useState<string>(seedBricks[0]?.code ?? "")
+  const [attrs, setAttrs] = useState<BrickAttributeSet>(() =>
+    selectedBrickCode ? assembleBrickAttributes(selectedBrickCode) : EMPTY_ATTRS
+  )
+
+  function refresh(brickCode: string = selectedBrickCode) {
+    setAttrs(brickCode ? assembleBrickAttributes(brickCode) : EMPTY_ATTRS)
+  }
+
+  function handleSelectBrick(code: string) {
+    setSelectedBrickCode(code)
+    refresh(code)
+  }
+
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
   // A candidate brick from a different category, awaiting confirmation.
   const [pendingBrick, setPendingBrick] = useState<Gs1Brick | null>(null)
@@ -1158,17 +1053,18 @@ export function Screen2ProfileDetail({
   const [status, setStatus] = useState<ProfileStatus>(initialStatus ?? "Active")
   const [toast, setToast] = useState<string | null>(null)
 
-  // Edit attribute row state
+  // Edit attribute row state — keyed by gs1Name (rows are freshly recomputed
+  // from the store on every render, so a stable index doesn't make sense).
   const [editAttrState, setEditAttrState] = useState<{
     open: boolean
     target: "core" | "extended" | null
-    idx: number
-  }>({ open: false, target: null, idx: -1 })
+    gs1Name: string | null
+  }>({ open: false, target: null, gs1Name: null })
 
-  // Edit image row state
-  const [editImageState, setEditImageState] = useState<{ open: boolean; idx: number }>({
+  // Edit image row state — keyed by requirementName (the store's own upsert key).
+  const [editImageState, setEditImageState] = useState<{ open: boolean; requirementName: string | null }>({
     open: false,
-    idx: -1,
+    requirementName: null,
   })
 
   function showToast(msg: string) {
@@ -1176,60 +1072,65 @@ export function Screen2ProfileDetail({
     setTimeout(() => setToast(null), 3500)
   }
 
-  function handleAddAttr(row: AttributeRow) {
-    if (addAttrTarget === "core") setCoreRows((r) => [...r, row])
-    if (addAttrTarget === "extended") setExtendedRows((r) => [...r, row])
+  function handleAddAttr(input: { name: string; guidance: string }) {
+    if (!addAttrTarget || !selectedBrickCode) return
+    addAttributeRequirement(selectedBrickCode, input.name, addAttrTarget, input.guidance || undefined)
+    refresh()
     setAddAttrTarget(null)
+    showToast("Attribute added.")
   }
 
-  function handleSaveAttr(updated: AttributeRow) {
-    if (editAttrState.target === "core") {
-      setCoreRows((rows) => rows.map((r, i) => (i === editAttrState.idx ? updated : r)))
-    } else if (editAttrState.target === "extended") {
-      setExtendedRows((rows) => rows.map((r, i) => (i === editAttrState.idx ? updated : r)))
-    }
+  function handleSaveAttr(gs1Name: string, updates: { name: string; guidance: string }) {
+    if (!selectedBrickCode) return
+    updateAttributeRequirement(selectedBrickCode, gs1Name, updates)
+    refresh()
     showToast("Attribute updated.")
   }
 
-  function handleSaveImageRow(updated: ImageRequirementRow) {
-    setImageRows((rows) => rows.map((r, i) => (i === editImageState.idx ? updated : r)))
+  function handleAddImage(row: ImageRequirement) {
+    if (!selectedBrickCode) return
+    setImageRequirement(selectedBrickCode, row)
+    refresh()
+    setAddImageOpen(false)
+    showToast("Image requirement added.")
+  }
+
+  function handleSaveImageRow(updated: ImageRequirement) {
+    if (!selectedBrickCode) return
+    setImageRequirement(selectedBrickCode, updated)
+    refresh()
     showToast("Image requirement updated.")
   }
 
   // A brick chosen in the Add-GS1-Category dialog. If it's a different category
   // (segment) than the requirement's, ask for confirmation first; otherwise add.
   function requestAddBrick(brick: Gs1Brick) {
-    if (primarySegment && brick.segment !== primarySegment) {
+    if (isDifferentSegment(brick.segment, primarySegment)) {
       setPendingBrick(brick)
     } else {
       commitAddBrick(brick)
     }
   }
 
+  // Adding a brick keeps it fully independent — no merging with the
+  // requirement's other bricks. Jump straight to it so its (fresh) attribute
+  // set is what's shown.
   function commitAddBrick(brick: Gs1Brick) {
-    // Append the new brick's standard extended attributes, deduped by GS1 code.
-    const additions: AttributeRow[] = brick.extendedAttributes
-      .filter((a) => !extendedRows.some((r) => r.tgcGs1Name === `${a.name} (${a.code})`))
-      .map((a) => ({
-        retailerName: a.name,
-        tgcGs1Name: `${a.name} (${a.code})`,
-        guidance: "",
-        source: "standard" as const,
-      }))
-    const newExtendedRows = [...extendedRows, ...additions]
     const newBricks: ProfileBrick[] = [...bricks, { code: brick.brickCode, name: brick.brickName }]
-    setExtendedRows(newExtendedRows)
     setBricks(newBricks)
+    setSelectedBrickCode(brick.brickCode)
+    refresh(brick.brickCode)
     onUpdateProfile?.(profileKey, {
       bricks: newBricks,
-      attributes:
-        `${coreRows.length + newExtendedRows.length} attributes` +
-        (imageRows.length ? ` · ${imageRows.length} image requirement${imageRows.length !== 1 ? "s" : ""}` : "") +
-        (newBricks.length > 1 ? ` · ${newBricks.length} GS1 categories` : ""),
+      attributes: describeProfileAttributes(newBricks),
       lastUpdated: today(),
     })
     showToast(`Added ${brick.brickName} to this requirement.`)
   }
+
+  const coreRows = attrs.coreAttributes
+  const extendedRows = attrs.extendedAttributes
+  const imageRows = attrs.imageRequirements
 
   return (
     <div className="flex flex-col gap-0 p-8 max-w-[1200px]">
@@ -1278,14 +1179,21 @@ export function Screen2ProfileDetail({
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-xs" style={{ color: "#6B7280" }}>
-              {bricks.length > 0
-                ? `GS1 Categor${bricks.length > 1 ? "ies" : "y"}: ${bricks[0].name}${
-                    bricks.length > 1 ? ` +${bricks.length - 1} more` : ""
-                  } · `
-                : ""}
-              {coreRows.length + extendedRows.length} attributes required
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {bricks.length > 1 ? (
+                <>
+                  <ProfileBrickSelector bricks={bricks} selectedCode={selectedBrickCode} onSelect={handleSelectBrick} />
+                  <span className="text-xs" style={{ color: "#6B7280" }}>
+                    {coreRows.length + extendedRows.length} attributes required for this category
+                  </span>
+                </>
+              ) : (
+                <p className="text-xs" style={{ color: "#6B7280" }}>
+                  {bricks.length > 0 ? `GS1 Category: ${bricks[0].name} · ` : ""}
+                  {coreRows.length + extendedRows.length} attributes required
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Attribute groups */}
@@ -1294,11 +1202,13 @@ export function Screen2ProfileDetail({
               title="Core Attributes"
               count={coreRows.length}
               defaultExpanded
-              onAddClick={() => setAddAttrTarget("core")}
+              onAddClick={() =>
+                selectedBrickCode ? setAddAttrTarget("core") : showToast("Map a GS1 category first.")
+              }
             >
               <AttributeTable
                 rows={coreRows}
-                onEditRow={(idx) => setEditAttrState({ open: true, target: "core", idx })}
+                onEditRow={(row) => setEditAttrState({ open: true, target: "core", gs1Name: row.gs1Name })}
               />
             </AttributeGroup>
 
@@ -1306,11 +1216,13 @@ export function Screen2ProfileDetail({
               title="Extended Attributes"
               count={extendedRows.length}
               defaultExpanded
-              onAddClick={() => setAddAttrTarget("extended")}
+              onAddClick={() =>
+                selectedBrickCode ? setAddAttrTarget("extended") : showToast("Map a GS1 category first.")
+              }
             >
               <AttributeTable
                 rows={extendedRows}
-                onEditRow={(idx) => setEditAttrState({ open: true, target: "extended", idx })}
+                onEditRow={(row) => setEditAttrState({ open: true, target: "extended", gs1Name: row.gs1Name })}
                 showSourceTags
               />
             </AttributeGroup>
@@ -1319,12 +1231,14 @@ export function Screen2ProfileDetail({
               title="Image Requirements"
               count={imageRows.length}
               defaultExpanded
-              onAddClick={() => setAddImageOpen(true)}
+              onAddClick={() =>
+                selectedBrickCode ? setAddImageOpen(true) : showToast("Map a GS1 category first.")
+              }
               addLabel="+ Add Image Requirement"
             >
               <ImageRequirementsTable
                 rows={imageRows}
-                onEditRow={(idx) => setEditImageState({ open: true, idx })}
+                onEditRow={(row) => setEditImageState({ open: true, requirementName: row.requirementName })}
               />
             </AttributeGroup>
           </div>
@@ -1365,6 +1279,7 @@ export function Screen2ProfileDetail({
             extendedCount={extendedRows.length}
             imageCount={imageRows.length}
             bricks={bricks}
+            selectedBrickCode={selectedBrickCode}
             categoryName={categoryName}
             onAddCategory={() => setAddCategoryOpen(true)}
           />
@@ -1392,25 +1307,26 @@ export function Screen2ProfileDetail({
       <AddImageRequirementDialog
         open={addImageOpen}
         onClose={() => setAddImageOpen(false)}
-        onAdd={(row) => setImageRows((r) => [...r, row])}
+        onAdd={handleAddImage}
       />
       <EditAttributeDialog
-        key={editAttrState.open ? `edit-attr-${editAttrState.target}-${editAttrState.idx}` : "edit-attr-closed"}
+        key={editAttrState.open ? `edit-attr-${editAttrState.target}-${editAttrState.gs1Name}` : "edit-attr-closed"}
         open={editAttrState.open}
         row={
           editAttrState.target === "core"
-            ? (coreRows[editAttrState.idx] ?? null)
+            ? (coreRows.find((r) => r.gs1Name === editAttrState.gs1Name) ?? null)
             : editAttrState.target === "extended"
-            ? (extendedRows[editAttrState.idx] ?? null)
+            ? (extendedRows.find((r) => r.gs1Name === editAttrState.gs1Name) ?? null)
             : null
         }
-        onClose={() => setEditAttrState({ open: false, target: null, idx: -1 })}
+        onClose={() => setEditAttrState({ open: false, target: null, gs1Name: null })}
         onSave={handleSaveAttr}
       />
       <EditImageRequirementDialog
+        key={editImageState.open ? `edit-image-${editImageState.requirementName}` : "edit-image-closed"}
         open={editImageState.open}
-        row={imageRows[editImageState.idx] ?? null}
-        onClose={() => setEditImageState({ open: false, idx: -1 })}
+        row={imageRows.find((r) => r.requirementName === editImageState.requirementName) ?? null}
+        onClose={() => setEditImageState({ open: false, requirementName: null })}
         onSave={handleSaveImageRow}
       />
       <ConfirmStatusModal

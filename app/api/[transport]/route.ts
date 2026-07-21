@@ -1,9 +1,10 @@
 // TGC demo MCP server — Streamable HTTP endpoint at /api/mcp.
 //
 // Exposes the prototype's mock catalogue data through the tool inventory
-// described in docs/mcp-concept.md, so any MCP client (claude.ai, ChatGPT
-// developer mode, Claude Desktop) can query requirements and supplier
-// compliance and create requirements against the in-memory demo store.
+// described in the README's "Requirement authoring model" and "Conversational
+// access (MCP)" sections, so any MCP client (claude.ai, ChatGPT developer
+// mode, Claude Desktop) can query requirements and supplier compliance and
+// create requirements against the in-memory demo store.
 
 import { createMcpHandler } from "mcp-handler"
 import { z } from "zod"
@@ -72,12 +73,13 @@ const handler = createMcpHandler(
     // ── Writes (in-memory demo store) ───────────────────────────────────────
     server.tool(
       "create_attribute_profile",
-      "Create a new attribute profile (requirement set) for a product category, mapped to a GS1 category. Both fields are mandatory. The profile starts as Draft and is seeded with the GS1 category's standard extended attributes. Before calling, confirm the category name and GS1 category choice with the user, and afterwards show them the created profile.",
+      "Create a new attribute profile (requirement set) for a product category, mapped to one or more GS1 categories. The profile starts as Draft and is seeded with each mapped GS1 category's standard extended attributes — each brick keeps its own attribute set, with no merging across bricks. Before calling, confirm the category name, GS1 category choice(s), and free-text product-type label with the user, and afterwards show them the created profile.",
       {
         categoryName: z.string().describe("The retailer's internal category name, e.g. 'Swimwear'"),
-        brickCode: z.string().describe("GS1 category code to map the category to (find via search_gs1_bricks)"),
+        brickCodes: z.array(z.string()).min(1).describe("One or more GS1 category codes to map (find via search_gs1_bricks)"),
+        category: z.string().optional().describe("Free-text product-type label shown in the requirements list, e.g. 'Women's Apparel' — independent of which GS1 categories are mapped; defaults to categoryName if omitted"),
       },
-      async ({ categoryName, brickCode }) => asText(createAttributeProfile(categoryName, brickCode))
+      async ({ categoryName, brickCodes, category }) => asText(createAttributeProfile(categoryName, brickCodes, category))
     )
 
     server.tool(

@@ -31,6 +31,8 @@ interface SupplierCatalogueProps {
   initialSelectedIds?: string[]
   /** Manual categorisation — mutates the shared store */
   onAssignCategory: (ids: Set<string>, brickCode: string) => void
+  /** Back to the Selection Code List — this screen has no nav entry of its own */
+  onBack: () => void
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -294,6 +296,7 @@ export function ScreenSupplierCatalogue({
   products,
   initialSelectedIds = [],
   onAssignCategory,
+  onBack,
 }: SupplierCatalogueProps) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialSelectedIds))
   const [assignOpen, setAssignOpen] = useState(false)
@@ -343,6 +346,15 @@ export function ScreenSupplierCatalogue({
 
   return (
     <div className="p-8 flex flex-col gap-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm">
+        <button onClick={onBack} className="font-light hover:underline" style={{ color: "#0168B3" }}>
+          Selection Code List
+        </button>
+        <span style={{ color: "#9CA3AF" }}>›</span>
+        <span className="font-light text-[#6B7280]">Catalogue</span>
+      </nav>
+
       {/* Header */}
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold text-[#111827]">Catalogue</h1>

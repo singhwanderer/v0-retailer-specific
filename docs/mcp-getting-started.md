@@ -157,5 +157,6 @@ vendors have data, then rephrase.
 
 - **`docs/mcp-faq.md`** — deeper FAQ: how mandatory fields and dropdowns work, persistence,
   security for a real rollout.
-- **`docs/mcp-concept.md`** — the strategy: why TGC-as-a-connector, the two plays, phasing.
-- **`docs/mcp-robustness-plan.md`** — planned improvements for freeform exploration.
+- **README's "Conversational access (MCP)" section** — the discoverability model
+  (`get_capabilities`, starter prompts, self-explaining empty results) and how this
+  connector fits alongside the retailer portal.

@@ -31,10 +31,9 @@ const supplierSections: NavSection[] = [
     label: "Catalogue",
     defaultExpanded: true,
     items: [
-      { id: "selection-code-list", label: "Selection Code List" },
+      { id: "selection-code-list", label: "Selection Code List", wired: true, isNew: true },
       { id: "advanced-search", label: "Advanced Search" },
       { id: "download-basket", label: "Download Basket" },
-      { id: "supplier-catalogue", label: "Products", wired: true, isNew: true },
     ],
   },
   {

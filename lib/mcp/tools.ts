@@ -1,25 +1,31 @@
 // Shared tool layer for the TGC demo MCP server.
 //
 // Pure functions over the prototype's mock data modules. This is the single
-// tool inventory described in docs/mcp-concept.md — consumed today by the
-// external MCP endpoint (app/api/[transport]/route.ts) and, in a later phase,
-// by an embedded portal assistant.
+// tool inventory described in the README's "Requirement authoring model" and
+// "Conversational access (MCP)" sections — consumed both by the external MCP
+// endpoint (app/api/[transport]/route.ts) and directly by the portal UI
+// (Screen 1/2), which call these same functions as plain client-side calls.
 
 import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
+  getProfileBricks,
   RETAILER_SUPPLIERS,
   type AttributeProfile,
+  type ProfileBrick,
   type ProfileStatus,
 } from "@/lib/retailer-requirements"
 import {
-  BASELINE_CORE_ATTRIBUTES,
   getProfileExtras,
   getStore,
-  readProfileExtras,
   type AttributeRequirement,
   type ImageRequirement,
 } from "@/lib/mcp/store"
+import {
+  assembleBrickAttributes,
+  describeProfileAttributes,
+  findProfileForBrick,
+} from "@/lib/mcp/attribute-assembly"
 
 const DEMO_NOTE =
   "Demo prototype: this change is stored in the demo server's in-memory data (mock data only, resets periodically). In production this would persist to TGC."
@@ -56,31 +62,18 @@ export function listAttributeProfiles(status?: ProfileStatus) {
 }
 
 export function getProfileDetail(brickCode: string) {
-  const profile = getStore().profiles.find((p) => p.brickCode === brickCode)
+  const profile = findProfileForBrick(getStore().profiles, brickCode)
   const brick = getBrickByCode(brickCode)
   if (!profile && !brick) {
     return { error: `No attribute profile or GS1 category found for category code ${brickCode}. Use search_gs1_bricks or list_attribute_profiles to find valid codes.` }
   }
   // Read-only: inspecting a profile must never create store state.
-  const extras = readProfileExtras(brickCode)
-  const standardExtended: AttributeRequirement[] = (brick?.extendedAttributes ?? []).map((a) => ({
-    name: a.name,
-    gs1Name: `${a.name} (${a.code})`,
-    guidance: "",
-    source: "standard",
-    target: "extended",
-  }))
+  const { coreAttributes, extendedAttributes, imageRequirements } = assembleBrickAttributes(brickCode)
   return {
     profile: profile ?? { note: "No retailer profile created yet for this GS1 category", brickCode, brickName: brick?.brickName },
-    coreAttributes: [
-      ...BASELINE_CORE_ATTRIBUTES,
-      ...extras.customAttributes.filter((a) => a.target === "core"),
-    ],
-    extendedAttributes: [
-      ...standardExtended,
-      ...extras.customAttributes.filter((a) => a.target === "extended"),
-    ],
-    imageRequirements: extras.imageRequirements,
+    coreAttributes,
+    extendedAttributes,
+    imageRequirements,
   }
 }
 
@@ -177,31 +170,46 @@ export function getCapabilities() {
 
 // ── Writes (in-memory demo store) ────────────────────────────────────────────
 
-export function createAttributeProfile(categoryName: string, brickCode: string) {
-  const brick = getBrickByCode(brickCode)
-  if (!brick) {
-    return { error: `Unknown GS1 category code ${brickCode}. Use search_gs1_bricks to find the right category first.` }
+/**
+ * Create a requirement profile mapped to one or more GS1 bricks. `category`
+ * is the free-text product-type label shown in the requirements list —
+ * independent of which/how-many bricks are mapped; it defaults to
+ * `categoryName` so existing single-argument callers keep working.
+ */
+export function createAttributeProfile(categoryName: string, brickCodes: string[], category?: string) {
+  if (brickCodes.length === 0) {
+    return { error: "At least one GS1 category code is required. Use search_gs1_bricks to find one." }
   }
+  const bricks = brickCodes.map((code) => getBrickByCode(code))
+  const missingIdx = bricks.findIndex((b) => !b)
+  if (missingIdx >= 0) {
+    return { error: `Unknown GS1 category code ${brickCodes[missingIdx]}. Use search_gs1_bricks to find the right category first.` }
+  }
+  const resolvedBricks = bricks as NonNullable<(typeof bricks)[number]>[]
   const store = getStore()
-  const existing = store.profiles.find((p) => p.brickCode === brickCode)
-  if (existing) {
-    return { error: `A profile for GS1 category ${brickCode} (${existing.name}) already exists. Use add_attribute_requirement or set_image_requirement to extend it.` }
+  const conflictCode = brickCodes.find((code) => findProfileForBrick(store.profiles, code))
+  if (conflictCode) {
+    const owner = findProfileForBrick(store.profiles, conflictCode)!
+    return { error: `GS1 category ${conflictCode} is already mapped to the "${owner.name}" profile. Use add_attribute_requirement or set_image_requirement to extend it.` }
   }
+  const [primary] = resolvedBricks
+  const mappedBricks: ProfileBrick[] = resolvedBricks.map((b) => ({ code: b.brickCode, name: b.brickName }))
   const profile: AttributeProfile = {
     name: categoryName,
-    category: categoryName,
-    attributes: `${BASELINE_CORE_ATTRIBUTES.length + brick.extendedAttributes.length} attributes`,
+    category: category ?? categoryName,
+    attributes: describeProfileAttributes(mappedBricks),
     status: "Draft",
     lastUpdated: today(),
     actions: ["Edit", "Activate"],
     isLink: true,
-    brickCode: brick.brickCode,
-    brickName: brick.brickName,
+    brickCode: primary.brickCode,
+    brickName: primary.brickName,
+    bricks: mappedBricks,
   }
   store.profiles.push(profile)
   return {
     created: profile,
-    seededStandardAttributes: brick.extendedAttributes.map((a) => `${a.name} (${a.code})`),
+    seededStandardAttributes: resolvedBricks.flatMap((b) => b.extendedAttributes.map((a) => `${a.name} (${a.code})`)),
     demo_note: DEMO_NOTE,
   }
 }
@@ -209,7 +217,7 @@ export function createAttributeProfile(categoryName: string, brickCode: string) 
 // A write may only extend a profile that actually exists — otherwise the store
 // silently grows extras for a category the retailer never set up.
 function requireProfile(brickCode: string) {
-  const profile = getStore().profiles.find((p) => p.brickCode === brickCode)
+  const profile = findProfileForBrick(getStore().profiles, brickCode)
   if (!profile) {
     return {
       error: `No attribute profile exists for GS1 category ${brickCode}. Create one first with create_attribute_profile, then add requirements to it.`,
@@ -253,6 +261,29 @@ export function setImageRequirement(brickCode: string, requirement: ImageRequire
     profileBrickCode: brickCode,
     demo_note: DEMO_NOTE,
   }
+}
+
+/**
+ * Edit an existing attribute row's label/guidance, whether it's a custom row
+ * (mutated in place) or a standard row inherited from the GS1 brick / the
+ * global baseline (recorded as an override, since standard rows aren't
+ * themselves stored — they're derived live).
+ */
+export function updateAttributeRequirement(
+  brickCode: string,
+  gs1Name: string,
+  updates: { name?: string; guidance?: string }
+) {
+  const missing = requireProfile(brickCode)
+  if (missing) return missing
+  const extras = getProfileExtras(brickCode)
+  const idx = extras.customAttributes.findIndex((a) => a.gs1Name === gs1Name)
+  if (idx >= 0) {
+    extras.customAttributes[idx] = { ...extras.customAttributes[idx], ...updates }
+  } else {
+    extras.overrides[gs1Name] = { ...extras.overrides[gs1Name], ...updates }
+  }
+  return { updated: { gs1Name, ...updates }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
 }
 
 function today(): string {

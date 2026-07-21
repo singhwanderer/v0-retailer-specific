@@ -9,9 +9,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
+import type { Gs1Brick } from "@/lib/gs1-standard-library"
 import { getProfileBricks, type AttributeProfile } from "@/lib/retailer-requirements"
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
+import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
+import { createAttributeProfile } from "@/lib/mcp/tools"
 
 interface Screen1Props {
   /** Shared profile list — the one source of truth (also read/written by Screen 2) */
@@ -172,8 +174,10 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
 // ── Create Requirement Modal (3 steps) ─────────────────────────────────────────
 interface CreateRequirementResult {
   name: string
-  brickCode: string | null
-  brickName: string | null
+  /** Free-text product-type label — always drives the list's Category column,
+   *  independent of which/how-many GS1 bricks get mapped below. */
+  productType: string
+  bricks: { code: string; name: string }[]
   initialStatus: StatusType
 }
 
@@ -190,17 +194,23 @@ function CreateRequirementModal({
 
   // Step 1 state
   const [reqName, setReqName] = useState("")
+  const [productType, setProductType] = useState("")
   const [initialStatus, setInitialStatus] = useState<"Draft" | "Active">("Draft")
 
-  // Step 2 state
-  const [selectedBrick, setSelectedBrick] = useState<Gs1Brick | null>(null)
+  // Step 2 state — multi-select, so a requirement can map to several bricks
+  // at creation. Cross-category (mixed-segment) adds ask for confirmation.
+  const [selectedBricks, setSelectedBricks] = useState<Gs1Brick[]>([])
+  const [pendingBrick, setPendingBrick] = useState<Gs1Brick | null>(null)
   const [skipped, setSkipped] = useState(false)
+  const establishedSegment = selectedBricks[0]?.segment
 
   function reset() {
     setStep(1)
     setReqName("")
+    setProductType("")
     setInitialStatus("Draft")
-    setSelectedBrick(null)
+    setSelectedBricks([])
+    setPendingBrick(null)
     setSkipped(false)
   }
 
@@ -210,26 +220,35 @@ function CreateRequirementModal({
   }
 
   function handleSkip() {
-    setSelectedBrick(null)
+    setSelectedBricks([])
     setSkipped(true)
     setStep(3)
   }
 
-  function handleSelectBrick(brick: Gs1Brick) {
-    setSelectedBrick(brick)
+  function handleToggleBrick(brick: Gs1Brick) {
     setSkipped(false)
+    const already = selectedBricks.some((b) => b.brickCode === brick.brickCode)
+    if (already) {
+      setSelectedBricks((prev) => prev.filter((b) => b.brickCode !== brick.brickCode))
+      return
+    }
+    if (isDifferentSegment(brick.segment, establishedSegment)) {
+      setPendingBrick(brick)
+    } else {
+      setSelectedBricks((prev) => [...prev, brick])
+    }
   }
 
   function goToStep3() {
-    if (!selectedBrick && !skipped) return
+    if (selectedBricks.length === 0 && !skipped) return
     setStep(3)
   }
 
   function handleCreate() {
     onCreated({
       name: reqName.trim(),
-      brickCode: selectedBrick?.brickCode ?? null,
-      brickName: selectedBrick?.brickName ?? null,
+      productType: productType.trim() || reqName.trim(),
+      bricks: selectedBricks.map((b) => ({ code: b.brickCode, name: b.brickName })),
       initialStatus,
     })
     reset()
@@ -258,15 +277,31 @@ function CreateRequirementModal({
                 autoFocus
                 value={reqName}
                 onChange={(e) => setReqName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing && reqName.trim()) setStep(2)
-                }}
                 placeholder="e.g. Women's Day Dresses"
                 className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
                 style={{ borderColor: "#E0E4E8" }}
               />
               <p className="text-[11px] leading-relaxed" style={{ color: "#9CA3AF" }}>
                 This is how the requirement will appear in your retailer portal. Suppliers see this name.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[#111827]">
+                Category / Product Type <span style={{ color: "#DC2626" }}>*</span>
+              </label>
+              <input
+                value={productType}
+                onChange={(e) => setProductType(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && reqName.trim() && productType.trim()) setStep(2)
+                }}
+                placeholder="e.g. Women's Apparel"
+                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
+                style={{ borderColor: "#E0E4E8" }}
+              />
+              <p className="text-[11px] leading-relaxed" style={{ color: "#9CA3AF" }}>
+                The free-text grouping shown in the requirements list — independent of which GS1
+                categories you map below, even if they span more than one.
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -294,16 +329,22 @@ function CreateRequirementModal({
         {step === 2 && (
           <div className="flex flex-col gap-3 py-1">
             <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>
-              Map <span className="font-medium text-[#111827]">{reqName}</span> to a GS1 standard category. The standard extended attributes for that category will be pre-loaded into your requirement.
+              Map <span className="font-medium text-[#111827]">{reqName}</span> to one or more GS1
+              standard categories. Each keeps its own standard extended attributes — nothing is
+              merged across categories.
             </p>
 
-            <Gs1BrickPicker selected={selectedBrick} onSelect={handleSelectBrick} />
+            <Gs1BrickPicker
+              multiSelect
+              selectedCodes={selectedBricks.map((b) => b.brickCode)}
+              onToggle={handleToggleBrick}
+            />
 
             {/* Skip option */}
             <div className="flex items-center justify-between pt-1">
               <p className="text-xs" style={{ color: "#9CA3AF" }}>
-                {selectedBrick
-                  ? <>Selected: <span className="font-medium text-[#0168B3]">{selectedBrick.brickName}</span></>
+                {selectedBricks.length > 0
+                  ? <>Selected: <span className="font-medium text-[#0168B3]">{selectedBricks.map((b) => b.brickName).join(", ")}</span></>
                   : "No category selected"}
               </p>
               <button
@@ -314,54 +355,63 @@ function CreateRequirementModal({
                 Skip — add attributes manually
               </button>
             </div>
+
+            <ConfirmMixedCategoryModal
+              candidate={pendingBrick}
+              currentSegment={establishedSegment}
+              onClose={() => setPendingBrick(null)}
+              onConfirm={() => pendingBrick && setSelectedBricks((prev) => [...prev, pendingBrick])}
+            />
           </div>
         )}
 
         {/* ── Step 3: Preview ── */}
         {step === 3 && (
           <div className="flex flex-col gap-4 py-1">
-            {selectedBrick ? (
+            {selectedBricks.length > 0 ? (
               <>
-                {/* Brick badge */}
-                <div
-                  className="flex items-start gap-3 p-3 rounded-md"
-                  style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
-                >
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-[#0168B3]">GS1 Category Mapping</p>
-                    <p className="text-sm font-semibold text-[#111827] mt-0.5">
-                      {selectedBrick.brickName}
-                    </p>
-                    <p className="text-[10px] font-mono mt-0.5" style={{ color: "#6B7280" }}>
-                      {selectedBrick.brickCode} · {selectedBrick.segment}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Attribute preview */}
-                <div>
-                  <p className="text-xs font-medium text-[#111827] mb-2">
-                    {selectedBrick.extendedAttributes.length} standard extended attributes will be pre-loaded:
-                  </p>
-                  <div
-                    className="rounded-md border overflow-hidden"
-                    style={{ borderColor: "#E0E4E8" }}
-                  >
-                    {selectedBrick.extendedAttributes.map((attr, i) => (
-                      <div
-                        key={attr.code}
-                        className="flex items-center justify-between px-3 py-2 text-xs"
-                        style={{
-                          borderBottom: i < selectedBrick.extendedAttributes.length - 1 ? "1px solid #F3F4F6" : undefined,
-                          backgroundColor: i % 2 === 0 ? "#fff" : "#F9FAFB",
-                        }}
-                      >
-                        <span className="font-medium text-[#111827]">{attr.name}</span>
-                        <span className="font-mono" style={{ color: "#9CA3AF" }}>{attr.code}</span>
+                {/* One card per selected brick — attributes are brick-scoped, not merged */}
+                {selectedBricks.map((brick) => (
+                  <div key={brick.brickCode} className="flex flex-col gap-2">
+                    <div
+                      className="flex items-start gap-3 p-3 rounded-md"
+                      style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
+                    >
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-[#0168B3]">GS1 Category Mapping</p>
+                        <p className="text-sm font-semibold text-[#111827] mt-0.5">
+                          {brick.brickName}
+                        </p>
+                        <p className="text-[10px] font-mono mt-0.5" style={{ color: "#6B7280" }}>
+                          {brick.brickCode} · {brick.segment}
+                        </p>
                       </div>
-                    ))}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-[#111827] mb-2">
+                        {brick.extendedAttributes.length} standard extended attributes will be pre-loaded:
+                      </p>
+                      <div
+                        className="rounded-md border overflow-hidden"
+                        style={{ borderColor: "#E0E4E8" }}
+                      >
+                        {brick.extendedAttributes.map((attr, i) => (
+                          <div
+                            key={attr.code}
+                            className="flex items-center justify-between px-3 py-2 text-xs"
+                            style={{
+                              borderBottom: i < brick.extendedAttributes.length - 1 ? "1px solid #F3F4F6" : undefined,
+                              backgroundColor: i % 2 === 0 ? "#fff" : "#F9FAFB",
+                            }}
+                          >
+                            <span className="font-medium text-[#111827]">{attr.name}</span>
+                            <span className="font-mono" style={{ color: "#9CA3AF" }}>{attr.code}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
 
                 {/* Callout */}
                 <div
@@ -424,7 +474,7 @@ function CreateRequirementModal({
           {step === 1 && (
             <button
               onClick={() => setStep(2)}
-              disabled={!reqName.trim()}
+              disabled={!reqName.trim() || !productType.trim()}
               className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
               style={{ backgroundColor: "#0168B3" }}
             >
@@ -435,7 +485,7 @@ function CreateRequirementModal({
           {step === 2 && (
             <button
               onClick={goToStep3}
-              disabled={!selectedBrick}
+              disabled={selectedBricks.length === 0 && !skipped}
               className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
               style={{ backgroundColor: "#0168B3" }}
             >
@@ -567,26 +617,44 @@ export function Screen1AttributeProfiles({
   }
 
   function handleCreated(result: CreateRequirementResult) {
-    const brickLabel = result.brickName ? ` mapped to ${result.brickName}` : ""
-    showToast(`"${result.name}" created as ${result.initialStatus}${brickLabel}.`)
-    const extendedCount = result.brickCode ? getBrickByCode(result.brickCode)?.extendedAttributes.length ?? 0 : 0
+    const brickCodes = result.bricks.map((b) => b.code)
+
+    if (brickCodes.length > 0) {
+      // Route through the shared store write path — the same function the
+      // MCP connector calls — so authoring here and via the connector are one
+      // code path.
+      const created = createAttributeProfile(result.name, brickCodes, result.productType)
+      if ("error" in created) {
+        showToast(created.error ?? "Could not create the requirement.")
+        return
+      }
+      const profile: AttributeProfile = {
+        ...created.created,
+        status: result.initialStatus,
+        actions: result.initialStatus === "Active" ? ["Edit", "Deactivate"] : ["Edit", "Activate"],
+      }
+      onCreateProfile(profile)
+      showToast(`"${result.name}" created as ${result.initialStatus}, mapped to ${result.bricks.length} GS1 categor${result.bricks.length !== 1 ? "ies" : "y"}.`)
+      onNavigateToProfile(profile.brickCode, profile.brickName, result.name, result.initialStatus)
+      return
+    }
+
+    // Skip path — no GS1 brick mapped; a plain baseline-only profile.
     const newProfile: AttributeProfile = {
       name: result.name,
-      category: result.brickName ?? result.name,
-      attributes: `${BASELINE_CORE_COUNT + extendedCount} attributes`,
+      category: result.productType,
+      attributes: `${BASELINE_CORE_COUNT} attributes`,
       status: result.initialStatus,
       lastUpdated: today(),
       actions: result.initialStatus === "Active" ? ["Edit", "Deactivate"] : ["Edit", "Activate"],
       isLink: true,
-      brickCode: result.brickCode ?? "",
-      brickName: result.brickName ?? "",
-      bricks: result.brickCode && result.brickName
-        ? [{ code: result.brickCode, name: result.brickName }]
-        : [],
+      brickCode: "",
+      brickName: "",
+      bricks: [],
     }
     onCreateProfile(newProfile)
-    // Navigate immediately into the new requirement's profile, passing the retailer's category name
-    onNavigateToProfile(result.brickCode ?? undefined, result.brickName ?? undefined, result.name, result.initialStatus)
+    showToast(`"${result.name}" created as ${result.initialStatus}.`)
+    onNavigateToProfile(undefined, undefined, result.name, result.initialStatus)
   }
 
   return (
