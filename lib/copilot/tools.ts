@@ -198,6 +198,8 @@ function makeReadTools(ctx: CopilotContext) {
           filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
           vendorScope: vendorScope === "all" ? "All vendors" : vendorScope,
           ...result,
+          coreAttributeNote:
+            "Core baseline attributes (Product ID, Product Description, GTIN code, GTIN Description, NRF Size Code, NRF Color Code, Size Description, Color Description) are always present on all products and are excluded from gap calculations.",
         }
       },
     }),
