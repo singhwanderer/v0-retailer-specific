@@ -30,7 +30,7 @@ const STARTER_PROMPTS = [
   "What does my Footwear profile require?",
   "Which supplier has the most open compliance gaps?",
   "Run a GS1 Core scorecard across my vendor base",
-  "Set up requirements for a new Swimwear category",
+  "Set up requirements for a new Earrings category",
 ]
 
 function today(): string {
