@@ -15,6 +15,7 @@ import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-prod
 import { ScreenSupplierGapDetail, type GapDetailCrumb } from "@/components/portal/screen-supplier-gap-detail"
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
+import { ScreenComplianceDashboard } from "@/components/portal/screen-compliance-dashboard"
 import { ComplianceAgentPanel } from "@/components/portal/compliance-agent-panel"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
@@ -70,16 +71,7 @@ type GapContext = {
   origin: GapOrigin
 }
 
-function DashboardPlaceholder() {
-  return (
-    <div className="p-8 flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-[#111827]">Dashboard</h1>
-      <p className="text-sm text-[#6B7280]">
-        Dashboard content is out of scope for this prototype.
-      </p>
-    </div>
-  )
-}
+
 
 const WELCOME_DISMISSED_KEY = "tgc-proto-welcome-dismissed"
 const TOGGLE_HINT_DISMISSED_KEY = "tgc-proto-toggle-hint-dismissed"
@@ -360,7 +352,7 @@ export default function RetailerPortal() {
     setGapContext(null)
   }
 
-  // ── L4 back to L2 (or L3 breadcrumb "partner" click) ───────────────────────
+  // ── L4 back to L2 (or L3 breadcrumb "partner" click) ──────────────────��────
   function handleBackToPartner() {
     setSupplierScreen("selection-codes")
     setGapContext(null)
@@ -520,7 +512,7 @@ export default function RetailerPortal() {
           {/* ── Retailer screens ── */}
           {perspective === "retailer" && (
             <>
-              {retailerScreen === "dashboard" && <DashboardPlaceholder />}
+              {retailerScreen === "dashboard" && <ScreenComplianceDashboard />}
               {retailerScreen === "attribute-profiles" && (
                 <Screen1AttributeProfiles
                   profiles={profiles}
