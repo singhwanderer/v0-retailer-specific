@@ -29,6 +29,11 @@ import {
   getSystemFilter,
   type SystemFilterId,
 } from "@/lib/system-filters"
+import { BASELINE_CORE_ATTRIBUTES } from "@/lib/mcp/store"
+
+// Core attribute names that are always present on every product by design.
+// They must never appear in any report's missing-attribute list.
+const CORE_ATTR_NAMES = new Set(BASELINE_CORE_ATTRIBUTES.map((a) => a.name))
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -173,20 +178,23 @@ function supplierGapAllocation(
   const brickCode = product.brickCode ?? ""
 
   if (filter.kind === "system" && (filter.id === "gs1-core" || filter.id === "nrf-retail-ready")) {
-    const pool = (filter.id === "gs1-core" ? GUIDANCE_CORE_ATTRIBUTES : NRF_AUDIT_ATTRIBUTES).map(
-      (name) => ({ name })
-    )
+    // Core attributes are always present — filter them out so they never appear as missing.
+    const pool = (filter.id === "gs1-core" ? GUIDANCE_CORE_ATTRIBUTES : NRF_AUDIT_ATTRIBUTES)
+      .map((name) => ({ name }))
+      .filter((a) => !CORE_ATTR_NAMES.has(a.name))
     const effectiveGaps = Math.min(Math.max(0, rawGaps - 2), pool.length)
     return { effectiveGaps, missing: pool.slice(0, effectiveGaps) }
   }
 
-  const pool =
+  // Core attrs are always populated — strip them from the pool before allocation.
+  const pool = (
     filter.kind === "account"
       ? resolveAccountFilterAttributes(filter.retailer, brickCode)
       : (getBrickByCode(brickCode)?.extendedAttributes ?? []).map((a) => ({
           name: a.name,
           code: a.code,
         }))
+  ).filter((a) => !CORE_ATTR_NAMES.has(a.name))
 
   const fromPool = Math.min(rawGaps, pool.length)
   const missing = pool.slice(0, fromPool)
@@ -371,6 +379,8 @@ export function runRetailerReport(
         (name) => ({ name })
       )
     }
+    // Core attributes are always populated — they must never appear as gaps.
+    pool = pool.filter((a) => !CORE_ATTR_NAMES.has(a.name))
     const waived = waivedAttributes(s.supplier)
     pool = pool.filter((a) => !isWaived(a.name, waived))
 
@@ -423,7 +433,7 @@ export function runRetailerReport(
   }
 }
 
-// ── Request assembly ──────────────────────────────────────────────────────────
+// ── Request assembly ─────────────────────────────────────────────────���────────
 
 /** Legacy-style report file name, e.g. "JRenee_Belk_Account_20260612-161130.csv". */
 export function buildReportFileName(requestedBy: string, filterLabel: string): string {
