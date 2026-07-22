@@ -1,6 +1,6 @@
 "use client"
 
-import { HelpCircle, User } from "lucide-react"
+import { Bot, HelpCircle, User } from "lucide-react"
 
 type Perspective = "retailer" | "supplier"
 
@@ -13,6 +13,9 @@ interface TopNavProps {
   showToggleHint?: boolean
   /** Reopen the welcome / about overlay */
   onShowAbout?: () => void
+  /** TGC Compliance Agent on/off — retailer-only */
+  aiEnabled?: boolean
+  onAiToggleChange?: (enabled: boolean) => void
 }
 
 const navLinks = [
@@ -28,6 +31,8 @@ export function TopNav({
   onPerspectiveChange,
   showToggleHint = false,
   onShowAbout,
+  aiEnabled = false,
+  onAiToggleChange,
 }: TopNavProps) {
   return (
     <header
@@ -70,8 +75,35 @@ export function TopNav({
         </nav>
       )}
 
-      {/* Right side: about + toggle + identity */}
+      {/* Right side: about + AI toggle + toggle + identity */}
       <div className="flex items-center gap-4">
+        {/* TGC Compliance Agent on/off — retailer-only */}
+        {perspective === "retailer" && onAiToggleChange && (
+          <div className="flex items-center gap-1.5" title="TGC Compliance Agent">
+            <Bot className="w-3.5 h-3.5 text-white/70" />
+            <span className="text-[10px] font-medium uppercase tracking-wide text-white/60 hidden lg:inline">
+              AI
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={aiEnabled}
+              aria-label="Toggle TGC Compliance Agent"
+              onClick={() => onAiToggleChange(!aiEnabled)}
+              className="relative inline-flex h-[1.15rem] w-8 shrink-0 items-center rounded-full transition-colors cursor-pointer"
+              style={{ backgroundColor: aiEnabled ? "#FFFFFF" : "rgba(255,255,255,0.25)" }}
+            >
+              <span
+                className="block size-4 rounded-full transition-transform"
+                style={{
+                  backgroundColor: aiEnabled ? "#0168B3" : "#FFFFFF",
+                  transform: aiEnabled ? "translateX(calc(100% - 2px))" : "translateX(2px)",
+                }}
+              />
+            </button>
+          </div>
+        )}
+
         {/* About this prototype */}
         {onShowAbout && (
           <button
