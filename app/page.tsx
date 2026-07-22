@@ -15,6 +15,7 @@ import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-prod
 import { ScreenSupplierGapDetail, type GapDetailCrumb } from "@/components/portal/screen-supplier-gap-detail"
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
+import { ComplianceAgentPanel } from "@/components/portal/compliance-agent-panel"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
   SUPPLIER_PRODUCTS_SEED,
@@ -82,6 +83,7 @@ function DashboardPlaceholder() {
 
 const WELCOME_DISMISSED_KEY = "tgc-proto-welcome-dismissed"
 const TOGGLE_HINT_DISMISSED_KEY = "tgc-proto-toggle-hint-dismissed"
+const AI_ENABLED_KEY = "tgc-proto-ai-enabled"
 
 export default function RetailerPortal() {
   const [perspective, setPerspective] = useState<Perspective>("retailer")
@@ -98,6 +100,20 @@ export default function RetailerPortal() {
     if (!welcomeDismissed) setWelcomeOpen(true)
     else if (!hintDismissed) setShowToggleHint(true)
   }, [])
+
+  // ── TGC Compliance Agent on/off ──────────────────────────────────────────────
+  // Off by default; persisted so it doesn't reset on reload mid-demo. The
+  // panel only mounts (not just visually hides) when this is true.
+  const [aiEnabled, setAiEnabled] = useState(false)
+
+  useEffect(() => {
+    setAiEnabled(localStorage.getItem(AI_ENABLED_KEY) === "1")
+  }, [])
+
+  function handleAiToggleChange(enabled: boolean) {
+    setAiEnabled(enabled)
+    localStorage.setItem(AI_ENABLED_KEY, enabled ? "1" : "0")
+  }
 
   function dismissWelcome() {
     localStorage.setItem(WELCOME_DISMISSED_KEY, "1")
@@ -483,7 +499,13 @@ export default function RetailerPortal() {
         onPerspectiveChange={handlePerspectiveChange}
         showToggleHint={showToggleHint}
         onShowAbout={() => setWelcomeOpen(true)}
+        aiEnabled={aiEnabled}
+        onAiToggleChange={handleAiToggleChange}
       />
+
+      {perspective === "retailer" && aiEnabled && (
+        <ComplianceAgentPanel profiles={profiles} onCreateProfile={handleCreateProfile} />
+      )}
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
