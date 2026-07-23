@@ -48,61 +48,13 @@ function Dot({ color }: { color: string }) {
 function AttributeTone({
   status,
 }: {
-  status: "provided" | "missing" | "beyond"
+  status: "provided" | "missing"
 }) {
   const cfg = {
     provided: { bg: "#DCFCE7", text: "#15803D", dot: "#16A34A" },
     missing: { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
-    beyond: { bg: "#F3F4F6", text: "#6B7280", dot: "#9CA3AF" },
   }[status]
   return cfg
-}
-
-/** The select-or-type value picker shared by both fillable sections (required
- *  gaps and optional extras) — filling either one calls the same handler. */
-function AttributeValuePicker({
-  attr,
-  onSelectValue,
-}: {
-  attr: MissingAttribute
-  onSelectValue: (value: string) => void
-}) {
-  const allowedValues = getAllowedValues(attr.code)
-  return allowedValues && allowedValues.length > 0 ? (
-    <Select value="" onValueChange={onSelectValue}>
-      <SelectTrigger className="ml-auto h-8 w-52 text-xs" aria-label={`Select a value for ${attr.name}`}>
-        <SelectValue placeholder="Select a value…" />
-      </SelectTrigger>
-      <SelectContent>
-        {allowedValues.map((v) => (
-          <SelectItem key={v.value} value={v.value} className="text-xs">
-            {v.value}
-            {v.code && (
-              <span className="ml-1.5 font-mono text-[10px] text-[#9CA3AF]">{v.code}</span>
-            )}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  ) : (
-    <input
-      type="text"
-      placeholder="Enter a value…"
-      aria-label={`Enter a value for ${attr.name}`}
-      onKeyDown={(e) => {
-        if (e.nativeEvent.isComposing) return
-        if (e.key === "Enter") {
-          const target = e.currentTarget
-          if (target.value) {
-            onSelectValue(target.value)
-            target.value = ""
-          }
-        }
-      }}
-      className="ml-auto h-8 w-52 text-xs px-3 py-1 rounded border"
-      style={{ borderColor: "#E0E4E8" }}
-    />
-  )
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -143,16 +95,6 @@ export function ScreenSupplierProductAttributes({
       value: product?.filledAttributes?.[attr.code] ?? "",
     }))
     .filter((a) => a.value) // Only those actually provided
-
-  // Fillable-but-not-required attributes — the rest of the brick's attribute
-  // pool: not required by this target (so not in missingAttrs) and not yet
-  // given a value (so not in providedAttrs).
-  const fillableAttrs = (brick?.extendedAttributes ?? []).filter(
-    (attr) =>
-      !missingAttrs.some((m) => m.code === attr.code) &&
-      !providedAttrs.some((p) => p.code === attr.code)
-  )
-  const beyondGapCount = fillableAttrs.length
 
   const handleConfirm = () => {
     if (pendingFill) {
@@ -225,17 +167,6 @@ export function ScreenSupplierProductAttributes({
                 <span className="font-medium text-[#111827]">{missingAttrs.length}</span> missing/gap
               </span>
             </div>
-            {beyondGapCount > 0 && (
-              <>
-                <span style={{ color: "#E0E4E8" }}>|</span>
-                <div className="flex items-center gap-2">
-                  <Dot color="#9CA3AF" />
-                  <span className="font-light text-[#6B7280]">
-                    <span className="font-medium text-[#111827]">{beyondGapCount}</span> fillable
-                  </span>
-                </div>
-              </>
-            )}
           </div>
         </div>
 
@@ -310,6 +241,7 @@ export function ScreenSupplierProductAttributes({
                 <tbody>
                   {missingAttrs.map((attr, idx) => {
                     const cfg = AttributeTone({ status: "missing" })
+                    const allowedValues = getAllowedValues(attr.code)
                     return (
                       <tr
                         key={attr.code}
@@ -328,59 +260,49 @@ export function ScreenSupplierProductAttributes({
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right align-middle w-56">
-                          <AttributeValuePicker
-                            attr={attr}
-                            onSelectValue={(value) => setPendingFill({ attr, value })}
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {/* Additional Fillable Attributes (not required by this target) */}
-        {fillableAttrs.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-sm font-semibold text-[#111827]">Additional Fillable Attributes</h2>
-              <p className="text-xs font-light text-[#6B7280]">
-                Not required by {targetLabel}, but can be provided if available.
-              </p>
-            </div>
-            <div
-              className="rounded-lg overflow-hidden"
-              style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
-            >
-              <table className="w-full text-sm">
-                <tbody>
-                  {fillableAttrs.map((attr, idx) => {
-                    const cfg = AttributeTone({ status: "beyond" })
-                    return (
-                      <tr
-                        key={attr.code}
-                        style={{
-                          borderBottom:
-                            idx < fillableAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
-                        }}
-                      >
-                        <td className="px-4 py-3 w-8 align-middle">
-                          <Dot color={cfg.dot} />
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <span className="font-medium text-[#111827]">{attr.name}</span>
-                          <span className="ml-2 text-xs font-light text-[#9CA3AF]">
-                            TGC: {attr.name} ({attr.code})
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right align-middle w-56">
-                          <AttributeValuePicker
-                            attr={attr}
-                            onSelectValue={(value) => setPendingFill({ attr, value })}
-                          />
+                          {allowedValues && allowedValues.length > 0 ? (
+                            <Select
+                              value=""
+                              onValueChange={(value) => setPendingFill({ attr, value })}
+                            >
+                              <SelectTrigger
+                                className="ml-auto h-8 w-52 text-xs"
+                                aria-label={`Select a value for ${attr.name}`}
+                              >
+                                <SelectValue placeholder="Select a value…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allowedValues.map((v) => (
+                                  <SelectItem key={v.value} value={v.value} className="text-xs">
+                                    {v.value}
+                                    {v.code && (
+                                      <span className="ml-1.5 font-mono text-[10px] text-[#9CA3AF]">
+                                        {v.code}
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <input
+                              type="text"
+                              placeholder="Enter a value…"
+                              aria-label={`Enter a value for ${attr.name}`}
+                              onKeyDown={(e) => {
+                                if (e.nativeEvent.isComposing) return
+                                if (e.key === "Enter") {
+                                  const target = e.currentTarget
+                                  if (target.value) {
+                                    setPendingFill({ attr, value: target.value })
+                                    target.value = ""
+                                  }
+                                }
+                              }}
+                              className="ml-auto h-8 w-52 text-xs px-3 py-1 rounded border"
+                              style={{ borderColor: "#E0E4E8" }}
+                            />
+                          )}
                         </td>
                       </tr>
                     )
@@ -392,7 +314,7 @@ export function ScreenSupplierProductAttributes({
         )}
 
         {/* Empty state */}
-        {providedAttrs.length === 0 && missingAttrs.length === 0 && beyondGapCount === 0 && (
+        {providedAttrs.length === 0 && missingAttrs.length === 0 && (
           <div
             className="flex items-center gap-2 px-4 py-3 rounded-lg"
             style={{ backgroundColor: "#F0FDF4", border: "1px solid #DCFCE7" }}
