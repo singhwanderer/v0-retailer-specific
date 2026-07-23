@@ -83,18 +83,22 @@ export function ScreenSupplierProductAttributes({
   // Get gap records (missing attrs)
   const { missingAttrs } = getGapRecords(product, target)
 
-  // Provided attributes — those in the product that are required for this target
+  // Provided attributes — the rest of the brick's attribute pool once the
+  // gap ones are excluded. The compliance table's gap count (e.g. "2 GS1
+  // gaps") already reflects how many of these are outstanding, so everything
+  // else in the pool reads as provided even when the seed data doesn't
+  // carry a real filled-in value for it (fall back to "On file").
   const providedAttrs = (brick?.extendedAttributes ?? [])
-    .filter((attr) => {
-      // Include if not in missing list
-      return !missingAttrs.some((m) => m.code === attr.code)
+    .filter((attr) => !missingAttrs.some((m) => m.code === attr.code))
+    .map((attr) => {
+      const realValue = product?.filledAttributes?.[attr.code]
+      return {
+        code: attr.code,
+        name: attr.name,
+        value: realValue ?? "On file",
+        editable: Boolean(realValue),
+      }
     })
-    .map((attr) => ({
-      code: attr.code,
-      name: attr.name,
-      value: product?.filledAttributes?.[attr.code] ?? "",
-    }))
-    .filter((a) => a.value) // Only those actually provided
 
   const handleConfirm = () => {
     if (pendingFill) {
@@ -204,16 +208,23 @@ export function ScreenSupplierProductAttributes({
                           </span>
                         </td>
                         <td className="px-4 py-3 align-middle">
-                          <span className="text-sm text-[#6B7280]">{attr.value}</span>
+                          <span
+                            className="text-sm"
+                            style={{ color: attr.editable ? "#6B7280" : "#9CA3AF" }}
+                          >
+                            {attr.value}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-right align-middle w-12">
-                          <button
-                            onClick={() => handleEditExisting(attr.code, attr.value)}
-                            className="inline-flex items-center justify-center p-1.5 rounded hover:bg-[#F3F4F6] transition-colors"
-                            aria-label={`Edit ${attr.name}`}
-                          >
-                            <Edit2 className="w-4 h-4" style={{ color: "#6B7280" }} />
-                          </button>
+                          {attr.editable && (
+                            <button
+                              onClick={() => handleEditExisting(attr.code, attr.value)}
+                              className="inline-flex items-center justify-center p-1.5 rounded hover:bg-[#F3F4F6] transition-colors"
+                              aria-label={`Edit ${attr.name}`}
+                            >
+                              <Edit2 className="w-4 h-4" style={{ color: "#6B7280" }} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )
