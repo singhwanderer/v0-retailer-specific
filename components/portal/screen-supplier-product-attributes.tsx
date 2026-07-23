@@ -85,7 +85,7 @@ export function ScreenSupplierProductAttributes({
   const { missingAttrs, totalAttrCount } = getGapRecords(product, target)
 
   // Provided attributes — those in the product that are required for this target
-  const providedAttrs = (brick?.attributes ?? [])
+  const providedAttrs = (brick?.extendedAttributes ?? [])
     .filter((attr) => {
       // Include if not in missing list
       return !missingAttrs.some((m) => m.code === attr.code)
@@ -93,7 +93,7 @@ export function ScreenSupplierProductAttributes({
     .map((attr) => ({
       code: attr.code,
       name: attr.name,
-      value: product?.attributes[attr.code] ?? "",
+      value: product?.filledAttributes?.[attr.code] ?? "",
     }))
     .filter((a) => a.value) // Only those actually provided
 
@@ -111,7 +111,7 @@ export function ScreenSupplierProductAttributes({
 
   const handleEditExisting = (attrCode: string, currentValue: string) => {
     // Find the attribute definition to get its name
-    const attrDef = brick?.attributes.find((a) => a.code === attrCode)
+    const attrDef = brick?.extendedAttributes.find((a) => a.code === attrCode)
     if (attrDef) {
       setPendingFill({
         attr: { code: attrCode, name: attrDef.name },
