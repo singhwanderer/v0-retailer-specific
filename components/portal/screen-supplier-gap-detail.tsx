@@ -231,8 +231,13 @@ export function ScreenSupplierGapDetail({
                             </SelectTrigger>
                             <SelectContent>
                               {allowedValues.map((v) => (
-                                <SelectItem key={v} value={v} className="text-xs">
-                                  {v}
+                                <SelectItem key={v.value} value={v.value} className="text-xs">
+                                  {v.value}
+                                  {v.code && (
+                                    <span className="ml-1.5 font-mono text-[10px] text-[#9CA3AF]">
+                                      {v.code}
+                                    </span>
+                                  )}
                                 </SelectItem>
                               ))}
                             </SelectContent>

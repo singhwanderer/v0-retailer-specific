@@ -174,9 +174,6 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
 // ── Create Requirement Modal (3 steps) ─────────────────────────────────────────
 interface CreateRequirementResult {
   name: string
-  /** Free-text product-type label — always drives the list's Category column,
-   *  independent of which/how-many GS1 bricks get mapped below. */
-  productType: string
   bricks: { code: string; name: string }[]
   initialStatus: StatusType
 }
@@ -194,7 +191,6 @@ function CreateRequirementModal({
 
   // Step 1 state
   const [reqName, setReqName] = useState("")
-  const [productType, setProductType] = useState("")
   const [initialStatus, setInitialStatus] = useState<"Draft" | "Active">("Draft")
 
   // Step 2 state — multi-select, so a requirement can map to several bricks
@@ -207,7 +203,6 @@ function CreateRequirementModal({
   function reset() {
     setStep(1)
     setReqName("")
-    setProductType("")
     setInitialStatus("Draft")
     setSelectedBricks([])
     setPendingBrick(null)
@@ -247,7 +242,6 @@ function CreateRequirementModal({
   function handleCreate() {
     onCreated({
       name: reqName.trim(),
-      productType: productType.trim() || reqName.trim(),
       bricks: selectedBricks.map((b) => ({ code: b.brickCode, name: b.brickName })),
       initialStatus,
     })
@@ -277,31 +271,15 @@ function CreateRequirementModal({
                 autoFocus
                 value={reqName}
                 onChange={(e) => setReqName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && reqName.trim()) setStep(2)
+                }}
                 placeholder="e.g. Women's Day Dresses"
                 className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
                 style={{ borderColor: "#E0E4E8" }}
               />
               <p className="text-[11px] leading-relaxed" style={{ color: "#9CA3AF" }}>
                 This is how the requirement will appear in your retailer portal. Suppliers see this name.
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#111827]">
-                Category / Product Type <span style={{ color: "#DC2626" }}>*</span>
-              </label>
-              <input
-                value={productType}
-                onChange={(e) => setProductType(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing && reqName.trim() && productType.trim()) setStep(2)
-                }}
-                placeholder="e.g. Women's Apparel"
-                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
-                style={{ borderColor: "#E0E4E8" }}
-              />
-              <p className="text-[11px] leading-relaxed" style={{ color: "#9CA3AF" }}>
-                The free-text grouping shown in the requirements list — independent of which GS1
-                categories you map below, even if they span more than one.
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -474,7 +452,7 @@ function CreateRequirementModal({
           {step === 1 && (
             <button
               onClick={() => setStep(2)}
-              disabled={!reqName.trim() || !productType.trim()}
+              disabled={!reqName.trim()}
               className="px-3.5 py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-40"
               style={{ backgroundColor: "#0168B3" }}
             >
@@ -623,7 +601,7 @@ export function Screen1AttributeProfiles({
       // Route through the shared store write path — the same function the
       // MCP connector calls — so authoring here and via the connector are one
       // code path.
-      const created = createAttributeProfile(result.name, brickCodes, result.productType)
+      const created = createAttributeProfile(result.name, brickCodes)
       if ("error" in created) {
         showToast(created.error ?? "Could not create the requirement.")
         return
@@ -642,7 +620,7 @@ export function Screen1AttributeProfiles({
     // Skip path — no GS1 brick mapped; a plain baseline-only profile.
     const newProfile: AttributeProfile = {
       name: result.name,
-      category: result.productType,
+      category: result.name,
       attributes: `${BASELINE_CORE_COUNT} attributes`,
       status: result.initialStatus,
       lastUpdated: today(),
@@ -694,9 +672,8 @@ export function Screen1AttributeProfiles({
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F4F6F8" }}>
-              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[22%]">Category</th>
-              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[18%]">Product Type</th>
-              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[20%]">GS1 Category</th>
+              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[26%]">Category</th>
+              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[24%]">GS1 Category</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[16%]">Requirements</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[10%]">Status</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[10%]">Last Updated</th>
@@ -719,7 +696,6 @@ export function Screen1AttributeProfiles({
                     {cat.name}
                   </button>
                 </td>
-                <td className="px-4 py-3.5 text-[#111827]">{cat.category}</td>
                 <td className="px-4 py-3.5">
                   {(() => {
                     const bricks = getProfileBricks(cat)
