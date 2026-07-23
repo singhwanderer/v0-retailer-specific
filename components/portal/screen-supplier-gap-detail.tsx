@@ -38,6 +38,8 @@ interface GapDetailProps {
   onFillAttribute: (productId: string, attributeCode: string, value: string) => void
   /** Jump to the (out-of-scope) GTIN list for this product */
   onViewGtins: (productId: string) => void
+  /** View all attributes for this product (provided + gaps + fillable) */
+  onViewAllAttributes?: (productId: string, target: GapTarget) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -80,6 +82,7 @@ export function ScreenSupplierGapDetail({
   onUploadImage,
   onFillAttribute,
   onViewGtins,
+  onViewAllAttributes,
 }: GapDetailProps) {
   const product = products.find((p) => p.id === productId)
   const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
@@ -170,6 +173,16 @@ export function ScreenSupplierGapDetail({
             complete={isComplete}
             label={isComplete ? "Complete" : `${gapCount} gaps`}
           />
+          <span className="text-[#E0E4E8] ml-auto">|</span>
+          {onViewAllAttributes && (
+            <button
+              onClick={() => onViewAllAttributes(productId, target)}
+              className="text-sm font-light hover:underline ml-2"
+              style={{ color: "#0168B3" }}
+            >
+              View all attributes →
+            </button>
+          )}
         </div>
       </div>
 

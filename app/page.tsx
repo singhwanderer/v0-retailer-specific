@@ -13,6 +13,7 @@ import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplie
 import { ScreenSupplierAllSelectionCodes } from "@/components/portal/screen-supplier-all-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
 import { ScreenSupplierGapDetail, type GapDetailCrumb } from "@/components/portal/screen-supplier-gap-detail"
+import { ScreenSupplierProductAttributes } from "@/components/portal/screen-supplier-product-attributes"
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
 import { ScreenComplianceDashboard } from "@/components/portal/screen-compliance-dashboard"
@@ -58,6 +59,7 @@ type SupplierScreen =
   | "selection-codes"
   | "supplier-products"
   | "supplier-gap-detail"
+  | "supplier-product-attributes"
   | "image-upload"
   | "compliance-reports"
 
@@ -66,6 +68,12 @@ type SupplierScreen =
 type GapOrigin = "partner-flow" | "gs1-view" | "code-list"
 
 type GapContext = {
+  productId: string
+  target: GapTarget
+  origin: GapOrigin
+}
+
+type AttrContext = {
   productId: string
   target: GapTarget
   origin: GapOrigin
@@ -158,6 +166,9 @@ export default function RetailerPortal() {
   // L4 context — product + target + origin flow, so gap detail works from the
   // partner drill-down, the GS1 view, and the account-wide code drill-down alike
   const [gapContext, setGapContext] = useState<GapContext | null>(null)
+
+  // L4.5 context — view all attributes for a product (reached from gap detail or product list)
+  const [attrContext, setAttrContext] = useState<AttrContext | null>(null)
 
   // Image-upload WIP screen context (reached only from gap detail)
   const [uploadImage, setUploadImage] = useState<MissingImage | null>(null)
@@ -359,7 +370,7 @@ export default function RetailerPortal() {
     setActiveCode(null)
   }
 
-  // ── L4 back to L1 (merged Compliance list) ─────────────────────────────────
+  // ── L4 back to L1 (merged Compliance list) ────��────────────────────────────
   function handleBackToPartnerList() {
     setSupplierScreen("compliance")
     setActivePartner(null)
@@ -390,6 +401,41 @@ export default function RetailerPortal() {
           { label: `Code ${activeCode?.label ?? ""}`, onClick: handleBackToProducts },
         ]
     }
+  }
+
+  // ── Gap detail or product list → view all attributes, and back ────────────
+  function handleViewAllAttributes(productId: string, target: GapTarget) {
+    const origin: GapOrigin =
+      supplierScreen === "gs1-products"
+        ? "gs1-view"
+        : supplierScreen === "account-code-products"
+          ? "code-list"
+          : supplierScreen === "supplier-gap-detail"
+            ? gapContext?.origin ?? "partner-flow"
+            : "partner-flow"
+    setAttrContext({ productId, target, origin })
+    setSupplierScreen("supplier-product-attributes")
+  }
+
+  function handleBackFromAttributes() {
+    // Back to the screen we came from
+    const origin = attrContext?.origin ?? "partner-flow"
+    if (supplierScreen === "supplier-product-attributes") {
+      // If we came from gap detail, go back to gap detail
+      if (gapContext?.productId === attrContext?.productId) {
+        setSupplierScreen("supplier-gap-detail")
+      } else {
+        // Otherwise go back to product list
+        setSupplierScreen(
+          origin === "gs1-view"
+            ? "gs1-products"
+            : origin === "code-list"
+              ? "account-code-products"
+              : "supplier-products"
+        )
+      }
+    }
+    setAttrContext(null)
   }
 
   // ── Gap detail → image-upload WIP screen, and back ─────────────────────────
@@ -578,6 +624,7 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   onBack={handleBackToPartnerList}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
+                  onViewAttributes={handleViewAllAttributes}
                   onGoToCatalogue={goToCatalogueWithUncategorised}
                 />
               )}
@@ -612,6 +659,7 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   onBack={handleBackToSelectionCodeList}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
+                  onViewAttributes={handleViewAllAttributes}
                 />
               )}
 
@@ -638,6 +686,7 @@ export default function RetailerPortal() {
                   onBack={handleBackToCompliance}
                   onBackToPartner={handleBackToPartner}
                   onNavigateToGapDetail={handleNavigateToGapDetail}
+                  onViewAttributes={handleViewAllAttributes}
                 />
               )}
 
@@ -662,6 +711,19 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   breadcrumbs={buildGapBreadcrumbs()}
                   onUploadImage={handleOpenImageUpload}
+                  onFillAttribute={handleFillAttribute}
+                  onViewGtins={handleViewGtins}
+                  onViewAllAttributes={handleViewAllAttributes}
+                />
+              )}
+
+              {/* L4.5 — View All Attributes (reached from gap detail or product list) */}
+              {supplierScreen === "supplier-product-attributes" && attrContext && (
+                <ScreenSupplierProductAttributes
+                  productId={attrContext.productId}
+                  target={attrContext.target}
+                  products={supplierProducts}
+                  onBack={handleBackFromAttributes}
                   onFillAttribute={handleFillAttribute}
                   onViewGtins={handleViewGtins}
                 />
