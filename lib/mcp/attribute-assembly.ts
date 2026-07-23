@@ -45,13 +45,18 @@ function applyOverride(
 export function assembleBrickAttributes(brickCode: string): BrickAttributeSet {
   const brick = getBrickByCode(brickCode)
   const extras = readProfileExtras(brickCode)
-  const baseline = BASELINE_CORE_ATTRIBUTES.map((a) => applyOverride(a, extras.overrides))
-  const standardExtended: AttributeRequirement[] = (brick?.extendedAttributes ?? []).map((a) =>
-    applyOverride(
-      { name: a.name, gs1Name: `${a.name} (${a.code})`, guidance: "", source: "standard", target: "extended" },
-      extras.overrides
-    )
+  const excluded = new Set(extras.excludedGs1Names)
+  const baseline = BASELINE_CORE_ATTRIBUTES.filter((a) => !excluded.has(a.gs1Name)).map((a) =>
+    applyOverride(a, extras.overrides)
   )
+  const standardExtended: AttributeRequirement[] = (brick?.extendedAttributes ?? [])
+    .filter((a) => !excluded.has(`${a.name} (${a.code})`))
+    .map((a) =>
+      applyOverride(
+        { name: a.name, gs1Name: `${a.name} (${a.code})`, guidance: "", source: "standard", target: "extended" },
+        extras.overrides
+      )
+    )
   return {
     brickCode,
     brickName: brick?.brickName ?? brickCode,

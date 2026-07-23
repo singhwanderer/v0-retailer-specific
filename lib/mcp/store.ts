@@ -39,6 +39,12 @@ export interface ProfileExtras {
    * instead of mutating a row that doesn't otherwise exist in the store.
    */
   overrides: Record<string, { name?: string; guidance?: string }>
+  /**
+   * Standard (GS1-inherited or baseline) rows removed from this profile —
+   * keyed by gs1Name. Standard rows aren't stored themselves, so removing one
+   * is recorded as an exclusion rather than a deletion from an array.
+   */
+  excludedGs1Names: string[]
 }
 
 export interface DemoStore {
@@ -80,6 +86,7 @@ function seed(): DemoStore {
           },
         ],
         overrides: {},
+        excludedGs1Names: [],
       },
     },
   }
@@ -94,13 +101,25 @@ export function getStore(): DemoStore {
 
 /** Read-only view of a profile's extras — never persists a new entry. */
 export function readProfileExtras(brickCode: string): ProfileExtras {
-  return getStore().profileExtras[brickCode] ?? { customAttributes: [], imageRequirements: [], overrides: {} }
+  return (
+    getStore().profileExtras[brickCode] ?? {
+      customAttributes: [],
+      imageRequirements: [],
+      overrides: {},
+      excludedGs1Names: [],
+    }
+  )
 }
 
 /** Mutable extras for a brick — creates and persists an entry if none exists.
  *  Only call from write paths that have already confirmed a profile exists. */
 export function getProfileExtras(brickCode: string): ProfileExtras {
   const store = getStore()
-  store.profileExtras[brickCode] ??= { customAttributes: [], imageRequirements: [], overrides: {} }
+  store.profileExtras[brickCode] ??= {
+    customAttributes: [],
+    imageRequirements: [],
+    overrides: {},
+    excludedGs1Names: [],
+  }
   return store.profileExtras[brickCode]
 }

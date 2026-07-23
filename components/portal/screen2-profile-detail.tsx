@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Pencil,
   Plus,
+  Trash2,
   X,
   CheckCircle,
 } from "lucide-react"
@@ -27,7 +28,12 @@ import {
   type ImageRequirement,
 } from "@/lib/mcp/store"
 import { assembleBrickAttributes, describeProfileAttributes, type BrickAttributeSet } from "@/lib/mcp/attribute-assembly"
-import { addAttributeRequirement, setImageRequirement, updateAttributeRequirement } from "@/lib/mcp/tools"
+import {
+  addAttributeRequirement,
+  removeAttributeRequirement,
+  setImageRequirement,
+  updateAttributeRequirement,
+} from "@/lib/mcp/tools"
 
 function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -140,6 +146,51 @@ function ConfirmStatusModal({
             style={{ backgroundColor: danger ? "#DC2626" : "#0168B3" }}
           >
             {confirm}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Confirm Delete Attribute Modal ────────────────────────────────────────────
+function ConfirmDeleteAttributeModal({
+  open,
+  onClose,
+  onConfirm,
+  attributeName,
+}: {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  attributeName: string
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#111827]">
+            Remove Attribute Requirement
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm leading-relaxed py-2" style={{ color: "#6B7280" }}>
+          Suppliers will no longer be required to provide &quot;{attributeName}&quot; for this
+          category. Any values already submitted for it are kept, not deleted.
+        </p>
+        <DialogFooter>
+          <button
+            onClick={onClose}
+            className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
+            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onConfirm(); onClose() }}
+            className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#DC2626" }}
+          >
+            Remove
           </button>
         </DialogFooter>
       </DialogContent>
@@ -322,10 +373,12 @@ function SourcePill({ source }: { source: "standard" | "custom" }) {
 function AttributeTable({
   rows,
   onEditRow,
+  onDeleteRow,
   showSourceTags = false,
 }: {
   rows: AttributeRequirement[]
   onEditRow: (row: AttributeRequirement) => void
+  onDeleteRow: (row: AttributeRequirement) => void
   showSourceTags?: boolean
 }) {
   return (
@@ -342,7 +395,7 @@ function AttributeTable({
             <th className="text-left px-4 py-2.5 font-medium text-[#6B7280]">
               Supplier Guidance Note (optional)
             </th>
-            <th className="px-4 py-2.5 w-10" />
+            <th className="px-4 py-2.5 w-16" />
           </tr>
         </thead>
         <tbody>
@@ -367,13 +420,20 @@ function AttributeTable({
               <td className="px-4 py-2.5 text-xs leading-relaxed" style={{ color: "#6B7280" }}>
                 {row.guidance ? row.guidance : <span style={{ color: "#D1D5DB" }}>—</span>}
               </td>
-              <td className="px-4 py-2.5 text-right">
+              <td className="px-4 py-2.5 text-right whitespace-nowrap">
                 <button
                   onClick={() => onEditRow(row)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#0168B3]"
                   title="Edit row"
                 >
                   <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onDeleteRow(row)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#DC2626] ml-2"
+                  title="Delete row"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </td>
             </tr>
@@ -1027,6 +1087,9 @@ export function Screen2ProfileDetail({
     requirementName: null,
   })
 
+  // Pending attribute-row deletion, awaiting confirmation.
+  const [deleteAttrTarget, setDeleteAttrTarget] = useState<AttributeRequirement | null>(null)
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 3500)
@@ -1045,6 +1108,13 @@ export function Screen2ProfileDetail({
     updateAttributeRequirement(selectedBrickCode, gs1Name, updates)
     refresh()
     showToast("Attribute updated.")
+  }
+
+  function handleDeleteAttr(row: AttributeRequirement) {
+    if (!selectedBrickCode) return
+    removeAttributeRequirement(selectedBrickCode, row.gs1Name)
+    refresh()
+    showToast(`"${row.name}" removed from requirements.`)
   }
 
   function handleAddImage(row: ImageRequirement) {
@@ -1169,6 +1239,7 @@ export function Screen2ProfileDetail({
               <AttributeTable
                 rows={coreRows}
                 onEditRow={(row) => setEditAttrState({ open: true, target: "core", gs1Name: row.gs1Name })}
+                onDeleteRow={(row) => setDeleteAttrTarget(row)}
               />
             </AttributeGroup>
 
@@ -1183,6 +1254,7 @@ export function Screen2ProfileDetail({
               <AttributeTable
                 rows={extendedRows}
                 onEditRow={(row) => setEditAttrState({ open: true, target: "extended", gs1Name: row.gs1Name })}
+                onDeleteRow={(row) => setDeleteAttrTarget(row)}
                 showSourceTags
               />
             </AttributeGroup>
@@ -1288,6 +1360,14 @@ export function Screen2ProfileDetail({
         row={imageRows.find((r) => r.requirementName === editImageState.requirementName) ?? null}
         onClose={() => setEditImageState({ open: false, requirementName: null })}
         onSave={handleSaveImageRow}
+      />
+      <ConfirmDeleteAttributeModal
+        open={deleteAttrTarget !== null}
+        onClose={() => setDeleteAttrTarget(null)}
+        onConfirm={() => {
+          if (deleteAttrTarget) handleDeleteAttr(deleteAttrTarget)
+        }}
+        attributeName={deleteAttrTarget?.name ?? ""}
       />
       <ConfirmStatusModal
         open={confirmStatusAction !== null}

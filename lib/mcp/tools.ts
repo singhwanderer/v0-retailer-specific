@@ -377,6 +377,28 @@ export function updateAttributeRequirement(
   return { updated: { gs1Name, ...updates }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
 }
 
+/**
+ * Remove an attribute row from a profile's requirements — a custom row is
+ * deleted outright; a standard row (GS1-inherited or global baseline) can't
+ * be deleted since it isn't itself stored, so it's recorded as an exclusion
+ * that assembleBrickAttributes filters out instead.
+ */
+export function removeAttributeRequirement(brickCode: string, gs1Name: string) {
+  const missing = requireProfile(brickCode)
+  if (missing) return missing
+  const extras = getProfileExtras(brickCode)
+  const idx = extras.customAttributes.findIndex((a) => a.gs1Name === gs1Name)
+  if (idx >= 0) {
+    const [removed] = extras.customAttributes.splice(idx, 1)
+    return { removed, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+  }
+  if (!extras.excludedGs1Names.includes(gs1Name)) {
+    extras.excludedGs1Names.push(gs1Name)
+  }
+  delete extras.overrides[gs1Name]
+  return { removed: { gs1Name }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+}
+
 function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
