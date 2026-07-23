@@ -1,0 +1,81 @@
+Input,Expected,Outcome
+What does my footwear profile require? Is core attribute mandatory?,"The Footwear profile which is mapped to brick code 10001077 includes total of 31 attributes which includes 8 mandatory attributes related to product and GTIN. Product ID, Product Description, GTIN code and Description , Size Code and Color Code and description for both. Then there's  a set of 22 extended attributes as mandated by GS1 for this brick code, such as Heel Height, Shoe Type, Sole Type, Toe Shape, and Material information. It also requires one image (""Hero Shot""). Do you want me to provide list of all 22 extended attributes?
+
+Regarding your question about core attributes: these are mandatory across the entire network by design. They are always required for every product, so they are included in all profiles. ","The ""Footwear"" profile for *Shoes - General Purpose* (10001077) currently includes 22 extended attributes—such as Heel Height, Shoe Type, and Sole Type—along with one image requirement (""Hero Shot"").
+
+Regarding your question: Yes, core attributes are mandatory for all products. These include the baseline fields (Product ID, Product Description, GTIN details, NRF Size/Color codes, and Size/Color descriptions) which are required by design across the entire network."
+10001352 what does it contain in attributes,"The profile for brick code 10001352 (*Shirts/Blouses/Polo Shirts/T-Shirts*) is part of the ""Apparel"" category. 
+
+Beyond the baseline attributes (Product ID, Product Description, GTIN code, GTIN Description, NRF Size Code, NRF Color Code, Size Description, and Color Description), this profile includes the following extended attributes:
+
+*   Advertised Origin
+*   Brand Name
+*   Care Instructions Code
+*   Closure
+*   Collar Type
+*   Consumer Item Length
+*   Consumer Life Stage
+*   Country of Origin
+*   Fabric or Material Code
+*   Features - Benefits Marketing Message
+*   Fiber
+*   Fur Animal Name
+*   Fur Country of Origin
+*   Fur Treatment
+*   Gauge
+*   Gender
+*   Global Product Classification (GPC)
+*   Harmonized Tariff Schedule Code
+*   Hooded
+*   Length Description
+*   Pocket Details
+*   Prop 65
+*   Sleeve Type
+*   Wrinkle Resistant","The profile containing Brick 10001352 (*Shirts/Blouses/Polo Shirts/T-Shirts*) is the **Apparel** profile.
+
+Beyond the 8 baseline core attributes (Product ID, Product Description, GTIN code, GTIN Description, NRF Size Code, NRF Color Code, Size Description, and Color Description), it requires the following **extended attributes**:
+
+*   **Apparel Specifics**: Advertised Origin, Brand Name, Care Instructions Code, Closure, Collar Type, Consumer Item Length, Consumer Life Stage, Country of Origin, Fabric or Material Code, Features - Benefits Marketing Message, Fiber, Fur Animal Name, Fur Country of Origin, Fur Treatment, Gender, Global Product Classification (GPC), Harmonized Tariff Schedule Code, Hooded, Length Description, Lined, Lining Material, Pocket Details, Prop 65, Sleeve Type, and Wrinkle Resistant."
+Run a GS1 Core scorecard across my vendor base,"The GS1 Core Scorecard report is complete. Across your vendor base, 116 out of 167 items (69%) are compliant with extended attribute requirements.
+
+*Per our core policy, the 8 baseline core attributes are always present and are not included in these gap calculations.*
+
+### Compliance by Vendor (Top 5 Gaps)
+| Supplier | Category | Compliance % | Open Gaps |
+| :--- | :--- | :--- | :--- |
+| **Ralph Lauren** | Jackets/Blazers/... | 46% | 15 |
+| **Calvin Klein** | Dresses | 60% | 8 |
+| **Calvin Klein** | Shirts/Blouses/... | 63% | 14 |
+| **J.Renée** | Footwear | 64% | 11 |
+| **Levi Strauss & Co.** | Shirts/Blouses/... | 64% | 17 |
+
+For a complete breakdown of all 105 open gaps or to view specific supplier details, please let me know. ","The GS1 Core Scorecard report is complete. Across your vendor base, the overall compliance rate for GS1 core attributes is 69% (116/167 items complete).
+
+Please note: As per protocol, the 8 baseline core attributes (Product ID, Product Description, GTIN code, GTIN Description, NRF Size Code, NRF Color Code, Size Description, and Color Description) are excluded from these gap calculations as they are always present.
+
+**Summary by Category:**
+*   **Belts/Braces/Cummerbunds:** 100% (5/5)
+*   **Sweaters/Pullovers:** 71% (17/24)
+*   **Footwear:** 71% (32/45)
+*   **Shirts/Blouses/Polo Shirts/T-Shirts:** 70% (43/61)
+*   **Dresses:** 60% (6/10)
+*   **Jackets/Blazers/Cardigans/Waistcoats:** 59% (13/22)
+
+Top-performing vendor is Michael Kors (100% compliance in Belts/Braces/Cummerbunds). Notable gaps persist in Ralph Lauren's Jackets/Blazers category (46% compliance).
+"
+How many brick codes in Apparel Category?,"The **Apparel** profile covers two GS1 brick codes:
+*   10001352 (*Shirts/Blouses/Polo Shirts/T-Shirts*)
+*   10001351 (*Sweaters/Pullovers*)","There are 2 brick codes mapped to the Apparel ; Shirts/Blouses/Polo Shirts/T-Shirts and Sweaters/Pullovers
+
+*Note: This data is a watermarked demo prototype.*"
+How many brick codes in Footwear Category?,"The **Footwear** profile currently covers one GS1 brick code:
+
+*   10001077 (*Shoes - General Purpose*)","There is 1 brick code listed in the Footwear category: ""Shoes - General Purpose"" 
+
+*Note: This data is a watermarked demo prototype.*"
+How many extended attributes for each category?,"Below are counts: Footwear: 39, Apparel: 51, Outerwear: 28, Dresses: 26, Skirts: 24, Trousers and Shirts: 26, Belts: 21, Footwear: 17. ","The number of extended attributes (excluding the 8 baseline core attributes) for each category is as follows:
+
+*   **Footwear** (Brick 10001077): 22 extended attributes
+*   **Apparel** (Bricks 10001352 & 10001351): 25 extended attributes
+
+*Note: This data is a watermarked demo prototype.*"
