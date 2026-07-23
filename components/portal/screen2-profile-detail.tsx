@@ -33,6 +33,14 @@ function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
+// Retailer-facing display of a standard attribute's TGC/GS1 name — strips the
+// trailing "(CODE)" that `gs1Name` carries as its store lookup key. Showing a
+// raw GS1 code here would wrongly suggest the retailer is prescribing a
+// specific value; only suppliers fill in values, on their own screens.
+function gs1DisplayName(gs1Name: string): string {
+  return gs1Name.replace(/\s*\([^()]*\)\s*$/, "")
+}
+
 type ProfileStatus = "Active" | "Draft"
 
 // The attribute set shown when a requirement has no GS1 brick mapped yet (the
@@ -234,7 +242,7 @@ function EditAttributeDialog({
               className="px-3 py-2 rounded-md text-sm"
               style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
             >
-              {row?.gs1Name}
+              {row ? gs1DisplayName(row.gs1Name) : ""}
             </div>
           </div>
           {/* Retailer label — editable */}
@@ -354,7 +362,7 @@ function AttributeTable({
                 className="px-4 py-2.5 text-xs"
                 style={{ color: "#6B7280", backgroundColor: "#F9FAFB" }}
               >
-                {row.gs1Name}
+                {gs1DisplayName(row.gs1Name)}
               </td>
               <td className="px-4 py-2.5 text-xs leading-relaxed" style={{ color: "#6B7280" }}>
                 {row.guidance ? row.guidance : <span style={{ color: "#D1D5DB" }}>—</span>}
@@ -819,7 +827,6 @@ function CategorySummaryCard({
           {hasBricks ? (
             <div className="flex flex-col gap-1.5">
               {bricks.map((b) => {
-                const segment = getBrickByCode(b.code)?.segment
                 const isActive = b.code === selectedBrickCode
                 return (
                   <div
@@ -831,14 +838,6 @@ function CategorySummaryCard({
                       <span className="text-sm font-semibold text-[#111827] truncate">{b.name}</span>
                       <span className="text-[10px] font-mono" style={{ color: "#6B7280" }}>{b.code}</span>
                     </div>
-                    {segment && (
-                      <span
-                        className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-                        style={{ backgroundColor: "#FFFFFF", color: "#6B7280" }}
-                      >
-                        {segment}
-                      </span>
-                    )}
                   </div>
                 )
               })}

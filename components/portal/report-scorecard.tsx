@@ -189,11 +189,6 @@ export function ReportScorecard({ report, accent, onBack }: ReportScorecardProps
                 </span>
                 <div className="w-52 shrink-0 flex flex-col">
                   <span className="text-sm font-medium text-[#111827] truncate">{a.name}</span>
-                  {a.code && (
-                    <span className="text-[10px] font-mono" style={{ color: "#9CA3AF" }}>
-                      {a.code}
-                    </span>
-                  )}
                 </div>
                 <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: "#F1F5F9" }}>
                   <div

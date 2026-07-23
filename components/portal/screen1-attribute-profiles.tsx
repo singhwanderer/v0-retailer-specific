@@ -383,7 +383,6 @@ function CreateRequirementModal({
                             }}
                           >
                             <span className="font-medium text-[#111827]">{attr.name}</span>
-                            <span className="font-mono" style={{ color: "#9CA3AF" }}>{attr.code}</span>
                           </div>
                         ))}
                       </div>

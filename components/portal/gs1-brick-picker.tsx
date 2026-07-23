@@ -122,12 +122,6 @@ export function Gs1BrickPicker({
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: "#F4F6F8", color: "#6B7280" }}
-                    >
-                      {brick.segment}
-                    </span>
                     <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
                       {brick.extendedAttributes.length} standard attributes
                     </span>
