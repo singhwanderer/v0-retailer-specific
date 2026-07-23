@@ -177,8 +177,8 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
     lastUpdated: "Mar 7, 2026",
     actions: ["Edit", "Deactivate"],
     isLink: true,
-    brickCode: "10006031",
-    brickName: "Belts",
+    brickCode: "10001326",
+    brickName: "Belts/Braces/Cummerbunds",
   },
 ]
 
@@ -237,7 +237,7 @@ export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
   { supplier: "Kate Spade", brickCode: "10006030", category: "Handbags/Purses", productsTotal: 13, productsWithGaps: 4, openGaps: 7, productsComplete: 9 },
 
   // Belts
-  { supplier: "Michael Kors", brickCode: "10006031", category: "Belts", productsTotal: 5, productsWithGaps: 0, openGaps: 0, productsComplete: 5 },
+  { supplier: "Michael Kors", brickCode: "10001326", category: "Belts/Braces/Cummerbunds", productsTotal: 5, productsWithGaps: 0, openGaps: 0, productsComplete: 5 },
 
   // Activewear / performance tops (Nike vs Nike Golf)
   { supplier: "Nike", brickCode: "10001400", category: "Sports/Performance Tops", productsTotal: 18, productsWithGaps: 4, openGaps: 6, productsComplete: 14 },

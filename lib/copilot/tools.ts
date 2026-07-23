@@ -78,7 +78,7 @@ function makeReadTools(ctx: CopilotContext) {
 
     get_profile_detail: tool({
       description: "Get the full attribute and image-requirement detail for one GS1 category code.",
-      inputSchema: z.object({ brickCode: z.string().describe("GS1 brick code, e.g. 10005811") }),
+      inputSchema: z.object({ brickCode: z.string().describe("GS1 brick code, e.g. 10001077 for Shoes - General Purpose") }),
       execute: async ({ brickCode }) => {
         const profile = findProfileForBrick(ctx.profiles, brickCode)
         const brick = getBrickByCode(brickCode)

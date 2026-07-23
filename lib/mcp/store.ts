@@ -64,9 +64,9 @@ function seed(): DemoStore {
   return {
     profiles: ATTRIBUTE_PROFILES.map((p) => ({ ...p })),
     profileExtras: {
-      // Footwear ships with the Hero Shot image requirement Screen 2 displays.
-      // Its core attributes are the shared 8-attribute baseline — no custom core rows.
-      "10005811": {
+      // Footwear (Shoes - General Purpose, 10001077) ships with the Hero Shot
+      // image requirement Screen 2 displays.
+      "10001077": {
         customAttributes: [],
         imageRequirements: [
           {
