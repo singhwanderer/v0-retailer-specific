@@ -77,7 +77,8 @@ clicks — production and our test suite stay in sync over time.
 
               ── separately, on demand, offline ──
 
-     PM/engineer runs: npm run eval
+     Engineering runs one command: npm run eval
+     (PMs never touch this — see callout below)
                                     │
                                     ▼
                      ┌─────────────────────────────┐
@@ -101,6 +102,17 @@ clicks — production and our test suite stay in sync over time.
 **Key design point:** the eval path calls the exact same agent function the
 live app uses. We are never testing a mock — an eval score is a direct
 prediction of production behavior.
+
+> **Important for this room: no PM ever needs to open a terminal or run a
+> command.** `npm run eval` is a one-line engineering task — think of it like
+> "kick off a build." As a PM you: add/edit test questions in the Datasets UI,
+> define what "correct" means in the Scorers UI, and review results in the
+> Experiments UI. When you want a fresh eval run (e.g. after adding new golden
+> questions), you ask engineering to trigger it — the same way you'd ask for
+> any other build/deploy. A natural next step (not yet built, optional) is to
+> automate this entirely — e.g. a scheduled or PR-triggered run — so it
+> happens without anyone asking. Flagging that as a future ask, not something
+> in place today.
 
 ---
 
