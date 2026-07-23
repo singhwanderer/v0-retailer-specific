@@ -357,11 +357,6 @@ export function ScreenComplianceDashboard() {
                         />
                       </div>
                     </div>
-                    {attr.code && (
-                      <span className="text-[10px] font-mono text-[#9CA3AF] flex-shrink-0 hidden md:inline">
-                        {attr.code}
-                      </span>
-                    )}
                   </div>
                 )
               })}
