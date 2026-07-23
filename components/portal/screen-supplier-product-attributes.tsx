@@ -85,7 +85,7 @@ export function ScreenSupplierProductAttributes({
   const { missingAttrs, totalAttrCount } = getGapRecords(product, target)
 
   // Provided attributes — those in the product that are required for this target
-  const providedAttrs = brick?.attributes
+  const providedAttrs = (brick?.attributes ?? [])
     .filter((attr) => {
       // Include if not in missing list
       return !missingAttrs.some((m) => m.code === attr.code)
@@ -96,7 +96,6 @@ export function ScreenSupplierProductAttributes({
       value: product?.attributes[attr.code] ?? "",
     }))
     .filter((a) => a.value) // Only those actually provided
-    ?? []
 
   // Beyond-gap attributes — required by this target but not in the brick
   // (shouldn't happen if schema is correct, but defensive)
