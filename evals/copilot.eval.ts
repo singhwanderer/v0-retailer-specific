@@ -29,33 +29,9 @@
 // (BRAINTRUST_API_KEY, or EvalTGC as provisioned on Vercel) available in the
 // shell when running the eval.
 
-import { Eval, initDataset } from "braintrust"
-import { runCopilotAgent } from "@/lib/copilot/agent"
-import { ATTRIBUTE_PROFILES, type AttributeProfile } from "@/lib/retailer-requirements"
+import { runGoldenEval } from "@/lib/copilot/run-eval"
 
-const PROJECT_NAME = process.env.BRAINTRUST_PROJECT ?? "tgc-copilot"
-const DATASET_NAME = process.env.BRAINTRUST_DATASET ?? "tgc-compliance-eval"
-
-type EvalInput = string | { question: string; profiles?: AttributeProfile[] }
-
-Eval<EvalInput, string, string>(PROJECT_NAME, {
-  // Pull cases by name from the Braintrust dataset.
-  data: initDataset(PROJECT_NAME, { dataset: DATASET_NAME }),
-
-  // Task: run the case through the real agent and return its text answer.
-  task: async (input) => {
-    const question = typeof input === "string" ? input : input.question
-    const profiles =
-      typeof input === "object" && input.profiles ? input.profiles : ATTRIBUTE_PROFILES
-
-    const { text } = await runCopilotAgent({
-      messages: [{ role: "user", content: question }],
-      profiles,
-    })
-    return text
-  },
-
-  // Scorers authored in the Braintrust UI (Scorers tab). Add code scorers here
-  // when ready — see the header note above.
-  scores: [],
-})
+// The eval logic itself lives in lib/copilot/run-eval.ts, shared with the
+// in-app trigger at app/api/admin/run-eval/route.ts, so there is one
+// definition of what an eval run does.
+runGoldenEval()
