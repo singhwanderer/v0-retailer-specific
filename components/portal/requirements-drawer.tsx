@@ -82,7 +82,7 @@ function CategoryAttributes({
   // once supplied, readiness of 100 means all provided.
   const allProvided = category.readiness === 100
 
-  const Row = ({ name, code, isExtra }: { name: string; code?: string; isExtra: boolean }) => {
+  const Row = ({ name, isExtra }: { name: string; isExtra: boolean }) => {
     const provided = allProvided
     return (
       <div className="flex items-center gap-2.5 px-3 py-2" style={{ borderTop: "1px solid #F3F4F6" }}>
@@ -96,7 +96,6 @@ function CategoryAttributes({
             {targetLabel} extra
           </span>
         )}
-        {code && <span className="text-[10px] font-light tabular-nums" style={{ color: "#9CA3AF" }}>{code}</span>}
       </div>
     )
   }
@@ -115,7 +114,7 @@ function CategoryAttributes({
             {targetLabel} extras
           </p>
           {extras.map((a) => (
-            <Row key={a.name} name={a.name} code={a.code} isExtra />
+            <Row key={a.name} name={a.name} isExtra />
           ))}
         </div>
       )}
@@ -123,7 +122,7 @@ function CategoryAttributes({
         GS1 baseline
       </p>
       {baseline.map((a) => (
-        <Row key={a.name} name={a.name} code={a.code} isExtra={false} />
+        <Row key={a.name} name={a.name} isExtra={false} />
       ))}
     </div>
   )
