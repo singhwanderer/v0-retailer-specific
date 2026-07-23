@@ -28,6 +28,8 @@ interface SupplierProductsProps {
   /** Partner breadcrumb — back to this partner's selection codes (L2). Retailer target only. */
   onBackToPartner?: () => void
   onNavigateToGapDetail: (productId: string, target: GapTarget) => void
+  /** View all attributes for a product (optional) */
+  onViewAttributes?: (productId: string, target: GapTarget) => void
   /** GS1 target only — route uncategorised products to the Catalogue */
   onGoToCatalogue?: () => void
 }
@@ -242,6 +244,7 @@ export function ScreenSupplierProducts({
   onBack,
   onBackToPartner,
   onNavigateToGapDetail,
+  onViewAttributes,
   onGoToCatalogue,
 }: SupplierProductsProps) {
   const isGs1 = target.kind === "gs1"
@@ -626,6 +629,25 @@ export function ScreenSupplierProducts({
                         />
                       )}
                     </td>
+                    {onViewAttributes && (
+                      <td className="px-4 py-3 text-right align-top">
+                        <button
+                          onClick={() => {
+                            const target_ =
+                              target.kind === "code"
+                                ? { kind: "gs1" as const }
+                                : target.kind === "gs1"
+                                  ? { kind: "gs1" as const }
+                                  : { kind: "retailer" as const, name: partnerName }
+                            onViewAttributes(row.id, target_)
+                          }}
+                          className="text-xs font-medium px-2.5 py-1.5 rounded hover:bg-[#F3F4F6] transition-colors"
+                          style={{ color: "#0168B3" }}
+                        >
+                          Attributes
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 )
               })
