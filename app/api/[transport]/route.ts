@@ -54,7 +54,7 @@ const handler = createMcpHandler(
     server.tool(
       "get_profile_detail",
       "Get the full requirement profile for a GS1 category code: core attributes, extended attributes (standard GS1 vs. retailer-added custom), per-attribute guidance, and image requirements (format, background, dimensions, file size, crop).",
-      { brickCode: z.string().describe("GS1 category code, e.g. 10005811 for Footwear") },
+      { brickCode: z.string().describe("GS1 category code, e.g. 10001077 for Shoes - General Purpose") },
       async ({ brickCode }) => asText(getProfileDetail(brickCode))
     )
 

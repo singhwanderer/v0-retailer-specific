@@ -47,18 +47,18 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   {
     name: "Footwear",
     category: "Footwear",
-    attributes: "34 attributes · 1 image requirement",
+    attributes: "30 attributes · 1 image requirement",
     status: "Active",
     lastUpdated: "Mar 8, 2026",
     actions: ["Edit", "Deactivate"],
     isLink: true,
-    brickCode: "10005811",
-    brickName: "Footwear",
+    brickCode: "10001077",
+    brickName: "Shoes - General Purpose",
   },
   {
     name: "Apparel",
     category: "Women's Apparel",
-    attributes: "51 attributes · 2 GS1 categories",
+    attributes: "59 attributes · 2 GS1 categories",
     status: "Active",
     lastUpdated: "Feb 14, 2026",
     actions: ["Edit", "Deactivate"],
@@ -71,42 +71,9 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
     ],
   },
   {
-    name: "Jewellery",
-    category: "Jewellery",
-    attributes: "22 attributes",
-    status: "Draft",
-    lastUpdated: "Mar 11, 2026",
-    actions: ["Edit", "Activate"],
-    isLink: true,
-    brickCode: "10006017",
-    brickName: "Necklaces/Chains/Pendants",
-  },
-  {
-    name: "Handbags",
-    category: "Accessories",
-    attributes: "28 attributes · 1 image requirement",
-    status: "Active",
-    lastUpdated: "Mar 2, 2026",
-    actions: ["Edit", "Deactivate"],
-    isLink: true,
-    brickCode: "10006030",
-    brickName: "Handbags/Purses",
-  },
-  {
-    name: "Activewear",
-    category: "Sportswear",
-    attributes: "37 attributes",
-    status: "Active",
-    lastUpdated: "Mar 9, 2026",
-    actions: ["Edit", "Deactivate"],
-    isLink: true,
-    brickCode: "10001400",
-    brickName: "Sports/Performance Tops",
-  },
-  {
     name: "Outerwear",
     category: "Women's Apparel",
-    attributes: "44 attributes",
+    attributes: "36 attributes",
     status: "Active",
     lastUpdated: "Feb 26, 2026",
     actions: ["Edit", "Deactivate"],
@@ -115,20 +82,9 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
     brickName: "Jackets/Blazers/Cardigans/Waistcoats",
   },
   {
-    name: "Sleepwear",
-    category: "Homewear",
-    attributes: "19 attributes",
-    status: "Draft",
-    lastUpdated: "Mar 13, 2026",
-    actions: ["Edit", "Activate"],
-    isLink: true,
-    brickCode: "10002100",
-    brickName: "Nightwear/Pyjamas",
-  },
-  {
     name: "Dresses",
     category: "Women's Apparel",
-    attributes: "13 attributes",
+    attributes: "34 attributes",
     status: "Active",
     lastUpdated: "Mar 15, 2026",
     actions: ["Edit", "Deactivate"],
@@ -139,7 +95,7 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   {
     name: "Skirts",
     category: "Women's Apparel",
-    attributes: "11 attributes",
+    attributes: "32 attributes",
     status: "Active",
     lastUpdated: "Mar 12, 2026",
     actions: ["Edit", "Deactivate"],
@@ -150,7 +106,7 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   {
     name: "Trousers & Shorts",
     category: "Women's Apparel",
-    attributes: "12 attributes",
+    attributes: "34 attributes",
     status: "Draft",
     lastUpdated: "Mar 14, 2026",
     actions: ["Edit", "Activate"],
@@ -159,26 +115,15 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
     brickName: "Trousers/Shorts",
   },
   {
-    name: "Rings",
-    category: "Jewellery",
-    attributes: "10 attributes",
-    status: "Draft",
-    lastUpdated: "Mar 10, 2026",
-    actions: ["Edit", "Activate"],
-    isLink: true,
-    brickCode: "10006018",
-    brickName: "Rings",
-  },
-  {
     name: "Belts",
     category: "Accessories",
-    attributes: "9 attributes",
+    attributes: "29 attributes",
     status: "Active",
     lastUpdated: "Mar 7, 2026",
     actions: ["Edit", "Deactivate"],
     isLink: true,
-    brickCode: "10006031",
-    brickName: "Belts",
+    brickCode: "10001326",
+    brickName: "Belts/Braces/Cummerbunds",
   },
 ]
 
@@ -198,15 +143,45 @@ export interface SupplierComplianceRow {
   productsComplete: number
 }
 
+// This is intentionally DENSE and easy to confuse — it is the raw material for
+// Braintrust evals (see evals/copilot.eval.ts). None of it is corrupt; the
+// challenge is realism, not garbage data:
+//   • Near-duplicate supplier names ("Calvin Klein" vs "Calvin Klein
+//     Performance"; "Ralph Lauren" vs "Lauren Ralph Lauren") — tests whether
+//     the agent resolves the RIGHT vendor instead of collapsing partial
+//     matches.
+//   • Suppliers trading in MULTIPLE categories with different standing in each
+//     (Calvin Klein spans Footwear, Shirts and Dresses; Ralph Lauren spans
+//     Sweaters and Outerwear; Levi Strauss spans Shirts and Sweaters) — tests
+//     whether the agent scopes an answer to the asked-about category rather
+//     than summing everything under one name.
+//   • A wide range of gap counts across a larger vendor base — tests precise
+//     "who is worst / by how much" ranking rather than a vague answer.
 export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
-  { supplier: "J.Renée", brickCode: "10005811", category: "Footwear", productsTotal: 14, productsWithGaps: 5, openGaps: 11, productsComplete: 9 },
+  // Footwear
+  { supplier: "J.Renée", brickCode: "10001077", category: "Footwear", productsTotal: 14, productsWithGaps: 5, openGaps: 11, productsComplete: 9 },
+  { supplier: "Nike Golf", brickCode: "10001077", category: "Footwear", productsTotal: 19, productsWithGaps: 6, openGaps: 13, productsComplete: 13 },
+  { supplier: "Calvin Klein", brickCode: "10001077", category: "Footwear", productsTotal: 12, productsWithGaps: 2, openGaps: 4, productsComplete: 10 },
+
+  // Shirts / tops (two very similar Calvin Klein rows across categories)
   { supplier: "Levi Strauss & Co.", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 22, productsWithGaps: 8, openGaps: 17, productsComplete: 14 },
-  { supplier: "Fossil Group", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 9, productsWithGaps: 2, openGaps: 3, productsComplete: 7 },
   { supplier: "Calvin Klein", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 16, productsWithGaps: 6, openGaps: 14, productsComplete: 10 },
-  { supplier: "York and Jones", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 7, productsWithGaps: 1, openGaps: 1, productsComplete: 6 },
-  { supplier: "Michael Kors", brickCode: "10006030", category: "Handbags/Purses", productsTotal: 11, productsWithGaps: 3, openGaps: 5, productsComplete: 8 },
-  { supplier: "Nike", brickCode: "10001400", category: "Sports/Performance Tops", productsTotal: 18, productsWithGaps: 4, openGaps: 6, productsComplete: 14 },
+  { supplier: "Calvin Klein Performance", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 8, productsWithGaps: 1, openGaps: 2, productsComplete: 7 },
+  { supplier: "Tommy Hilfiger", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 15, productsWithGaps: 3, openGaps: 5, productsComplete: 12 },
+
+  // Sweaters/pullovers (same Levi entity, different category)
+  { supplier: "Levi Strauss & Co.", brickCode: "10001351", category: "Sweaters/Pullovers", productsTotal: 10, productsWithGaps: 2, openGaps: 4, productsComplete: 8 },
+  { supplier: "Ralph Lauren", brickCode: "10001351", category: "Sweaters/Pullovers", productsTotal: 14, productsWithGaps: 5, openGaps: 9, productsComplete: 9 },
+
+  // Belts
+  { supplier: "Michael Kors", brickCode: "10001326", category: "Belts/Braces/Cummerbunds", productsTotal: 5, productsWithGaps: 0, openGaps: 0, productsComplete: 5 },
+
+  // Outerwear (Ralph Lauren vs Lauren Ralph Lauren)
   { supplier: "Ralph Lauren", brickCode: "10001350", category: "Jackets/Blazers/Cardigans/Waistcoats", productsTotal: 13, productsWithGaps: 7, openGaps: 15, productsComplete: 6 },
+  { supplier: "Lauren Ralph Lauren", brickCode: "10001350", category: "Jackets/Blazers/Cardigans/Waistcoats", productsTotal: 9, productsWithGaps: 2, openGaps: 3, productsComplete: 7 },
+
+  // Dresses
+  { supplier: "Calvin Klein", brickCode: "10001333", category: "Dresses", productsTotal: 10, productsWithGaps: 4, openGaps: 8, productsComplete: 6 },
 ]
 
 export type ExceptionType = "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"

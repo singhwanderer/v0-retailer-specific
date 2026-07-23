@@ -19,11 +19,10 @@ export interface Gs1Brick {
 
 export const GS1_BRICKS: Gs1Brick[] = [
   // ── Footwear ──────────────────────────────────────────────────────────────
-  // Brick 10005811 maps to "Footwear" in the profiles (general-purpose shoes).
-  // Attributes sourced from Footwear.csv column B (Shoes - General Purpose).
+  // Brick 10001077 = "Shoes - General Purpose" per Footwear.csv column B.
   {
-    brickCode: "10005811",
-    brickName: "Footwear",
+    brickCode: "10001077",
+    brickName: "Shoes - General Purpose",
     segment: "Footwear",
     extendedAttributes: [
       { name: "Advertised Origin", code: "GM03ADVOR" },
@@ -50,11 +49,10 @@ export const GS1_BRICKS: Gs1Brick[] = [
       { name: "Toe Style", code: "GM03TOST" },
     ],
   },
-  // Brick 10005812 maps to "Athletic/Sports Footwear" in the profiles.
-  // Attributes sourced from Footwear.csv column D (Athletic Footwear - General Purpose).
+  // Brick 10001070 = "Athletic Footwear - General Purpose" per Footwear.csv column D.
   {
-    brickCode: "10005812",
-    brickName: "Athletic/Sports Footwear",
+    brickCode: "10001070",
+    brickName: "Athletic Footwear - General Purpose",
     segment: "Footwear",
     extendedAttributes: [
       { name: "Advertised Origin", code: "GM03ADVOR" },
@@ -167,12 +165,13 @@ export const GS1_BRICKS: Gs1Brick[] = [
       { name: "Fur Animal Name", code: "GM03FRAN" },
       { name: "Fur Country of Origin", code: "GM03FRCO" },
       { name: "Fur Treatment", code: "GM03FTMT" },
-      { name: "Gauge", code: "GM03GAUG" },
       { name: "Gender", code: "GENDER" },
       { name: "Global Product Classification (GPC)", code: "GPC" },
       { name: "Harmonized Tariff Schedule Code", code: "GM03HTSC" },
       { name: "Hooded", code: "GM03HOOD" },
       { name: "Length Description", code: "GM03LNDS" },
+      { name: "Lined", code: "GM03LIND" },
+      { name: "Lining Material", code: "GM03LIMT" },
       { name: "Pocket Details", code: "GM03PKDT" },
       { name: "Prop 65", code: "GM03PR65" },
       { name: "Sleeve Type", code: "GM03SLTP" },
@@ -202,7 +201,10 @@ export const GS1_BRICKS: Gs1Brick[] = [
       { name: "Gender", code: "GENDER" },
       { name: "Global Product Classification (GPC)", code: "GPC" },
       { name: "Harmonized Tariff Schedule Code", code: "GM03HTSC" },
+      { name: "Hooded", code: "GM03HOOD" },
       { name: "Length Description", code: "GM03LNDS" },
+      { name: "Lined", code: "GM03LIND" },
+      { name: "Lining Material", code: "GM03LIMT" },
       { name: "Pocket Details", code: "GM03PKDT" },
       { name: "Prop 65", code: "GM03PR65" },
       { name: "Sleeve Type", code: "GM03SLTP" },
@@ -303,6 +305,7 @@ export const GS1_BRICKS: Gs1Brick[] = [
       { name: "Advertised Origin", code: "GM03ADVOR" },
       { name: "Brand Name", code: "GM03BRNM" },
       { name: "Care Instructions Code", code: "GM03CRIC" },
+      { name: "Closure", code: "GM03CLOS" },
       { name: "Consumer Item Length", code: "GM03CITL" },
       { name: "Consumer Life Stage", code: "CONLIFESTAGE" },
       { name: "Country of Origin", code: "GM03COOR" },
@@ -333,6 +336,7 @@ export const GS1_BRICKS: Gs1Brick[] = [
       { name: "Advertised Origin", code: "GM03ADVOR" },
       { name: "Brand Name", code: "GM03BRNM" },
       { name: "Care Instructions Code", code: "GM03CRIC" },
+      { name: "Closure", code: "GM03CLOS" },
       { name: "Consumer Life Stage", code: "CONLIFESTAGE" },
       { name: "Country of Origin", code: "GM03COOR" },
       { name: "Fabric or Material Code", code: "GM03FBMC" },
@@ -545,31 +549,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
       { name: "Harmonized Tariff Schedule Code", code: "GM03HTSC" },
       { name: "Prop 65", code: "GM03PR65" },
       { name: "Reversible", code: "GM03RVRS" },
-      { name: "Stretch", code: "GM03STRH" },
-    ],
-  },
-  {
-    brickCode: "10006031",
-    brickName: "Belts",
-    segment: "Accessories",
-    extendedAttributes: [
-      { name: "Adjustable", code: "GM03ADJB" },
-      { name: "Advertised Origin", code: "GM03ADVOR" },
-      { name: "Belt Type", code: "GM03BLTP" },
-      { name: "Brand Name", code: "GM03BRNM" },
-      { name: "Care Instructions Code", code: "GM03CRIC" },
-      { name: "Closure", code: "GM03CLOS" },
-      { name: "Country of Origin", code: "GM03COOR" },
-      { name: "Fabric or Material", code: "GM03FBMC" },
-      { name: "Features - Benefits Marketing Message", code: "GM03FBMM" },
-      { name: "Fiber", code: "GM03FIBR" },
-      { name: "Fur Animal Name", code: "GM03FRAN" },
-      { name: "Fur Country of Origin", code: "GM03FRCO" },
-      { name: "Fur Treatment", code: "GM03FTMT" },
-      { name: "Gender", code: "GENDER" },
-      { name: "Global Product Classification (GPC)", code: "GPC" },
-      { name: "Harmonized Tariff Schedule Code", code: "GM03HTSC" },
-      { name: "Prop 65", code: "GM03PR65" },
       { name: "Stretch", code: "GM03STRH" },
     ],
   },

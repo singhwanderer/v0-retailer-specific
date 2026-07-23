@@ -160,7 +160,7 @@ export function TopNav({
                   style={{ backgroundColor: "#111827" }}
                 />
                 Flip to <span className="font-semibold">Supplier</span> to see the other half of the
-                story \u2014 one product, every retailer at once.
+                story — one product, every retailer at once.
               </div>
             </div>
           )}
