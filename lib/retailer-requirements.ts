@@ -198,15 +198,57 @@ export interface SupplierComplianceRow {
   productsComplete: number
 }
 
+// This is intentionally DENSE and easy to confuse — it is the raw material for
+// Braintrust evals (see evals/copilot.eval.ts). None of it is corrupt; the
+// challenge is realism, not garbage data:
+//   • Near-duplicate supplier names ("Calvin Klein" vs "Calvin Klein
+//     Performance"; "Nike" vs "Nike Golf"; "Ralph Lauren" vs "Lauren Ralph
+//     Lauren") — tests whether the agent resolves the RIGHT vendor instead of
+//     collapsing partial matches.
+//   • Suppliers trading in MULTIPLE categories with different standing in each
+//     (Calvin Klein, Michael Kors, Nike, Ralph Lauren) — tests whether the
+//     agent scopes an answer to the asked-about category rather than summing
+//     everything under one name.
+//   • A wide range of gap counts across a larger vendor base — tests precise
+//     "who is worst / by how much" ranking rather than a vague answer.
 export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
+  // Footwear
   { supplier: "J.Renée", brickCode: "10005811", category: "Footwear", productsTotal: 14, productsWithGaps: 5, openGaps: 11, productsComplete: 9 },
+  { supplier: "Nike Golf", brickCode: "10005811", category: "Footwear", productsTotal: 19, productsWithGaps: 6, openGaps: 13, productsComplete: 13 },
+  { supplier: "Calvin Klein", brickCode: "10005811", category: "Footwear", productsTotal: 12, productsWithGaps: 2, openGaps: 4, productsComplete: 10 },
+
+  // Shirts / tops (two very similar Calvin Klein rows across categories)
   { supplier: "Levi Strauss & Co.", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 22, productsWithGaps: 8, openGaps: 17, productsComplete: 14 },
-  { supplier: "Fossil Group", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 9, productsWithGaps: 2, openGaps: 3, productsComplete: 7 },
   { supplier: "Calvin Klein", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 16, productsWithGaps: 6, openGaps: 14, productsComplete: 10 },
+  { supplier: "Calvin Klein Performance", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 8, productsWithGaps: 1, openGaps: 2, productsComplete: 7 },
+  { supplier: "Tommy Hilfiger", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 15, productsWithGaps: 3, openGaps: 5, productsComplete: 12 },
+
+  // Sweaters/pullovers (same Levi entity, different category)
+  { supplier: "Levi Strauss & Co.", brickCode: "10001351", category: "Sweaters/Pullovers", productsTotal: 10, productsWithGaps: 2, openGaps: 4, productsComplete: 8 },
+  { supplier: "Ralph Lauren", brickCode: "10001351", category: "Sweaters/Pullovers", productsTotal: 14, productsWithGaps: 5, openGaps: 9, productsComplete: 9 },
+
+  // Jewellery (near-duplicate: "Fossil Group" vs "Fossil Inc.")
+  { supplier: "Fossil Group", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 9, productsWithGaps: 2, openGaps: 3, productsComplete: 7 },
+  { supplier: "Fossil Inc.", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 6, productsWithGaps: 3, openGaps: 8, productsComplete: 3 },
   { supplier: "York and Jones", brickCode: "10006017", category: "Necklaces/Chains/Pendants", productsTotal: 7, productsWithGaps: 1, openGaps: 1, productsComplete: 6 },
+
+  // Handbags (Michael Kors also appears in Belts below)
   { supplier: "Michael Kors", brickCode: "10006030", category: "Handbags/Purses", productsTotal: 11, productsWithGaps: 3, openGaps: 5, productsComplete: 8 },
+  { supplier: "Kate Spade", brickCode: "10006030", category: "Handbags/Purses", productsTotal: 13, productsWithGaps: 4, openGaps: 7, productsComplete: 9 },
+
+  // Belts
+  { supplier: "Michael Kors", brickCode: "10006031", category: "Belts", productsTotal: 5, productsWithGaps: 0, openGaps: 0, productsComplete: 5 },
+
+  // Activewear / performance tops (Nike vs Nike Golf)
   { supplier: "Nike", brickCode: "10001400", category: "Sports/Performance Tops", productsTotal: 18, productsWithGaps: 4, openGaps: 6, productsComplete: 14 },
+  { supplier: "Under Armour", brickCode: "10001400", category: "Sports/Performance Tops", productsTotal: 12, productsWithGaps: 5, openGaps: 10, productsComplete: 7 },
+
+  // Outerwear (Ralph Lauren vs Lauren Ralph Lauren)
   { supplier: "Ralph Lauren", brickCode: "10001350", category: "Jackets/Blazers/Cardigans/Waistcoats", productsTotal: 13, productsWithGaps: 7, openGaps: 15, productsComplete: 6 },
+  { supplier: "Lauren Ralph Lauren", brickCode: "10001350", category: "Jackets/Blazers/Cardigans/Waistcoats", productsTotal: 9, productsWithGaps: 2, openGaps: 3, productsComplete: 7 },
+
+  // Dresses
+  { supplier: "Calvin Klein", brickCode: "10001333", category: "Dresses", productsTotal: 10, productsWithGaps: 4, openGaps: 8, productsComplete: 6 },
 ]
 
 export type ExceptionType = "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"

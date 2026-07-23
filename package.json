@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "eval": "braintrust eval evals/"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.21",
@@ -41,6 +42,7 @@
     "@vercel/analytics": "1.6.1",
     "ai": "^7.0.34",
     "autoprefixer": "^10.4.20",
+    "braintrust": "^3.24.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
