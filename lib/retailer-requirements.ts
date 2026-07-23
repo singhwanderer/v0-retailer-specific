@@ -52,8 +52,8 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
     lastUpdated: "Mar 8, 2026",
     actions: ["Edit", "Deactivate"],
     isLink: true,
-    brickCode: "10005811",
-    brickName: "Footwear",
+    brickCode: "10001077",
+    brickName: "Shoes - General Purpose",
   },
   {
     name: "Apparel",
@@ -213,9 +213,9 @@ export interface SupplierComplianceRow {
 //     "who is worst / by how much" ranking rather than a vague answer.
 export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
   // Footwear
-  { supplier: "J.Renée", brickCode: "10005811", category: "Footwear", productsTotal: 14, productsWithGaps: 5, openGaps: 11, productsComplete: 9 },
-  { supplier: "Nike Golf", brickCode: "10005811", category: "Footwear", productsTotal: 19, productsWithGaps: 6, openGaps: 13, productsComplete: 13 },
-  { supplier: "Calvin Klein", brickCode: "10005811", category: "Footwear", productsTotal: 12, productsWithGaps: 2, openGaps: 4, productsComplete: 10 },
+  { supplier: "J.Renée", brickCode: "10001077", category: "Footwear", productsTotal: 14, productsWithGaps: 5, openGaps: 11, productsComplete: 9 },
+  { supplier: "Nike Golf", brickCode: "10001077", category: "Footwear", productsTotal: 19, productsWithGaps: 6, openGaps: 13, productsComplete: 13 },
+  { supplier: "Calvin Klein", brickCode: "10001077", category: "Footwear", productsTotal: 12, productsWithGaps: 2, openGaps: 4, productsComplete: 10 },
 
   // Shirts / tops (two very similar Calvin Klein rows across categories)
   { supplier: "Levi Strauss & Co.", brickCode: "10001352", category: "Shirts/Blouses/Polo Shirts/T-Shirts", productsTotal: 22, productsWithGaps: 8, openGaps: 17, productsComplete: 14 },
