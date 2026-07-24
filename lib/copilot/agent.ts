@@ -25,7 +25,7 @@ import { buildCopilotTools, type ProposedAction } from "@/lib/copilot/tools"
 import { SYSTEM_PROMPT } from "@/lib/copilot/system-prompt"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 
-const MODEL_ID = "gemini-3.1-flash-lite"
+const MODEL_ID = "gemini-2.0-flash-lite"
 
 // Wrap the AI SDK once so every model call is traced.
 const { generateText } = wrapAISDK(ai)
