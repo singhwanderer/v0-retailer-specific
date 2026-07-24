@@ -12,7 +12,7 @@
 // clicks Apply. Read + Create only; there is no edit tool.
 
 import { after } from "next/server"
-import { Client } from "langsmith"
+import { RunTree } from "langsmith/run_trees"
 import {
   runCopilotAgent,
   CopilotConfigError,
@@ -63,8 +63,13 @@ export async function POST(req: Request) {
     // a serverless function can freeze right after the response is sent,
     // dropping any traces that hadn't finished uploading yet. `after()`
     // schedules this post-response, so it never adds latency to the reply.
+    //
+    // Must flush the same shared client that traceable()/wrapAISDK actually
+    // write to (RunTree.getSharedClient()) — a fresh `new Client()` has its
+    // own empty batch queue and flushing it is a no-op, which left the last
+    // step of every tool-calling run stuck "pending" in the LangSmith UI.
     after(async () => {
-      await new Client().awaitPendingTraceBatches()
+      await RunTree.getSharedClient().awaitPendingTraceBatches()
     })
   }
 }
