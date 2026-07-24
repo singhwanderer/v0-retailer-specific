@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, Tag } from "lucide-react"
+import { Bot, ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
@@ -17,6 +17,7 @@ const retailerNavItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, wired: true },
   { id: "attribute-profiles", label: "Attributes & Images", icon: Tag, wired: true },
   { id: "compliance-reports", label: "Compliance Reports", icon: FileChartColumn, wired: true },
+  { id: "ai-access", label: "AI Assistant Access", icon: Bot, wired: true },
 ]
 
 // ── Supplier nav — mirrors the real Trading Grid Catalogue left nav ────────────

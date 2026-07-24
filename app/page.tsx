@@ -17,6 +17,7 @@ import { ScreenSupplierProductAttributes } from "@/components/portal/screen-supp
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
 import { ScreenComplianceDashboard } from "@/components/portal/screen-compliance-dashboard"
+import { ScreenRetailerAiAccess } from "@/components/portal/screen-retailer-ai-access"
 import { ComplianceAgentPanel } from "@/components/portal/compliance-agent-panel"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
@@ -49,6 +50,7 @@ type RetailerScreen =
   | "vendor-exceptions"
   | "profile-detail"
   | "compliance-reports"
+  | "ai-access"
 
 type SupplierScreen =
   | "compliance"
@@ -265,7 +267,8 @@ export default function RetailerPortal() {
       id === "dashboard" ||
       id === "attribute-profiles" ||
       id === "vendor-exceptions" ||
-      id === "compliance-reports"
+      id === "compliance-reports" ||
+      id === "ai-access"
     ) {
       setRetailerScreen(id as RetailerScreen)
     }
@@ -610,6 +613,11 @@ export default function RetailerPortal() {
                   onRequestReport={(p) => handleRunReport("retailer", p)}
                 />
               )}
+
+              {/* Signpost for the external MCP connector — what it is, how to
+                  connect, what it can do, and its current (unauthenticated)
+                  security posture */}
+              {retailerScreen === "ai-access" && <ScreenRetailerAiAccess />}
             </>
           )}
 
