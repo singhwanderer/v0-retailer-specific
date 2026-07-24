@@ -201,16 +201,27 @@ it's catching up to a documented standard.
 | **Real auth (OAuth 2.1), no shared credentials** | Today's "no auth, anyone with the URL" model is fine for mock data and nowhere near acceptable once real customer data is behind it | MCP's own authorization spec now mandates OAuth 2.1 for any server handling real resources |
 | **Tokens scoped to *this* server only (Resource Indicators, RFC 8707)** | Stops a token stolen from one system being replayed against another | Prevents the "confused deputy" attack pattern called out across enterprise MCP security guides |
 | **Delegated identity, not a shared service account** | Every action needs to carry *both* "which customer/tenant" and "which agent" as separate, checkable claims — not one bucket credential everyone shares | OAuth token-exchange delegation (RFC 8693) — the emerging standard for agent-acts-on-behalf-of-user flows |
-| **Tenant checked on every tool call, not just at login** | A valid token isn't proof the caller should see *this* tenant's data — that check has to happen again at each individual tool invocation | Called out repeatedly as the #1 multi-tenant MCP failure mode: isolation enforced at login but not re-checked per call |
+| **Separate service/workload identity for agent-initiated actions** | A delegated user token only exists while a human is in the session. An agent acting on its own — e.g. a scheduled compliance check with no user connected at that moment — needs its own scoped, short-lived credential (client-credentials style), not a borrowed user token | Standard distinction between "on-behalf-of" delegation and workload identity for autonomous agent actions |
+| **Tenant checked on every tool call, not just at login — across *both* tenant classes** | A valid token isn't proof the caller should see *this* tenant's data — that check has to happen again at each individual tool invocation. For us specifically, that means keeping retailer tenants and supplier tenants isolated from each other, not just isolating peers within the same class | Called out repeatedly as the #1 multi-tenant MCP failure mode: isolation enforced at login but not re-checked per call |
 | **Least privilege / progressive scopes** | Start every connection at read-only/discovery; only grant write scopes when a specific action actually needs them | Standard "progressive scope" pattern for MCP servers handling sensitive data |
 | **No token passthrough** | Our server must never blindly forward a token it didn't issue itself, or accept one meant for a different service | Explicitly called out as forbidden in current MCP security guidance |
+| **Rate limits and bounded retrieval per call** | Caps on how much a single tool call can fetch or how often it can be called — without this, tool surface growth means unpredictable cost and blast radius, not just a security gap | One of the 5 essential practices in current enterprise MCP security guidance |
+| **Container / process isolation per tenant or session** | Keeps one tenant's (or one compromised agent's) blast radius from reaching another tenant's runtime, not just their data | Listed alongside per-request identity and least privilege as core enterprise MCP practice |
 | **Full audit logging (who, which agent, which tenant, which tool, what scope)** | Without conversation-level logging, a security incident can't be reconstructed and compliance can't be demonstrated | Table stakes for any MCP server described as "enterprise" in 2026 guidance |
-| **Curated tool registry, not ad hoc tool sprawl** | Agents need a discoverable, vetted catalog of approved tools rather than every team wiring up its own — this was also raised directly by our own platform stakeholder (Rick) as a gap today | Standard recommendation alongside container isolation and least privilege |
+| **Curated tool registry, not ad hoc tool sprawl** | Agents need a discoverable, vetted catalog of approved tools rather than every team wiring up its own — this was also raised directly by our own platform stakeholder (Rick) as a gap today | Standard recommendation alongside least privilege and audit logging |
 | **Central gateway ownership** | Auth, tenancy, and rate-limiting should live in one shared layer (for us: the **TG Aviator MCP Gateway**), not be rebuilt inside every product's MCP server | Matches both external best practice and our own platform's stated direction |
 
 The common thread across all of it: **a working demo and a safe one aren't the
 same claim.** Nothing here is a surprise or a blocker we're discovering late —
 it's the standard checklist, and we already know which boxes are unchecked.
+
+Two of these rows exist specifically because of what's in 4B below, not in
+spite of it: **service/workload identity** is what the proactive,
+event-triggered agent needs (no human in the session to delegate from), and
+**two-tenant-class isolation** is what supplier-side tools require (retailer
+and supplier tenants must never see each other, not just peers within one
+side). Neither capability in 4B is safe to build until its matching row here
+is checked.
 
 ### 4B — Beyond the prototype: what else becomes possible
 
@@ -280,9 +291,13 @@ and more callers.
 - **It's a demo today by design** — no auth, no persistence, mock data — but
   every one of those gaps is a known, scoped step, not a surprise blocker.
 - **"Enterprise-ready" is a checklist, not a vague future** — real OAuth,
-  tokens scoped per server, tenant checked on every call, full audit logging.
-  It's documented industry practice, and we already know which boxes are
-  unchecked.
+  tokens scoped per server, tenant checked on every call across both retailer
+  and supplier tenants, workload identity for agent-initiated actions, rate
+  limits, container isolation, full audit logging. It's documented industry
+  practice, and we already know which boxes are unchecked.
+- **Every expansion idea maps to a specific checklist item.** Proactive agents
+  need workload identity; supplier-side tools need two-tenant-class isolation.
+  We're not adding scope faster than we're adding the controls it requires.
 - **We're not building this security layer alone.** TGC is the named first
   implementation for TG Aviator's multi-tenant platform — our job is a
   Catalogue-specific Domain Agent behind their shared Gateway, not a bespoke
