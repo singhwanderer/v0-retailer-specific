@@ -98,6 +98,11 @@ function makeReadTools(ctx: CopilotContext) {
     list_my_suppliers: tool({
       description: "List the suppliers trading under this retailer account, ranked by open compliance gaps.",
       inputSchema: z.object({}),
+      // Deliberately uncapped: this is the fixture for testing whether the
+      // agent accurately reports/counts/lists a large tool output (~1000
+      // rows, see lib/generated-suppliers.ts) rather than hallucinating over
+      // it (see golden-dataset Template 4 in scripts/generate-golden-dataset.ts).
+      // This is a permanent product decision, not a bug — don't add a limit here.
       execute: async () => ({
         note: "Compliance for the suppliers trading under your retailer account, ranked by open gaps.",
         suppliers: [...RETAILER_SUPPLIERS]

@@ -4,6 +4,8 @@
 // Exceptions) components so the portal UI and the demo MCP server read the
 // same rows instead of each keeping a private copy.
 
+import { GENERATED_SUPPLIERS } from "./generated-suppliers.ts"
+
 export type ProfileStatus = "Active" | "Draft"
 
 /** One GS1 brick mapped to a requirement profile. */
@@ -157,7 +159,7 @@ export interface SupplierComplianceRow {
 //     than summing everything under one name.
 //   • A wide range of gap counts across a larger vendor base — tests precise
 //     "who is worst / by how much" ranking rather than a vague answer.
-export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
+export const HAND_CURATED_SUPPLIERS: SupplierComplianceRow[] = [
   // Footwear
   { supplier: "J.Renée", brickCode: "10001077", category: "Footwear", productsTotal: 14, productsWithGaps: 5, openGaps: 11, productsComplete: 9 },
   { supplier: "Nike Golf", brickCode: "10001077", category: "Footwear", productsTotal: 19, productsWithGaps: 6, openGaps: 13, productsComplete: 13 },
@@ -182,6 +184,19 @@ export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
 
   // Dresses
   { supplier: "Calvin Klein", brickCode: "10001333", category: "Dresses", productsTotal: 10, productsWithGaps: 4, openGaps: 8, productsComplete: 6 },
+]
+
+// ~1000 additional, distinct, newly-generated suppliers — see
+// scripts/generate-suppliers.ts. This scale mirrors a real retailer (a big
+// chain like Dillard's genuinely has ~1000 suppliers, ~100-200 per
+// category), and exists specifically so `list_my_suppliers` (deliberately
+// left uncapped — see lib/copilot/tools.ts and lib/mcp/tools.ts) gives the
+// TGC Compliance Agent a genuinely large tool-output surface to test its
+// accuracy against, rather than the ~14-row set above being all it ever
+// has to summarize.
+export const RETAILER_SUPPLIERS: SupplierComplianceRow[] = [
+  ...HAND_CURATED_SUPPLIERS,
+  ...GENERATED_SUPPLIERS,
 ]
 
 export type ExceptionType = "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"

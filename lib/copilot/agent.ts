@@ -40,13 +40,56 @@ export interface CopilotAgentInput {
   profiles: AttributeProfile[]
 }
 
+/** Points the retailer user to an in-app screen where they can verify an
+ *  answer themselves — deterministically derived from which tools fired,
+ *  never guessed by the model (see TOOL_SOURCE_SCREENS below). */
+export interface CopilotSource {
+  screen: "dashboard" | "attribute-profiles" | "compliance-reports"
+  label: string
+}
+
 export interface CopilotAgentResult {
   text: string
   proposals: ProposedAction[]
+  sources: CopilotSource[]
 }
 
 /** Thrown when the server is missing the Gemini key needed to run the model. */
 export class CopilotConfigError extends Error {}
+
+// Deterministic tool -> screen mapping for CopilotSource. This is fixed code,
+// not something the model decides — the system prompt is never told to
+// "cite a screen," since an LLM guessing at UI structure would be exactly
+// the kind of hallucination this feature is meant to avoid. get_capabilities
+// is deliberately absent: it's a meta answer, not something any one screen
+// verifies.
+const TOOL_SOURCE_SCREENS: Record<string, CopilotSource> = {
+  get_profile_detail: { screen: "attribute-profiles", label: "Attributes & Images" },
+  list_attribute_profiles: { screen: "attribute-profiles", label: "Attributes & Images" },
+  search_gs1_bricks: { screen: "attribute-profiles", label: "Attributes & Images" },
+  create_attribute_profile: { screen: "attribute-profiles", label: "Attributes & Images" },
+  add_attribute_requirement: { screen: "attribute-profiles", label: "Attributes & Images" },
+  set_image_requirement: { screen: "attribute-profiles", label: "Attributes & Images" },
+  run_compliance_report: { screen: "compliance-reports", label: "Compliance Reports" },
+  list_system_filters: { screen: "compliance-reports", label: "Compliance Reports" },
+  list_my_suppliers: { screen: "dashboard", label: "Dashboard" },
+  get_supplier_compliance: { screen: "dashboard", label: "Dashboard" },
+}
+
+function sourcesFromSteps(steps: { toolCalls: readonly { toolName: string }[] }[]): CopilotSource[] {
+  const seenScreens = new Set<CopilotSource["screen"]>()
+  const sources: CopilotSource[] = []
+  for (const step of steps) {
+    for (const call of step.toolCalls) {
+      const source = TOOL_SOURCE_SCREENS[call.toolName]
+      if (source && !seenScreens.has(source.screen)) {
+        seenScreens.add(source.screen)
+        sources.push(source)
+      }
+    }
+  }
+  return sources.slice(0, 2)
+}
 
 async function runCopilotAgentInner({
   messages,
@@ -77,7 +120,9 @@ async function runCopilotAgentInner({
     )
     .map((output) => output.proposal)
 
-  return { text: result.text, proposals }
+  const sources = sourcesFromSteps(result.steps)
+
+  return { text: result.text, proposals, sources }
 }
 
 // traceable() records one parent span per agent run ("tgc-compliance-agent"),

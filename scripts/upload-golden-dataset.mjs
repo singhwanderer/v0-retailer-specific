@@ -1,4 +1,6 @@
-// One-off uploader: pushes Golder_Retailer_Specific.csv into a LangSmith dataset.
+// One-off uploader: pushes Golder_Retailer_Specific.csv (hand-curated) and
+// Golden_Retailer_Specific_Generated.csv (see scripts/generate-golden-dataset.ts,
+// mechanically derived from GS1 reference data) into a LangSmith dataset.
 //
 // Run locally (never paste your LangSmith key into chat/commits):
 //   LANGSMITH_API_KEY=lsv2_... node scripts/upload-golden-dataset.mjs
@@ -12,13 +14,13 @@
 // (checked by exact text match against existing examples) — it does not
 // create a second dataset or duplicate rows on a rerun.
 
-import { readFileSync } from "node:fs"
+import { readFileSync, existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 import { Client } from "langsmith"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const csvPath = join(__dirname, "..", "Golder_Retailer_Specific.csv")
+const csvFilenames = ["Golder_Retailer_Specific.csv", "Golden_Retailer_Specific_Generated.csv"]
 
 const apiKey = process.env.LANGSMITH_API_KEY
 if (!apiKey) {
@@ -69,15 +71,31 @@ function parseCsv(text) {
   return rows.filter((r) => r.some((cell) => cell.trim().length > 0))
 }
 
-const raw = readFileSync(csvPath, "utf-8")
-const rows = parseCsv(raw)
-const [header, ...dataRows] = rows
-const inputIdx = header.indexOf("Input")
-const expectedIdx = header.indexOf("Expected")
-const outcomeIdx = header.indexOf("Outcome")
+const dataRows = []
+let inputIdx, expectedIdx, outcomeIdx
 
-if (inputIdx === -1 || expectedIdx === -1) {
-  console.error(`CSV header must include "Input" and "Expected". Found: ${header.join(", ")}`)
+for (const filename of csvFilenames) {
+  const csvPath = join(__dirname, "..", filename)
+  if (!existsSync(csvPath)) continue
+  const raw = readFileSync(csvPath, "utf-8")
+  const [header, ...fileRows] = parseCsv(raw)
+  const fileInputIdx = header.indexOf("Input")
+  const fileExpectedIdx = header.indexOf("Expected")
+  const fileOutcomeIdx = header.indexOf("Outcome")
+  if (fileInputIdx === -1 || fileExpectedIdx === -1) {
+    console.error(`${filename}: header must include "Input" and "Expected". Found: ${header.join(", ")}`)
+    process.exit(1)
+  }
+  // All expected CSVs share the same 3-column shape, so the same indices work
+  // across files — assert that rather than tracking per-file indices.
+  inputIdx = fileInputIdx
+  expectedIdx = fileExpectedIdx
+  outcomeIdx = fileOutcomeIdx
+  dataRows.push(...fileRows)
+}
+
+if (inputIdx === undefined) {
+  console.error(`No readable CSV found among: ${csvFilenames.join(", ")}`)
   process.exit(1)
 }
 
@@ -87,7 +105,8 @@ const datasetExists = await client.hasDataset({ datasetName })
 if (!datasetExists) {
   await client.createDataset(datasetName, {
     description:
-      "Golden Q&A set for the TGC Compliance Agent, uploaded from Golder_Retailer_Specific.csv.",
+      "Golden Q&A set for the TGC Compliance Agent, uploaded from Golder_Retailer_Specific.csv " +
+      "(hand-curated) and Golden_Retailer_Specific_Generated.csv (generated from GS1 reference data).",
   })
 }
 

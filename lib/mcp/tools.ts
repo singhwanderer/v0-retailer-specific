@@ -79,6 +79,11 @@ export function getProfileDetail(brickCode: string) {
   }
 }
 
+// Deliberately uncapped: this is the fixture for testing whether the agent
+// accurately reports/counts/lists a large tool output (~1000 rows, see
+// lib/generated-suppliers.ts) rather than hallucinating over it (see
+// golden-dataset Template 4 in scripts/generate-golden-dataset.ts). This is
+// a permanent product decision, not a bug — don't add a limit here.
 export function listMySuppliers() {
   return {
     note: "Compliance for the suppliers trading under your retailer account, ranked by open gaps.",
