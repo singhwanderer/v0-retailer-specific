@@ -43,8 +43,8 @@ export async function POST(req: Request) {
   const profiles = body.context?.profiles ?? []
 
   try {
-    const { text, proposals } = await runCopilotAgent({ messages, profiles })
-    return Response.json({ text, proposals })
+    const { text, proposals, sources } = await runCopilotAgent({ messages, profiles })
+    return Response.json({ text, proposals, sources })
   } catch (error) {
     if (error instanceof CopilotConfigError) {
       return Response.json(

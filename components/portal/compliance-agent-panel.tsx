@@ -8,10 +8,12 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { createAttributeProfile, addAttributeRequirement, setImageRequirement } from "@/lib/mcp/tools"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 import type { ProposedAction } from "@/lib/copilot/tools"
+import type { CopilotSource } from "@/lib/copilot/agent"
 
 interface ChatMessage {
   role: "user" | "assistant"
   content: string
+  sources?: CopilotSource[]
 }
 
 interface PendingProposal {
@@ -65,7 +67,10 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile }: ComplianceAg
         setError(data.error ?? "Something went wrong.")
         return
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: data.text || "(no response)" }])
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.text || "(no response)", sources: data.sources ?? [] },
+      ])
       if (Array.isArray(data.proposals) && data.proposals.length > 0) {
         setProposals((prev) => [
           ...prev,
@@ -204,13 +209,18 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile }: ComplianceAg
               </div>
 
               {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
                   <div
                     className={`rounded-2xl px-3.5 py-2.5 text-sm max-w-[85%] whitespace-pre-wrap ${m.role === "user" ? "rounded-tr-sm text-white" : "rounded-tl-sm"}`}
                     style={m.role === "user" ? { backgroundColor: "#0168B3" } : { backgroundColor: "#F3F4F6", color: "#111827" }}
                   >
                     {m.content}
                   </div>
+                  {m.sources && m.sources.length > 0 && (
+                    <p className="mt-1 max-w-[85%] text-xs" style={{ color: "#6B7280" }}>
+                      See also: {m.sources.map((s) => s.label).join(" · ")}
+                    </p>
+                  )}
                 </div>
               ))}
 
