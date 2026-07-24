@@ -4,6 +4,7 @@ import { useState } from "react"
 import { CheckCircle, Download, FileChartColumn, Info, Plus, X } from "lucide-react"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 import type { ReportRequest } from "@/lib/compliance-report"
+import type { GapTarget, MissingImage } from "@/lib/supplier-catalogue"
 import {
   ReportRequestModal,
   type ReportRequestPayload,
@@ -30,6 +31,8 @@ interface ScreenComplianceReportsProps {
   /** Retailer side: the live attribute-profile list for the request modal. */
   profiles?: AttributeProfile[]
   onRequestReport: (payload: ReportRequestPayload) => string
+  /** Open the image-upload flow for one missing image requirement on a product row */
+  onUploadImage?: (productId: string, target: GapTarget, image: MissingImage) => void
 }
 
 function StatusPill({ status }: { status: ReportRequest["status"] }) {
@@ -113,6 +116,7 @@ export function ScreenComplianceReports({
   reports,
   profiles,
   onRequestReport,
+  onUploadImage,
 }: ScreenComplianceReportsProps) {
   const [requestOpen, setRequestOpen] = useState(false)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
@@ -133,7 +137,14 @@ export function ScreenComplianceReports({
 
   // ── Scorecard view ──
   if (selected && selected.status === "Complete") {
-    return <ReportScorecard report={selected} accent={accent} onBack={() => setSelectedReportId(null)} />
+    return (
+      <ReportScorecard
+        report={selected}
+        accent={accent}
+        onBack={() => setSelectedReportId(null)}
+        onUploadImage={onUploadImage}
+      />
+    )
   }
 
   // ── Queue view ──

@@ -7,6 +7,7 @@ import {
   getGapRecords,
   type GapTarget,
   type MissingAttribute,
+  type MissingImage,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
 import { getAllowedValues } from "@/lib/gs1-attribute-values"
@@ -32,6 +33,8 @@ interface ProductAttributesProps {
   onFillAttribute: (productId: string, attributeCode: string, value: string) => void
   /** Jump to the (out-of-scope) GTIN list for this product */
   onViewGtins: (productId: string) => void
+  /** Open the image-upload flow for one missing image requirement */
+  onUploadImage: (image: MissingImage) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -164,6 +167,7 @@ export function ScreenSupplierProductAttributes({
   onBack,
   onFillAttribute,
   onViewGtins,
+  onUploadImage,
 }: ProductAttributesProps) {
   const product = products.find((p) => p.id === productId)
   const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
@@ -178,8 +182,8 @@ export function ScreenSupplierProductAttributes({
   const isGs1 = target.kind === "gs1"
   const targetLabel = isGs1 ? "GS1 Standard" : target.name
 
-  // Get gap records (missing attrs)
-  const { missingAttrs } = getGapRecords(product, target)
+  // Get gap records (missing attrs + missing images)
+  const { missingAttrs, missingImages } = getGapRecords(product, target)
 
   // Provided attributes — those in the product that are required for this target
   const providedAttrs = (brick?.extendedAttributes ?? [])
@@ -265,6 +269,25 @@ export function ScreenSupplierProductAttributes({
                 <span className="font-medium text-[#111827]">{missingAttrs.length}</span> missing/gap
               </span>
             </div>
+            {missingImages.length > 0 && (
+              <>
+                <span style={{ color: "#E0E4E8" }}>|</span>
+                <div className="flex items-center gap-2">
+                  <Dot color="#F59E0B" />
+                  <span className="font-light text-[#6B7280]">
+                    <span className="font-medium text-[#111827]">{missingImages.length}</span> image
+                    requirement{missingImages.length !== 1 ? "s" : ""} missing
+                  </span>
+                </div>
+                <button
+                  onClick={() => onUploadImage(missingImages[0])}
+                  className="ml-auto px-3 py-1.5 rounded-md text-xs font-medium text-white hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: "#0168B3" }}
+                >
+                  Upload Image
+                </button>
+              </>
+            )}
           </div>
         </div>
 

@@ -444,6 +444,14 @@ export default function RetailerPortal() {
     setSupplierScreen("image-upload")
   }
 
+  // ── Any other screen showing an image gap → image-upload WIP screen ───────
+  // Establishes the gap context the upload screen (and its "Back") relies on,
+  // then hands off the same way the gap-detail table does.
+  function handleUploadImageFor(productId: string, target: GapTarget, image: MissingImage) {
+    setGapContext({ productId, target, origin: gapContext?.origin ?? "partner-flow" })
+    handleOpenImageUpload(image)
+  }
+
   function handleBackFromImageUpload() {
     setUploadImage(null)
     setSupplierScreen("supplier-gap-detail")
@@ -699,6 +707,7 @@ export default function RetailerPortal() {
                   requestedBy="J.Renée"
                   reports={supplierReports}
                   onRequestReport={(p) => handleRunReport("supplier", p)}
+                  onUploadImage={handleUploadImageFor}
                 />
               )}
 
@@ -726,6 +735,9 @@ export default function RetailerPortal() {
                   onBack={handleBackFromAttributes}
                   onFillAttribute={handleFillAttribute}
                   onViewGtins={handleViewGtins}
+                  onUploadImage={(image) =>
+                    handleUploadImageFor(attrContext.productId, attrContext.target, image)
+                  }
                 />
               )}
 
