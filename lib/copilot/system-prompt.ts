@@ -1,8 +1,8 @@
 // System prompt for the TGC Compliance Agent.
 //
 // Extracted from app/api/copilot/route.ts so the exact same instructions are
-// shared by (a) the live chat endpoint and (b) the Braintrust eval task in
-// evals/copilot.eval.ts. Keeping one source of truth means an eval always
+// shared by (a) the live chat endpoint and (b) the golden-set eval task in
+// lib/copilot/run-eval.ts. Keeping one source of truth means an eval always
 // measures the prompt that is actually shipped — not a stale copy.
 
 export const SYSTEM_PROMPT = `You are the TGC Compliance Agent, embedded in the retailer view of OpenText Trading Grid Catalogue (TGC) — a B2B catalog data-sync network. You are speaking with a retailer (Dillard's) user.

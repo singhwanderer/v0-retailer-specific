@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { BadgeCheck, Edit2, ChevronLeft } from "lucide-react"
+import { useEffect, useState } from "react"
+import { BadgeCheck, Edit2, ChevronLeft, FlaskConical } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import {
   getGapRecords,
@@ -55,6 +55,104 @@ function AttributeTone({
     missing: { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
   }[status]
   return cfg
+}
+
+// ── Discreet eval trigger (personal debug tool; hidden unless enabled) ────────
+// Enable once per browser by visiting this screen with ?tools=1 in the URL —
+// after that it's remembered (localStorage) and the small button below
+// appears in the bottom-right corner. Nobody else sees it unless they know to
+// add that query param themselves. The click calls /api/admin/run-eval, which
+// itself stays off unless ENABLE_EVAL_TRIGGER is set on the deployment.
+
+const EVAL_TOOLS_STORAGE_KEY = "tgc_eval_tools_visible"
+
+function useEvalToolsVisible() {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("tools") === "1") {
+      window.localStorage.setItem(EVAL_TOOLS_STORAGE_KEY, "1")
+    }
+    setVisible(window.localStorage.getItem(EVAL_TOOLS_STORAGE_KEY) === "1")
+  }, [])
+
+  return visible
+}
+
+function EvalTriggerButton() {
+  const visible = useEvalToolsVisible()
+  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle")
+  const [experimentName, setExperimentName] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  if (!visible) return null
+
+  async function handleClick() {
+    setStatus("running")
+    setExperimentName(null)
+    setErrorMessage(null)
+    try {
+      const secret = process.env.NEXT_PUBLIC_EVAL_TRIGGER_SECRET ?? ""
+      const res = await fetch(`/api/admin/run-eval?secret=${encodeURIComponent(secret)}`, {
+        method: "POST",
+      })
+      if (res.status === 404) {
+        setStatus("error")
+        setErrorMessage("Not enabled on this deployment yet.")
+        return
+      }
+      const data = await res.json()
+      if (data.ok) {
+        setStatus("done")
+        setExperimentName(data.experimentName ?? null)
+      } else {
+        setStatus("error")
+        setErrorMessage(data.error ?? "Something went wrong.")
+      }
+    } catch {
+      setStatus("error")
+      setErrorMessage("Couldn't reach the server.")
+    }
+  }
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+      {status === "done" && (
+        <a
+          href="https://smith.langchain.com/"
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs px-3 py-1.5 rounded-md shadow-sm text-right"
+          style={{ backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #DCFCE7" }}
+        >
+          Done{experimentName ? ` — experiment: ${experimentName}` : ""}. Open LangSmith →
+        </a>
+      )}
+      {status === "error" && errorMessage && (
+        <span
+          className="text-xs px-3 py-1.5 rounded-md shadow-sm"
+          style={{ backgroundColor: "#FEF3C7", color: "#92400E", border: "1px solid #FDE68A" }}
+        >
+          {errorMessage}
+        </span>
+      )}
+      <button
+        onClick={handleClick}
+        disabled={status === "running"}
+        aria-label="Run golden-set evaluation"
+        title="Run golden-set evaluation"
+        className="w-9 h-9 rounded-full flex items-center justify-center shadow-sm opacity-40 hover:opacity-100 transition-opacity disabled:opacity-70"
+        style={{ backgroundColor: "#FFFFFF", border: "1px solid #E0E4E8" }}
+      >
+        <FlaskConical
+          className={`w-4 h-4 ${status === "running" ? "animate-pulse" : ""}`}
+          style={{ color: "#6B7280" }}
+        />
+      </button>
+    </div>
+  )
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -326,6 +424,8 @@ export function ScreenSupplierProductAttributes({
           </div>
         )}
       </div>
+
+      <EvalTriggerButton />
 
       {/* Confirm fill modal */}
       <ConfirmFillAttributeModal
