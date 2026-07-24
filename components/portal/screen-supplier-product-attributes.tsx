@@ -84,14 +84,14 @@ function useEvalToolsVisible() {
 function EvalTriggerButton() {
   const visible = useEvalToolsVisible()
   const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle")
-  const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [experimentName, setExperimentName] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   if (!visible) return null
 
   async function handleClick() {
     setStatus("running")
-    setResultUrl(null)
+    setExperimentName(null)
     setErrorMessage(null)
     try {
       const secret = process.env.NEXT_PUBLIC_EVAL_TRIGGER_SECRET ?? ""
@@ -106,7 +106,7 @@ function EvalTriggerButton() {
       const data = await res.json()
       if (data.ok) {
         setStatus("done")
-        setResultUrl(data.experimentUrl ?? data.projectUrl ?? null)
+        setExperimentName(data.experimentName ?? null)
       } else {
         setStatus("error")
         setErrorMessage(data.error ?? "Something went wrong.")
@@ -119,15 +119,15 @@ function EvalTriggerButton() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
-      {status === "done" && resultUrl && (
+      {status === "done" && (
         <a
-          href={resultUrl}
+          href="https://smith.langchain.com/"
           target="_blank"
           rel="noreferrer"
-          className="text-xs px-3 py-1.5 rounded-md shadow-sm"
+          className="text-xs px-3 py-1.5 rounded-md shadow-sm text-right"
           style={{ backgroundColor: "#F0FDF4", color: "#15803D", border: "1px solid #DCFCE7" }}
         >
-          View results in Braintrust →
+          Done{experimentName ? ` — experiment: ${experimentName}` : ""}. Open LangSmith →
         </a>
       )}
       {status === "error" && errorMessage && (

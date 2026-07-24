@@ -16,14 +16,16 @@ LLM feature, it can:
 
 We needed a way to **see what the agent is doing in production** and **catch
 regressions before they ship** — without building that tooling ourselves. We
-adopted **Braintrust**, a third-party LLM observability + evaluation platform,
-to provide both.
+adopted **LangSmith** (LangChain's LLM observability + evaluation platform) to
+provide both — chosen over a comparable alternative (Braintrust) because we
+already have LangSmith set up and in use internally for other projects, so
+this reuses an existing vendor relationship rather than starting a new one.
 
 ---
 
 ## 2. The one-paragraph pitch
 
-Braintrust gives us two connected feedback loops, built on the same underlying
+LangSmith gives us two connected feedback loops, built on the same underlying
 data model:
 
 1. **Observability (production)** — every real chat turn the agent handles is
@@ -33,9 +35,9 @@ data model:
    test questions with known-good answers, and score how well it does, so we
    can compare before/after a change.
 
-Because logs and eval results share the same format, a real production
-conversation can later be promoted into a permanent test case with a couple of
-clicks — production and our test suite stay in sync over time.
+Because logs and evaluation datasets share the same underlying platform, a
+real production conversation can be promoted into a permanent test case —
+production and our test suite stay in sync over time.
 
 ---
 
@@ -59,31 +61,31 @@ clicks — production and our test suite stay in sync over time.
                      │   runCopilotAgent()          │
                      │   - the Gemini tool-calling  │
                      │     loop                     │
-                     │   - wrapped in a Braintrust  │
+                     │   - wrapped in a LangSmith   │
                      │     "trace" automatically    │
                      └──────────────┬───────────────┘
                                     │
                     (response sent to user immediately —
-                     does not wait on Braintrust)
+                     does not wait on LangSmith)
                                     │
                                     ▼
                      ┌─────────────────────────────┐
-                     │   Braintrust cloud           │
-                     │   Project: "tgc-copilot"     │
-                     │   → Logs tab: this trace     │
-                     │     appears within seconds   │
+                     │   LangSmith cloud            │
+                     │   → this trace appears in    │
+                     │     your project within      │
+                     │     seconds                  │
                      └─────────────────────────────┘
 
 
               ── separately, on demand, offline ──
 
-     Engineering runs one command: npm run eval
-     (PMs never touch this — see callout below)
+     A discreet button on the supplier attributes screen
+     (hidden unless you know to enable it — see status below)
                                     │
                                     ▼
                      ┌─────────────────────────────┐
                      │  Pulls the golden dataset    │
-                     │  BY NAME from Braintrust      │
+                     │  BY NAME from LangSmith       │
                      │  ("tgc-compliance-eval")      │
                      │  Runs each question through   │
                      │  the SAME agent code as        │
@@ -92,10 +94,10 @@ clicks — production and our test suite stay in sync over time.
                                     │
                                     ▼
                      ┌─────────────────────────────┐
-                     │   Braintrust cloud           │
-                     │   → Experiments tab: one new │
-                     │     comparable run, ready to │
-                     │     score and diff            │
+                     │   LangSmith cloud            │
+                     │   → a new Experiment, ready  │
+                     │     to score and compare in   │
+                     │     the LangSmith UI          │
                      └─────────────────────────────┘
 ```
 
@@ -103,16 +105,11 @@ clicks — production and our test suite stay in sync over time.
 live app uses. We are never testing a mock — an eval score is a direct
 prediction of production behavior.
 
-> **Important for this room: no PM ever needs to open a terminal or run a
-> command.** `npm run eval` is a one-line engineering task — think of it like
-> "kick off a build." As a PM you: add/edit test questions in the Datasets UI,
-> define what "correct" means in the Scorers UI, and review results in the
-> Experiments UI. When you want a fresh eval run (e.g. after adding new golden
-> questions), you ask engineering to trigger it — the same way you'd ask for
-> any other build/deploy. A natural next step (not yet built, optional) is to
-> automate this entirely — e.g. a scheduled or PR-triggered run — so it
-> happens without anyone asking. Flagging that as a future ask, not something
-> in place today.
+> **No PM ever needs to open a terminal or run a command.** Kicking off a
+> fresh eval run is a single click on the button described above — there is
+> no `npm run` step to ask engineering for. Everything else (adding test
+> questions, defining scorers, comparing runs) happens directly in the
+> LangSmith UI.
 
 ---
 
@@ -120,11 +117,11 @@ prediction of production behavior.
 
 | Principle | What we did |
 | --- | --- |
-| **Never risk the user experience** | Braintrust logging is wrapped around the agent call, not gating it. If Braintrust is slow, unreachable, misconfigured, or the API key is missing, the agent still runs and answers the user normally — logging silently no-ops. |
-| **Minimize engineering footprint** | The entire code-side integration is ~3 files: one wrapper in the agent module, one eval entry-point script, one config line. Everything else (test data, scoring logic, dashboards, human review) is designed to live in the Braintrust UI, ownable by non-engineers. |
-| **Reuse, don't rebuild** | We didn't write our own logging/eval harness. Braintrust's SDK provides the tracing wrapper and the eval runner out of the box. |
-| **Secrets stay server-side** | The Braintrust API key is read only in server code, never shipped to the browser, never hardcoded, never returned in any API response. |
-| **PM/SME-editable test suite** | The golden dataset lives in Braintrust itself (uploaded via the UI), not hardcoded in our codebase — so the team can add, edit, or grow test cases without an engineer or a deploy. |
+| **Never risk the user experience** | LangSmith tracing wraps the agent call, it doesn't gate it. If LangSmith is slow, unreachable, misconfigured, or the API key is missing, the wrapper becomes a no-op — the agent still runs and answers the user normally. |
+| **Minimize engineering footprint** | The code-side integration is a handful of files: a tracing wrapper in the agent module, a shared eval-runner function, and the button's API route. Test data, scoring logic, dashboards, and human review are designed to live in the LangSmith UI. |
+| **Reuse, don't rebuild** | We didn't write our own logging/eval harness, and we didn't onboard a new vendor — LangSmith is already used elsewhere internally. Its SDK provides the tracing wrapper (`wrapAISDK`) and the eval runner (`evaluate`) out of the box. |
+| **Secrets stay server-side** | The LangSmith API key is read only in server code, never shipped to the browser, never hardcoded, never returned in any API response. |
+| **PM/SME-editable test suite** | The golden dataset lives in LangSmith itself, not hardcoded in our codebase — so the team can add, edit, or grow test cases without an engineer or a deploy. |
 
 ---
 
@@ -135,18 +132,23 @@ This is the split we designed for, so that iteration doesn't bottleneck on engin
 | Capability | Owned by | Where |
 | --- | --- | --- |
 | Instrumenting the agent to produce traces | Engineering | `lib/copilot/agent.ts` (one-time setup, done) |
-| Viewing production conversations / debugging a bad answer | **PM/anyone with Braintrust access** | Braintrust → **Logs** |
-| Adding/editing golden test questions | **PM** | Braintrust → **Datasets** |
-| Defining what counts as a "correct" answer (scorers) | **PM** (no-code templates) or Engineering (custom logic) | Braintrust → **Scorers** |
-| Trying a different system prompt | **PM**, without a deploy (optional, not yet wired) | Braintrust → **Prompts** |
-| Running the agent against the golden set | Engineering (one command, or CI) | `npm run eval` |
-| Comparing two eval runs / deciding if a change is safe to ship | **PM** | Braintrust → **Experiments** |
-| Human sign-off / manual grading of real conversations | **PM/SME** | Braintrust → **Review** |
+| Viewing production conversations / debugging a bad answer | **PM/anyone with LangSmith access** | LangSmith → **Tracing project** |
+| Adding/editing golden test questions | **PM** | LangSmith → **Datasets** (import from CSV, or add rows by hand) |
+| Defining what counts as a "correct" answer (scorers) | **PM** (pre-built templates: Correctness, Hallucination, Conciseness — or a custom rubric) or Engineering (a domain-specific check like GS1 validity) | LangSmith → **Evaluators** |
+| Kicking off a fresh eval run | **PM** | The button on the supplier attributes screen (no terminal) |
+| Comparing two eval runs / deciding if a change is safe to ship | **PM** | LangSmith → **Experiments** |
+| Human sign-off / manual grading of real conversations | **PM/SME** | LangSmith → **Annotation queue / Review** |
 | Go/no-go release decision | **PM** | A judgment call informed by the above — not a system output |
 
 The intent: engineers keep the plumbing thin, PMs own the judgment calls —
 what "good" looks like, what test cases matter, and whether a change is safe
 to release.
+
+One honest caveat: a domain-specific check like "is this GTIN/brick-code
+combination actually valid against our GS1 reference data" is not something
+any generic platform template can express — that one requires a small piece
+of engineer-written code regardless of vendor. Everything else in the table
+above is genuinely UI-only.
 
 ---
 
@@ -158,54 +160,58 @@ inputs/outputs, token counts, and response time.
 
 It does **not** include anything like a user ID, supplier ID, GTIN, product
 image, or a reviewer's decision — those concepts don't exist in this feature.
-The golden test dataset itself is uploaded directly into Braintrust by a PM
-(via the Datasets UI or a small one-off script); it never passes through our
-application code.
+The golden test dataset is uploaded into LangSmith directly (via the UI, or a
+small one-off script); it never passes through our application code.
 
 ---
 
 ## 7. Current status
 
 - ✅ Live production tracing is active — every chat turn is logged to
-  Braintrust under project `tgc-copilot`.
-- ✅ Offline evaluation is wired — `npm run eval` runs the golden set through
-  the real agent and produces a comparable Experiment.
-- ✅ Golden dataset (**6 seed questions** covering footwear/apparel attribute
-  requirements, mandatory-attribute logic, and category-specific gap
-  questions) is live in Braintrust as dataset `tgc-compliance-eval`.
-- ⏳ Not yet configured: scorers (so eval runs don't have a score attached
-  until one is added in the Scorers tab), and prompt-library migration (the
-  system prompt still lives in code, not Braintrust's Prompts UI).
+  LangSmith.
+- ✅ Offline evaluation is wired — the in-app button runs the golden set
+  through the real agent and produces a comparable Experiment.
+- ⏳ Golden dataset needs to be (re-)uploaded to LangSmith — this was
+  previously uploaded to Braintrust as part of an earlier evaluation of that
+  vendor; moving to LangSmith means the same CSV needs pushing into a
+  LangSmith dataset named `tgc-compliance-eval`.
+- ⏳ Not yet configured: evaluators/scorers (so eval runs don't have a score
+  attached until one is bound in the LangSmith UI), and prompt-library
+  migration (the system prompt still lives in code).
 
 ---
 
 ## 8. What's intentionally *not* built yet (and why that's fine)
 
-To keep the initial footprint minimal and reviewable, we did **not** add:
+To keep the footprint minimal and reviewable, we did **not** add:
 
-- Automated scoring/scorers (by design — authored in the UI, when the team
+- Automated scoring/evaluators (by design — authored in the UI, when the team
   is ready to define "correct")
-- CI gating on eval results (can be added later as a PR check)
-- Dashboards beyond Braintrust's built-in Monitor tab
+- CI gating on eval results
+- Any new hosting/infrastructure (AWS, a new Vercel route beyond the existing
+  button, etc.) — everything runs on infrastructure we already have
 - A prompt-library migration (the system prompt is still a code constant)
 
 None of these block the current logging/eval loop from being useful today;
 they're straightforward additions once the team decides they're worth the
-engineering time.
+engineering time — and each one would be flagged and scoped before being built.
 
 ---
 
 ## 9. Key talking points for the room
 
-- **This is not "just logging."** The same underlying data model powers both
+- **This is not "just logging."** The same underlying platform powers both
   live debugging and our regression-test suite — a bad production answer can
-  become tomorrow's test case in a couple of clicks.
+  become tomorrow's test case.
 - **Most of the day-to-day surface is no-code.** Once the (small) engineering
-  hook was built, growing the test set, defining what "correct" means, and
-  deciding whether to ship a change are all things a PM can do directly in
-  Braintrust — no deploy required.
+  hook was built, growing the test set, defining what "correct" means, kicking
+  off a run, and deciding whether to ship a change are all things a PM can do
+  directly — no terminal, no deploy required.
 - **It's safe by construction.** The agent's behavior for real users is
-  completely unaffected by Braintrust being slow, down, or misconfigured.
+  completely unaffected by LangSmith being slow, down, or misconfigured.
 - **It measures the real thing.** Because evals call the exact same function
   production uses, a good eval score is a direct signal about production
   quality — not a proxy.
+- **This reused what we already had.** No new vendor relationship, no new
+  billing plan, no new AWS/infra footprint — LangSmith was already part of
+  our stack for other projects.

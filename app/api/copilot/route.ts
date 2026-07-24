@@ -2,7 +2,7 @@
 //
 // This route is now just HTTP glue: it parses and validates the request, then
 // hands off to runCopilotAgent (lib/copilot/agent.ts), which owns the Gemini
-// tool-calling loop, proposal extraction, and Braintrust tracing.
+// tool-calling loop, proposal extraction, and LangSmith tracing.
 //
 // Reads answer directly from the retailer's current session data (passed in as
 // context, since the browser and this serverless route don't share memory —

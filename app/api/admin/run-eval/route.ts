@@ -1,8 +1,8 @@
 // Discreet, opt-in trigger for the golden-set eval — backs the small button
 // on the supplier product-attributes screen so one person can kick off a
-// fresh Braintrust experiment from the browser instead of asking engineering
-// to run `npm run eval`. Off by default: both env vars below must be set, or
-// this route 404s as if it doesn't exist (no route/login page to discover).
+// fresh LangSmith experiment from the browser instead of running anything in
+// a terminal. Off by default: both env vars below must be set, or this route
+// 404s as if it doesn't exist (no route/login page to discover).
 //
 // Enable by setting on the deployment (e.g. Vercel, or locally in .env.local):
 //   ENABLE_EVAL_TRIGGER=true
@@ -25,13 +25,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await runGoldenEval()
-    return Response.json({
-      ok: true,
-      experimentUrl: result.summary.experimentUrl,
-      projectUrl: result.summary.projectUrl,
-      resultCount: result.results.length,
-    })
+    const { experimentName, resultCount } = await runGoldenEval()
+    return Response.json({ ok: true, experimentName, resultCount })
   } catch (error) {
     return Response.json(
       { ok: false, error: error instanceof Error ? error.message : "Unknown error" },

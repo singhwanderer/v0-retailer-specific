@@ -1,31 +1,32 @@
-// One-off uploader: pushes Golder_Retailer_Specific.csv into a Braintrust dataset.
+// One-off uploader: pushes Golder_Retailer_Specific.csv into a LangSmith dataset.
 //
-// Run locally (never paste your Braintrust key into chat/commits):
-//   BRAINTRUST_API_KEY=sk-... node scripts/upload-golden-dataset.mjs
+// Run locally (never paste your LangSmith key into chat/commits):
+//   LANGSMITH_API_KEY=lsv2_... node scripts/upload-golden-dataset.mjs
 //
-// Optional overrides (defaults match lib/copilot/agent.ts / evals/copilot.eval.ts):
-//   BRAINTRUST_PROJECT=tgc-copilot BRAINTRUST_DATASET=tgc-compliance-eval
+// Optional override (default matches lib/copilot/run-eval.ts):
+//   LANGSMITH_DATASET=tgc-compliance-eval
 //
-// CSV columns expected: Input, Expected, Outcome (Outcome is carried as metadata).
-// Re-running this script does not duplicate rows for unchanged input/expected
-// pairs — Braintrust dataset inserts are content-addressed by row hash.
+// CSV columns expected: Input, Expected, Outcome. Rows become LangSmith
+// examples: inputs: { question }, outputs: { answer }, metadata: { outcome }.
+// Re-running this script skips questions that already exist in the dataset
+// (checked by exact text match against existing examples) — it does not
+// create a second dataset or duplicate rows on a rerun.
 
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
-import { initDataset } from "braintrust"
+import { Client } from "langsmith"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const csvPath = join(__dirname, "..", "Golder_Retailer_Specific.csv")
 
-const apiKey = process.env.BRAINTRUST_API_KEY ?? process.env.EvalTGC
+const apiKey = process.env.LANGSMITH_API_KEY
 if (!apiKey) {
-  console.error("Missing BRAINTRUST_API_KEY (or EvalTGC) in the environment.")
+  console.error("Missing LANGSMITH_API_KEY in the environment.")
   process.exit(1)
 }
 
-const projectName = process.env.BRAINTRUST_PROJECT ?? "tgc-copilot"
-const datasetName = process.env.BRAINTRUST_DATASET ?? "tgc-compliance-eval"
+const datasetName = process.env.LANGSMITH_DATASET ?? "tgc-compliance-eval"
 
 function parseCsv(text) {
   const rows = []
@@ -80,20 +81,40 @@ if (inputIdx === -1 || expectedIdx === -1) {
   process.exit(1)
 }
 
-const dataset = initDataset(projectName, { dataset: datasetName, apiKey })
+const client = new Client({ apiKey })
 
-let count = 0
-for (const r of dataRows) {
-  const input = r[inputIdx]?.trim()
-  const expected = r[expectedIdx]?.trim()
-  if (!input) continue
-  dataset.insert({
-    input,
-    expected: expected || undefined,
-    metadata: outcomeIdx !== -1 && r[outcomeIdx]?.trim() ? { outcome: r[outcomeIdx].trim() } : undefined,
+const datasetExists = await client.hasDataset({ datasetName })
+if (!datasetExists) {
+  await client.createDataset(datasetName, {
+    description:
+      "Golden Q&A set for the TGC Compliance Agent, uploaded from Golder_Retailer_Specific.csv.",
   })
-  count++
 }
 
-await dataset.flush()
-console.log(`Pushed ${count} rows to Braintrust project "${projectName}", dataset "${datasetName}".`)
+const existingQuestions = new Set()
+if (datasetExists) {
+  for await (const example of client.listExamples({ datasetName })) {
+    if (typeof example.inputs?.question === "string") {
+      existingQuestions.add(example.inputs.question)
+    }
+  }
+}
+
+const toCreate = []
+for (const r of dataRows) {
+  const question = r[inputIdx]?.trim()
+  const answer = r[expectedIdx]?.trim()
+  if (!question || existingQuestions.has(question)) continue
+  toCreate.push({
+    dataset_name: datasetName,
+    inputs: { question },
+    outputs: answer ? { answer } : undefined,
+    metadata: outcomeIdx !== -1 && r[outcomeIdx]?.trim() ? { outcome: r[outcomeIdx].trim() } : undefined,
+  })
+}
+
+const created = toCreate.length > 0 ? await client.createExamples(toCreate) : []
+console.log(
+  `Pushed ${created.length} new row(s) to LangSmith dataset "${datasetName}" ` +
+    `(${dataRows.length - created.length} already present, skipped).`
+)

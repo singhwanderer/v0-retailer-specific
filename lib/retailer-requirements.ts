@@ -144,7 +144,7 @@ export interface SupplierComplianceRow {
 }
 
 // This is intentionally DENSE and easy to confuse — it is the raw material for
-// Braintrust evals (see evals/copilot.eval.ts). None of it is corrupt; the
+// the golden-set eval (see lib/copilot/run-eval.ts). None of it is corrupt; the
 // challenge is realism, not garbage data:
 //   • Near-duplicate supplier names ("Calvin Klein" vs "Calvin Klein
 //     Performance"; "Ralph Lauren" vs "Lauren Ralph Lauren") — tests whether
