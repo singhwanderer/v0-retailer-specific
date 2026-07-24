@@ -11,6 +11,7 @@
 // resulting experiment picks up those scores without any code change here.
 
 import { evaluate } from "langsmith/evaluation"
+import { Client } from "langsmith"
 import { runCopilotAgent } from "@/lib/copilot/agent"
 import { ATTRIBUTE_PROFILES } from "@/lib/retailer-requirements"
 
@@ -37,6 +38,11 @@ export async function runGoldenEval() {
   for await (const row of results) {
     rows.push(row)
   }
+
+  // This route is manually triggered and already expects a short wait, so
+  // flush synchronously (unlike the chat route's after()) — better to be
+  // sure the experiment fully lands in LangSmith before reporting "done".
+  await new Client().awaitPendingTraceBatches()
 
   return { experimentName: results.experimentName, resultCount: rows.length }
 }

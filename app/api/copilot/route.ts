@@ -11,6 +11,8 @@
 // only applies (client-side, the same way Screen 1/2 already do) once the user
 // clicks Apply. Read + Create only; there is no edit tool.
 
+import { after } from "next/server"
+import { Client } from "langsmith"
 import {
   runCopilotAgent,
   CopilotConfigError,
@@ -55,5 +57,14 @@ export async function POST(req: Request) {
       { error: "The TGC Compliance Agent couldn't process that request. Please try again." },
       { status: 502 }
     )
+  } finally {
+    // LangSmith batches trace uploads in the background and does not
+    // auto-detect Vercel's waitUntil the way Braintrust did. Without this,
+    // a serverless function can freeze right after the response is sent,
+    // dropping any traces that hadn't finished uploading yet. `after()`
+    // schedules this post-response, so it never adds latency to the reply.
+    after(async () => {
+      await new Client().awaitPendingTraceBatches()
+    })
   }
 }
