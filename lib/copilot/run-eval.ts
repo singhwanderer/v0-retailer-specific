@@ -11,7 +11,7 @@
 // resulting experiment picks up those scores without any code change here.
 
 import { evaluate } from "langsmith/evaluation"
-import { Client } from "langsmith"
+import { RunTree } from "langsmith/run_trees"
 import { runCopilotAgent } from "@/lib/copilot/agent"
 import { ATTRIBUTE_PROFILES } from "@/lib/retailer-requirements"
 
@@ -42,7 +42,9 @@ export async function runGoldenEval() {
   // This route is manually triggered and already expects a short wait, so
   // flush synchronously (unlike the chat route's after()) — better to be
   // sure the experiment fully lands in LangSmith before reporting "done".
-  await new Client().awaitPendingTraceBatches()
+  // Must be the same shared client traceable()/evaluate() actually write to
+  // (RunTree.getSharedClient()) — a fresh `new Client()` has an empty queue.
+  await RunTree.getSharedClient().awaitPendingTraceBatches()
 
   return { experimentName: results.experimentName, resultCount: rows.length }
 }
