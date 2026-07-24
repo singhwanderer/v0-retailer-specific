@@ -187,6 +187,87 @@ retailers' data.
 
 ---
 
+## Part 4 — Making this enterprise-ready and external-facing
+
+Everything above is deliberately a **demo bar**, not a **production bar**. Those
+are different checklists, and the industry has converged on what the
+production one actually contains — this isn't us inventing security theater,
+it's catching up to a documented standard.
+
+### 4A — What "enterprise-ready, external-facing" actually requires
+
+| Requirement | Why it matters | Where it's documented |
+| --- | --- | --- |
+| **Real auth (OAuth 2.1), no shared credentials** | Today's "no auth, anyone with the URL" model is fine for mock data and nowhere near acceptable once real customer data is behind it | MCP's own authorization spec now mandates OAuth 2.1 for any server handling real resources |
+| **Tokens scoped to *this* server only (Resource Indicators, RFC 8707)** | Stops a token stolen from one system being replayed against another | Prevents the "confused deputy" attack pattern called out across enterprise MCP security guides |
+| **Delegated identity, not a shared service account** | Every action needs to carry *both* "which customer/tenant" and "which agent" as separate, checkable claims — not one bucket credential everyone shares | OAuth token-exchange delegation (RFC 8693) — the emerging standard for agent-acts-on-behalf-of-user flows |
+| **Tenant checked on every tool call, not just at login** | A valid token isn't proof the caller should see *this* tenant's data — that check has to happen again at each individual tool invocation | Called out repeatedly as the #1 multi-tenant MCP failure mode: isolation enforced at login but not re-checked per call |
+| **Least privilege / progressive scopes** | Start every connection at read-only/discovery; only grant write scopes when a specific action actually needs them | Standard "progressive scope" pattern for MCP servers handling sensitive data |
+| **No token passthrough** | Our server must never blindly forward a token it didn't issue itself, or accept one meant for a different service | Explicitly called out as forbidden in current MCP security guidance |
+| **Full audit logging (who, which agent, which tenant, which tool, what scope)** | Without conversation-level logging, a security incident can't be reconstructed and compliance can't be demonstrated | Table stakes for any MCP server described as "enterprise" in 2026 guidance |
+| **Curated tool registry, not ad hoc tool sprawl** | Agents need a discoverable, vetted catalog of approved tools rather than every team wiring up its own — this was also raised directly by our own platform stakeholder (Rick) as a gap today | Standard recommendation alongside container isolation and least privilege |
+| **Central gateway ownership** | Auth, tenancy, and rate-limiting should live in one shared layer (for us: the **TG Aviator MCP Gateway**), not be rebuilt inside every product's MCP server | Matches both external best practice and our own platform's stated direction |
+
+The common thread across all of it: **a working demo and a safe one aren't the
+same claim.** Nothing here is a surprise or a blocker we're discovering late —
+it's the standard checklist, and we already know which boxes are unchecked.
+
+### 4B — Beyond the prototype: what else becomes possible
+
+Today's server is intentionally narrow — 6 read tools, 3 write tools, one
+retailer's-eye view, no persistence. None of that is a ceiling. Once the
+enterprise-readiness checklist above is in place, the same "one server, any
+AI" bet opens up:
+
+- **Real integration with TG Aviator MT.** Per direct guidance from our
+  platform stakeholder, TGC has been named the first implementation of
+  TG Aviator's multi-tenant agent platform — meaning our MCP tool sits behind
+  the shared **TG Aviator MCP Gateway** with a **Catalogue Domain Agent** in
+  front of it, and any customer gets ad-hoc, conversational access with
+  multi-tenant security enforced by the platform, not by us.
+- **Supplier-side tools, not just retailer-side.** Today's server only
+  answers "how are my suppliers doing" for a retailer. A supplier-facing tool
+  set (own compliance status, own outstanding requirements) is the natural
+  next surface.
+- **Persistence and a real portal sync.** Writes made through chat should
+  land in the same database the portal UI reads from, so a requirement
+  created by an AI conversation shows up on-screen immediately — no separate
+  demo store.
+- **Agent-to-agent (A2A), not just human-to-agent.** Once identity and tenant
+  scoping are solid, this doesn't have to be human-chat-only — a supplier's
+  own agent could query our compliance tools directly (under its own scoped,
+  audited identity), which is the same pattern the industry is standardizing
+  under the A2A protocol.
+- **Proactive, not just reactive.** Beyond "answer when asked," an
+  event-triggered agent could flag a supplier falling behind on compliance the
+  moment a report goes red, running under a scoped service identity tied to
+  the affected tenant.
+- **Embedded, not just external chat.** The same tool contract can power an
+  in-portal copilot, not only a user's external Claude/ChatGPT session —
+  same backend, different front door.
+- **Bounded, cost-aware retrieval.** As tool surface grows, apply the same
+  discipline we already use internally for our Notion-based PM tooling —
+  explicit caps on retrieval depth and payload size per call — so a bigger
+  tool catalog doesn't mean unbounded, unpredictable cost per question.
+
+None of this requires re-architecting the core idea — it's the same "AI reads
+our rulebook live" model from Part 1, extended to more tools, more identities,
+and more callers.
+
+---
+
+### Sources for the practices above
+
+- [MCP Authorization specification](https://modelcontextprotocol.io/specification/draft/basic/authorization)
+- [Enterprise-Managed Authorization: Zero-touch OAuth for MCP](https://blog.modelcontextprotocol.io/posts/enterprise-managed-auth/)
+- [MCP Security Best Practices for Enterprise Deployments (2026) — Stacklok](https://stacklok.com/blog/mcp-security-best-practices-what-every-enterprise-team-needs-to-know-in-2026/)
+- [MCP Security for Enterprises: Best Practices Checklist — MintMCP](https://www.mintmcp.com/blog/mcp-security-enterprises)
+- [How to Architect a Multi-Tenant MCP Server for Enterprise B2B SaaS — Truto](https://truto.one/blog/how-to-architect-a-multi-tenant-mcp-server-for-enterprise-b2b-saas/)
+- [MCP Security for Multi-Tenant AI Agents: Isolation Patterns — Prefactor](https://prefactor.tech/blog/mcp-security-multi-tenant-ai-agents-explained)
+- [OAuth for MCP — Emerging Enterprise Patterns for Agent Authorization — GitGuardian](https://blog.gitguardian.com/oauth-for-mcp-emerging-enterprise-patterns-for-agent-authorization/)
+
+---
+
 ## Talking points for the room
 
 - **MCP is a standard, not our invention** — "USB-C for AI assistants." We
@@ -198,3 +279,14 @@ retailers' data.
   the conversation; we only publish and enforce the actions.
 - **It's a demo today by design** — no auth, no persistence, mock data — but
   every one of those gaps is a known, scoped step, not a surprise blocker.
+- **"Enterprise-ready" is a checklist, not a vague future** — real OAuth,
+  tokens scoped per server, tenant checked on every call, full audit logging.
+  It's documented industry practice, and we already know which boxes are
+  unchecked.
+- **We're not building this security layer alone.** TGC is the named first
+  implementation for TG Aviator's multi-tenant platform — our job is a
+  Catalogue-specific Domain Agent behind their shared Gateway, not a bespoke
+  auth stack.
+- **The tool surface is a floor, not a ceiling** — supplier-side tools,
+  agent-to-agent access, proactive alerts, and an in-portal copilot are all
+  the same underlying model, just with more callers and more identities.
