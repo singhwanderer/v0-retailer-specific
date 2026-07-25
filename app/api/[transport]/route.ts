@@ -150,10 +150,15 @@ const handler = createMcpHandler(
 
     server.tool(
       "set_vendor_exception",
-      "Create or update a vendor exception — a waiver, extended deadline, or reduced-scope exclusion against one or more attributes for a named vendor, scoped to one category. An Active 'Attribute Waiver' exception's attributes reduce that vendor's gap count for this exact category in run_compliance_report and the portal's own Compliance Reports/Dashboard screens (Extended Deadline and Reduced Scope still change which attribute is named as a gap, but don't reduce the count). To update an existing exception (e.g. revoke it by setting status to Expired, or extend validUntil), pass its id from list_vendor_exceptions; omit id to create a new one. Confirm the exact vendor, category, exception type, attributes, and validity with the user before calling — this changes real compliance numbers.",
+      "Create or update a vendor exception — a waiver, extended deadline, or reduced-scope exclusion against one or more attributes for a named vendor, scoped to one category. An Active 'Attribute Waiver' exception's attributes reduce that vendor's gap count for this exact category in run_compliance_report and the portal's own Compliance Reports/Dashboard screens (Extended Deadline and Reduced Scope still change which attribute is named as a gap, but don't reduce the count). To update an existing exception (e.g. revoke it by setting status to Expired, or extend validUntil), pass its id from list_vendor_exceptions; omit id to create a new one. If no vendor is named, the exception applies to J.Renée, the supplier persona this demo is logged in as. Confirm the exact vendor, category, exception type, attributes, and validity with the user before calling — this changes real compliance numbers.",
       {
         id: z.string().optional().describe("Existing exception id to update, from list_vendor_exceptions. Omit to create a new exception."),
-        vendor: z.string().describe("Vendor name, e.g. 'Levi Strauss & Co.'"),
+        vendor: z
+          .string()
+          .optional()
+          .describe(
+            "Vendor name, e.g. 'Levi Strauss & Co.'. Omit to apply the exception to J.Renée — the supplier persona this demo is logged in as, and the only vendor whose supplier-side view reflects an exception."
+          ),
         brickCode: z
           .string()
           .describe(

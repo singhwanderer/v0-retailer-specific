@@ -5,6 +5,7 @@ import { BadgeCheck } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import {
   getGapRecords,
+  getProductAttributes,
   IMAGE_REQUIREMENT_POOL,
   type GapTarget,
   type MissingAttribute,
@@ -104,7 +105,11 @@ export function ScreenSupplierGapDetail({
     getGapRecords(product, target)
   const missingImageNames = new Set(missingImages.map((img) => img.name))
 
-  const providedAttrCount = totalAttrCount - missingAttrs.length
+  // Derived from the same full-attribute list the "All attributes" screen
+  // renders, so the two screens can't report different "provided" figures.
+  const providedAttrCount = getProductAttributes(product, target).filter(
+    (a) => a.status === "provided"
+  ).length
   const providedImageCount = totalImageCount - missingImages.length
   const gapCount = missingAttrs.length + missingImages.length
   const isComplete = gapCount === 0
@@ -186,6 +191,57 @@ export function ScreenSupplierGapDetail({
         </div>
       </div>
 
+      {/* Waived by this retailer — not gaps, but shown so the count is explicable */}
+      {waivedAttrs.length > 0 && (
+        <section
+          className="flex flex-col gap-3 px-4 py-4 rounded-lg"
+          style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
+        >
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-semibold" style={{ color: "#0168B3" }}>
+              {targetLabel} granted you an exception &mdash; {waivedAttrs.length} attribute
+              {waivedAttrs.length !== 1 ? "s" : ""} no longer count
+              {waivedAttrs.length === 1 ? "s" : ""} as a gap
+            </h2>
+            <p className="text-xs font-light text-[#6B7280]">
+              {targetLabel} has granted an exception for these attributes, so they are not counted
+              as gaps against you. Other trading partners may still require them.
+            </p>
+          </div>
+          <div
+            className="rounded-lg overflow-hidden"
+            style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
+          >
+            <table className="w-full text-sm">
+              <tbody>
+                {waivedAttrs.map((attr, idx) => (
+                  <tr
+                    key={attr.code}
+                    style={{
+                      borderBottom: idx < waivedAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
+                    }}
+                  >
+                    <td className="px-4 py-3 w-8 align-middle">
+                      <Dot color="#9CA3AF" />
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="font-medium" style={{ color: "#6B7280" }}>
+                        {attr.name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 align-middle text-right">
+                      <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
+                        Waived
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* Section A — Missing Attributes */}
       <section className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
@@ -226,9 +282,6 @@ export function ScreenSupplierGapDetail({
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <span className="font-medium text-[#111827]">{attr.name}</span>
-                        <span className="ml-2 text-xs font-light text-[#9CA3AF]">
-                          TGC: {attr.name} ({attr.code})
-                        </span>
                       </td>
                       <td className="px-4 py-3 text-right align-middle w-56">
                         {allowedValues && allowedValues.length > 0 ? (
@@ -283,50 +336,6 @@ export function ScreenSupplierGapDetail({
           )}
         </div>
       </section>
-
-      {/* Waived by this retailer — not gaps, but shown so the count is explicable */}
-      {waivedAttrs.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-[#111827]">Waived by {targetLabel}</h2>
-            <p className="text-xs font-light text-[#6B7280]">
-              {targetLabel} has granted an exception for these attributes, so they are not counted
-              as gaps against you. Other trading partners may still require them.
-            </p>
-          </div>
-          <div
-            className="rounded-lg overflow-hidden"
-            style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
-          >
-            <table className="w-full text-sm">
-              <tbody>
-                {waivedAttrs.map((attr, idx) => (
-                  <tr
-                    key={attr.code}
-                    style={{
-                      borderBottom: idx < waivedAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
-                    }}
-                  >
-                    <td className="px-4 py-3 w-8 align-middle">
-                      <Dot color="#9CA3AF" />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <span className="font-medium" style={{ color: "#6B7280" }}>
-                        {attr.name}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-middle text-right">
-                      <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
-                        Waived
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
 
       {/* Section B — Image Requirements */}
       <section className="flex flex-col gap-3">

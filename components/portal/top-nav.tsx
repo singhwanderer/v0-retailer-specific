@@ -1,6 +1,8 @@
 "use client"
 
 import { Bot, HelpCircle, User } from "lucide-react"
+import { SupplierNotifications } from "@/components/portal/supplier-notifications"
+import type { VendorException } from "@/lib/mcp/store"
 
 type Perspective = "retailer" | "supplier"
 
@@ -16,6 +18,10 @@ interface TopNavProps {
   /** TGC Compliance Agent on/off — retailer-only */
   aiEnabled?: boolean
   onAiToggleChange?: (enabled: boolean) => void
+  /** Active exceptions granted to the supplier persona — supplier-only */
+  supplierExceptions?: VendorException[]
+  /** Jump to the selection code an exception applies to */
+  onOpenException?: (exception: VendorException) => void
 }
 
 const navLinks = [
@@ -33,6 +39,8 @@ export function TopNav({
   onShowAbout,
   aiEnabled = false,
   onAiToggleChange,
+  supplierExceptions = [],
+  onOpenException,
 }: TopNavProps) {
   return (
     <header
@@ -102,6 +110,14 @@ export function TopNav({
               />
             </button>
           </div>
+        )}
+
+        {/* Exception notifications — supplier-only */}
+        {perspective === "supplier" && onOpenException && (
+          <SupplierNotifications
+            exceptions={supplierExceptions}
+            onOpenException={onOpenException}
+          />
         )}
 
         {/* About this prototype */}

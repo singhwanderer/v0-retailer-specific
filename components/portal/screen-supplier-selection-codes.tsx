@@ -1,7 +1,11 @@
 "use client"
 
 import { Download } from "lucide-react"
-import { getSelectionCodesForPartner, type SupplierProduct } from "@/lib/supplier-catalogue"
+import {
+  getSelectionCodesForPartner,
+  waivedAttributesForTarget,
+  type SupplierProduct,
+} from "@/lib/supplier-catalogue"
 
 // ── CSV generation ────────────────────────────────────────────────────────────
 // Columns: Product ID, Description, Category, Category Brick Code (GS1),
@@ -88,6 +92,24 @@ function GapBadge({ gaps, complete, total }: { gaps: number; complete: number; t
   )
 }
 
+/**
+ * Attributes this partner has waived here. Shown beside the gap badge so a gap
+ * count that dropped without the supplier doing anything has a visible reason.
+ */
+function WaivedBadge({ count, partnerName }: { count: number; partnerName: string }) {
+  if (count === 0) return null
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+      style={{ backgroundColor: "#EFF6FF", color: "#0168B3" }}
+      title={`${partnerName} has waived ${count} attribute${count !== 1 ? "s" : ""} for you here`}
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#0168B3" }} />
+      {count} waived
+    </span>
+  )
+}
+
 export function ScreenSupplierSelectionCodes({
   partnerName,
   products,
@@ -170,7 +192,18 @@ export function ScreenSupplierSelectionCodes({
                     {sc.products}
                   </td>
                   <td className="px-4 py-3 align-middle">
-                    <GapBadge gaps={sc.gaps} complete={sc.complete} total={sc.products} />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <GapBadge gaps={sc.gaps} complete={sc.complete} total={sc.products} />
+                      <WaivedBadge
+                        count={
+                          waivedAttributesForTarget(sc.brickCode, {
+                            kind: "retailer",
+                            name: partnerName,
+                          }).length
+                        }
+                        partnerName={partnerName}
+                      />
+                    </div>
                   </td>
                   <td className="px-4 py-3 align-middle text-right">
                     <button
