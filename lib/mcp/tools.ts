@@ -7,7 +7,7 @@
 // (Screen 1/2), which call these same functions as plain client-side calls.
 
 import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
-import { SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
+import { SUPPLIER_PERSONA, SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
   getProfileBricks,
   RETAILER_SUPPLIERS,
@@ -219,7 +219,10 @@ export function listVendorExceptions(vendor?: string, status?: "Active" | "Expir
 
 /**
  * Create or update a vendor exception. Pass `id` (from list_vendor_exceptions)
- * to update an existing exception; omit it to create a new one. `brickCode`
+ * to update an existing exception; omit it to create a new one. `vendor` may be
+ * omitted, in which case the exception applies to SUPPLIER_PERSONA (J.Renée) —
+ * the supplier this prototype is logged in as, and the only one whose supplier
+ * view reflects an exception. `brickCode`
  * scopes the exception to one category — required because a vendor can
  * supply multiple categories (e.g. Calvin Klein: Footwear, Shirts, Dresses),
  * and without an explicit scope a waiver could leak into an unrelated
@@ -233,7 +236,7 @@ export function listVendorExceptions(vendor?: string, status?: "Active" | "Expir
  */
 export function setVendorException(args: {
   id?: string
-  vendor: string
+  vendor?: string
   brickCode: string
   profile: string
   exceptionType: "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"
@@ -246,6 +249,12 @@ export function setVendorException(args: {
   }
   const store = getStore()
 
+  // The supplier side of this prototype is logged in as one persona, so an
+  // exception granted without naming a vendor is meant for them — that's the
+  // only vendor whose supplier view can actually reflect it.
+  const vendor = args.vendor?.trim() || SUPPLIER_PERSONA
+  const assumedVendor = !args.vendor?.trim()
+
   if (args.id) {
     const idx = store.vendorExceptions.findIndex((e) => e.id === args.id)
     if (idx < 0) {
@@ -255,7 +264,7 @@ export function setVendorException(args: {
     }
     const updated: VendorException = {
       ...store.vendorExceptions[idx],
-      vendor: args.vendor,
+      vendor,
       brickCode: args.brickCode,
       profile: args.profile,
       exceptionType: args.exceptionType,
@@ -264,12 +273,12 @@ export function setVendorException(args: {
       status: args.status ?? store.vendorExceptions[idx].status,
     }
     store.vendorExceptions[idx] = updated
-    return { updated, demo_note: DEMO_NOTE }
+    return { updated, ...(assumedVendor ? { assumedVendor: vendor } : {}), demo_note: DEMO_NOTE }
   }
 
   const created: VendorException = {
     id: `exc-${Date.now()}-${store.vendorExceptions.length}`,
-    vendor: args.vendor,
+    vendor,
     brickCode: args.brickCode,
     profile: args.profile,
     exceptionType: args.exceptionType,
@@ -279,7 +288,7 @@ export function setVendorException(args: {
     actions: ["Edit", "Revoke"],
   }
   store.vendorExceptions.push(created)
-  return { created, demo_note: DEMO_NOTE }
+  return { created, ...(assumedVendor ? { assumedVendor: vendor } : {}), demo_note: DEMO_NOTE }
 }
 
 // Plain-English catalog of what this connector can do, plus a live snapshot of

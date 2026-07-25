@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, ShieldOff, Tag } from "lucide-react"
+import { ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
@@ -12,11 +12,14 @@ interface SidebarProps {
   perspective: Perspective
 }
 
-// ── Retailer nav (unchanged) ──────────────────────────────────────────────────
+// ── Retailer nav ──────────────────────────────────────────────────────────────
+// Vendor Exceptions is deliberately absent: exceptions are authored
+// conversationally through the MCP connector, not from a nav destination. The
+// screen itself (screen3-vendor-exceptions.tsx) is kept and still routes, so
+// restoring the entry is a one-line change.
 const retailerNavItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, wired: true },
   { id: "attribute-profiles", label: "Attributes & Images", icon: Tag, wired: true },
-  { id: "vendor-exceptions", label: "Vendor Exceptions", icon: ShieldOff, wired: true },
   { id: "compliance-reports", label: "Compliance Reports", icon: FileChartColumn, wired: true },
 ]
 

@@ -21,9 +21,12 @@ import { AiAccessModal } from "@/components/portal/screen-retailer-ai-access"
 import { ComplianceAgentPanel } from "@/components/portal/compliance-agent-panel"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
+  EXCEPTION_GRANTING_RETAILER,
+  SUPPLIER_PERSONA,
   SUPPLIER_PRODUCTS_SEED,
   assignCategory,
   fillAttribute,
+  getSelectionCodesForPartner,
   type GapTarget,
   type MissingImage,
   type SupplierProduct,
@@ -41,7 +44,12 @@ import {
   runSupplierReport,
   type ReportRequest,
 } from "@/lib/compliance-report"
-import { getStore } from "@/lib/mcp/store"
+import {
+  activeExceptionsForVendor,
+  getStore,
+  hydrateVendorExceptions,
+  type VendorException,
+} from "@/lib/mcp/store"
 
 type Perspective = "retailer" | "supplier"
 
@@ -180,6 +188,41 @@ export default function RetailerPortal() {
 
   // Account-wide Selection Code List drill-down context
   const [activeAccountCode, setActiveAccountCode] = useState<{ brickCode: string; label: string } | null>(null)
+
+  // ── Exceptions granted to us ────────────────────────────────────────────────
+  // The demo store is a module global, so the browser's copy never sees writes
+  // made by the MCP server. Poll the server's copy and hydrate ours, then keep
+  // the active list in state for the notification bell. Without this an
+  // exception granted in chat would change the retailer's numbers and do
+  // nothing at all on this side.
+  const [supplierExceptions, setSupplierExceptions] = useState<VendorException[]>(() =>
+    activeExceptionsForVendor(SUPPLIER_PERSONA)
+  )
+
+  useEffect(() => {
+    if (perspective !== "supplier") return
+    let cancelled = false
+
+    async function refresh() {
+      try {
+        const res = await fetch("/api/supplier-exceptions", { cache: "no-store" })
+        if (!res.ok) return
+        const data = (await res.json()) as { exceptions: VendorException[] }
+        if (cancelled) return
+        hydrateVendorExceptions(data.exceptions)
+        setSupplierExceptions(activeExceptionsForVendor(SUPPLIER_PERSONA))
+      } catch {
+        // Offline or the route isn't up — keep whatever we already have.
+      }
+    }
+
+    refresh()
+    const timer = setInterval(refresh, 15_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [perspective])
 
   // Manual categorisation — mutates the shared store so every screen reflects it
   function handleAssignCategory(ids: Set<string>, brickCode: string) {
@@ -330,6 +373,27 @@ export default function RetailerPortal() {
   // ── L2 → L3 ────────────────────────────────────────────────────────────────
   function handleSelectCode(codeId: string, codeLabel: string, brickCode: string) {
     setActiveCode({ id: codeId, label: codeLabel, brickCode })
+    setSupplierScreen("supplier-products")
+  }
+
+  // ── Notification → the selection code the exception applies to ─────────────
+  // Exceptions carry a GS1 brick, not a selection code, so resolve the code
+  // from the live catalogue. Only one retailer grants exceptions in this
+  // prototype, so that's the partner to land under.
+  function handleOpenException(exception: VendorException) {
+    setPerspective("supplier")
+    const partnerName = EXCEPTION_GRANTING_RETAILER
+    const code = getSelectionCodesForPartner(supplierProducts, partnerName).find(
+      (sc) => sc.brickCode === exception.brickCode
+    )
+    setActivePartner({ id: partnerName, name: partnerName })
+    if (!code) {
+      // No products under that category for this partner — the code list is
+      // still the most useful place to land.
+      setSupplierScreen("selection-codes")
+      return
+    }
+    setActiveCode({ id: code.id, label: `${code.id} — ${code.label}`, brickCode: code.brickCode })
     setSupplierScreen("supplier-products")
   }
 
@@ -552,6 +616,8 @@ export default function RetailerPortal() {
         onShowAbout={() => setWelcomeOpen(true)}
         aiEnabled={aiEnabled}
         onAiToggleChange={handleAiToggleChange}
+        supplierExceptions={supplierExceptions}
+        onOpenException={handleOpenException}
       />
 
       {perspective === "retailer" && aiEnabled && (

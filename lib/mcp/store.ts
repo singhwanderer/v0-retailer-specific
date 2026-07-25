@@ -109,6 +109,19 @@ export function getStore(): DemoStore {
   return globalScope.__tgcDemoStore
 }
 
+/**
+ * Replace the client-side copy of the exception list with the server's.
+ *
+ * The demo store is a module global, so the browser bundle gets its own copy
+ * seeded from VENDOR_EXCEPTIONS and never sees exceptions written by the MCP
+ * server, which run in the Node process. The supplier portal polls
+ * /api/supplier-exceptions and hands the result here, so a waiver granted in
+ * chat shows up in the supplier's gap counts and notifications.
+ */
+export function hydrateVendorExceptions(exceptions: VendorException[]): void {
+  getStore().vendorExceptions = exceptions
+}
+
 /** Active exceptions for one vendor — the shape the compliance-report engine needs. */
 export function activeExceptionsForVendor(vendor: string, exceptionType?: ExceptionType): VendorException[] {
   return getStore().vendorExceptions.filter(

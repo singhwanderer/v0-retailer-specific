@@ -6,6 +6,7 @@
 // updates the compliance counts and product lists everywhere, instead of each
 // screen keeping its own copy that can drift out of agreement.
 
+import { getAllowedValues } from "@/lib/gs1-attribute-values"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import { isAttributeWaived, waivedAttributeNames } from "@/lib/mcp/store"
 
@@ -723,6 +724,126 @@ export function getGapRecords(
     totalAttrCount: attrPoolSize,
     totalImageCount: IMAGE_REQUIREMENT_POOL.length,
   }
+}
+
+// ── Full attribute view ───────────────────────────────────────────────────────
+// The gap engine above only ever answers "what's missing". The supplier also
+// needs to see and edit everything that is *already* on the product, which the
+// count-based seed doesn't carry: SupplierProduct stores gap counts, never
+// attribute values. Rather than hand-author a value map onto ~55 seed products,
+// values for the non-gap attributes are derived deterministically from the GS1
+// allowed-value lists, keyed on product + attribute, so they are stable across
+// renders and reloads and read as plausible catalogue data.
+//
+// These derived values are display-only: they are never written into
+// filledAttributes, so compliance arithmetic stays driven entirely by
+// getGapRecords. The moment the supplier edits one, it becomes a real filled
+// attribute and takes precedence.
+
+export type ResolvedAttributeStatus = "provided" | "missing" | "waived"
+
+export type ResolvedAttribute = {
+  code: string
+  name: string
+  /** Empty only when status is "missing" (or "waived" and never supplied). */
+  value: string
+  status: ResolvedAttributeStatus
+  /** "filled" = the supplier entered this value; "seeded" = derived demo data. */
+  source: "filled" | "seeded"
+}
+
+/**
+ * A stable, plausible value for an attribute the product is deemed to already
+ * provide. Picks from the GS1 allowed-value list where one exists; otherwise
+ * falls back to a short deterministic string, since free-text attributes have
+ * no enumerated values to choose from.
+ */
+function seededAttributeValue(productId: string, attr: BrickAttribute): string {
+  const options = getAllowedValues(attr.code)
+  const hash = stableHash(`${productId}|${attr.code}`)
+  if (options && options.length > 0) return options[hash % options.length].value
+
+  // No GS1 code list — a free-text field. Match on the attribute name so the
+  // value at least reads like the thing it's describing; a country field gets
+  // a country, a percentage gets a number. Order matters: the first keyword
+  // that matches wins.
+  const name = attr.name.toLowerCase()
+  for (const [keyword, pool] of FREE_TEXT_VALUE_POOLS) {
+    if (name.includes(keyword)) return pool[hash % pool.length]
+  }
+  return GENERIC_FREE_TEXT_POOL[hash % GENERIC_FREE_TEXT_POOL.length]
+}
+
+/**
+ * Plausible stand-in values for free-text attributes, keyed by a substring of
+ * the attribute name. Demo data only — the seed carries no real values.
+ */
+const FREE_TEXT_VALUE_POOLS: [string, string[]][] = [
+  ["country", ["China", "Vietnam", "Italy", "Portugal", "India", "Brazil"]],
+  ["origin", ["China", "Vietnam", "Italy", "Portugal", "India", "Brazil"]],
+  ["brand", ["J.Renée", "J.Renée Collection", "J.Renée Signature"]],
+  ["tariff", ["6403.99.90", "6404.19.39", "6402.99.31"]],
+  ["classification", ["10001077", "10001334", "10001235"]],
+  ["percent", ["100", "80", "65", "50"]],
+  ["weight", ["0.6 kg", "0.8 kg", "1.1 kg"]],
+  ["width", ["3.5 cm", "5 cm", "7.5 cm"]],
+  ["height", ["6 cm", "8 cm", "10 cm"]],
+  ["length", ["24 cm", "26 cm", "28 cm"]],
+  ["diameter", ["12 mm", "16 mm", "20 mm"]],
+  ["size", ["6 M", "7 M", "8 M", "9 M"]],
+  ["colour", ["Black", "Cognac", "Bone", "Navy"]],
+  ["color", ["Black", "Cognac", "Bone", "Navy"]],
+  ["message", ["Cushioned footbed with a padded collar for all-day wear."]],
+  ["description", ["Cushioned footbed with a padded collar for all-day wear."]],
+  ["marketing", ["Cushioned footbed with a padded collar for all-day wear."]],
+  ["care", ["Wipe clean with a damp cloth"]],
+  ["warranty", ["1 year limited"]],
+  ["fur", ["Not applicable"]],
+  ["material", ["Leather upper, synthetic lining"]],
+  ["fabric", ["Leather upper, synthetic lining"]],
+  ["code", ["JR-4820", "JR-5194", "JR-6033"]],
+]
+
+const GENERIC_FREE_TEXT_POOL = ["Standard", "Not applicable", "Supplied"]
+
+/**
+ * Every attribute in this product's category, with its status against one
+ * compliance target and the value currently on the product.
+ *
+ * The list is the whole GS1 brick pool in pool order, so its length always
+ * equals the `totalAttrCount` used by the "X of Y provided" summaries — the
+ * full-attribute screen and the requirements-status screen can never disagree.
+ */
+export function getProductAttributes(
+  product: SupplierProduct | undefined,
+  target: GapTarget
+): ResolvedAttribute[] {
+  const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
+  const pool = brick?.extendedAttributes ?? []
+
+  const { missingAttrs, waivedAttrs } = getGapRecords(product, target)
+  const missingCodes = new Set(missingAttrs.map((a) => a.code))
+  const waivedCodes = new Set(waivedAttrs.map((a) => a.code))
+
+  return pool.map((attr) => {
+    const filled = product?.filledAttributes?.[attr.code]
+    if (filled) {
+      return { code: attr.code, name: attr.name, value: filled, status: "provided" as const, source: "filled" as const }
+    }
+    if (missingCodes.has(attr.code)) {
+      return { code: attr.code, name: attr.name, value: "", status: "missing" as const, source: "seeded" as const }
+    }
+    if (waivedCodes.has(attr.code)) {
+      return { code: attr.code, name: attr.name, value: "", status: "waived" as const, source: "seeded" as const }
+    }
+    return {
+      code: attr.code,
+      name: attr.name,
+      value: product ? seededAttributeValue(product.id, attr) : "",
+      status: "provided" as const,
+      source: "seeded" as const,
+    }
+  })
 }
 
 // ── Completion % ──────────────────────────────────────────────────────────────

@@ -5,9 +5,11 @@ import { BadgeCheck, Edit2, ChevronLeft, FlaskConical } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 import {
   getGapRecords,
+  getProductAttributes,
   type GapTarget,
   type MissingAttribute,
   type MissingImage,
+  type ResolvedAttribute,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
 import { getAllowedValues } from "@/lib/gs1-attribute-values"
@@ -48,16 +50,71 @@ function Dot({ color }: { color: string }) {
   )
 }
 
-function AttributeTone({
-  status,
+const STATUS_TONE = {
+  provided: { bg: "#DCFCE7", text: "#15803D", dot: "#16A34A" },
+  missing: { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
+  waived: { bg: "#F3F4F6", text: "#6B7280", dot: "#9CA3AF" },
+} as const
+
+/**
+ * Value entry for one attribute — a GS1 pick-list where the attribute has an
+ * enumerated code list, a free-text box otherwise. Used for both filling a gap
+ * and editing a value that is already on the product, so the two paths can't
+ * drift apart.
+ */
+function AttributeValueEditor({
+  attr,
+  initialValue,
+  onSubmit,
 }: {
-  status: "provided" | "missing"
+  attr: { code: string; name: string }
+  initialValue: string
+  onSubmit: (value: string) => void
 }) {
-  const cfg = {
-    provided: { bg: "#DCFCE7", text: "#15803D", dot: "#16A34A" },
-    missing: { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
-  }[status]
-  return cfg
+  const allowedValues = getAllowedValues(attr.code)
+
+  if (allowedValues && allowedValues.length > 0) {
+    return (
+      <Select value={initialValue || undefined} onValueChange={onSubmit}>
+        <SelectTrigger className="ml-auto h-8 w-52 text-xs" aria-label={`Select a value for ${attr.name}`}>
+          <SelectValue placeholder="Select a value…" />
+        </SelectTrigger>
+        <SelectContent>
+          {allowedValues.map((v) => (
+            <SelectItem key={v.value} value={v.value} className="text-xs">
+              {v.value}
+              {v.code && (
+                <span className="ml-1.5 font-mono text-[10px] text-[#9CA3AF]">{v.code}</span>
+              )}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  return (
+    <input
+      type="text"
+      defaultValue={initialValue}
+      autoFocus={Boolean(initialValue)}
+      placeholder="Enter a value…"
+      aria-label={`Enter a value for ${attr.name}`}
+      className="ml-auto h-8 w-52 text-xs rounded-md border px-2.5 outline-none focus:ring-2"
+      style={{ borderColor: "#E0E4E8" }}
+      onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing) return
+        if (e.key === "Enter") {
+          const value = e.currentTarget.value.trim()
+          if (value) onSubmit(value)
+        }
+      }}
+      onBlur={(e) => {
+        const value = e.currentTarget.value.trim()
+        if (value && value !== initialValue) onSubmit(value)
+      }}
+    />
+  )
 }
 
 // ── Discreet eval trigger (personal debug tool; hidden unless enabled) ────────
@@ -182,21 +239,15 @@ export function ScreenSupplierProductAttributes({
   const isGs1 = target.kind === "gs1"
   const targetLabel = isGs1 ? "GS1 Standard" : target.name
 
-  // Get gap records (missing attrs + missing images)
-  const { missingAttrs, missingImages } = getGapRecords(product, target)
+  // Image gaps still come from the gap engine; attributes come from the shared
+  // full-attribute derivation so this screen lists the whole category pool —
+  // provided, missing and waived — rather than only the outstanding gaps.
+  const { missingImages } = getGapRecords(product, target)
+  const attributes = getProductAttributes(product, target)
 
-  // Provided attributes — those in the product that are required for this target
-  const providedAttrs = (brick?.extendedAttributes ?? [])
-    .filter((attr) => {
-      // Include if not in missing list
-      return !missingAttrs.some((m) => m.code === attr.code)
-    })
-    .map((attr) => ({
-      code: attr.code,
-      name: attr.name,
-      value: product?.filledAttributes?.[attr.code] ?? "",
-    }))
-    .filter((a) => a.value) // Only those actually provided
+  const providedCount = attributes.filter((a) => a.status === "provided").length
+  const missingCount = attributes.filter((a) => a.status === "missing").length
+  const waivedCount = attributes.filter((a) => a.status === "waived").length
 
   const handleConfirm = () => {
     if (pendingFill) {
@@ -206,16 +257,12 @@ export function ScreenSupplierProductAttributes({
     }
   }
 
-  const handleEditExisting = (attrCode: string, currentValue: string) => {
-    // Find the attribute definition to get its name
-    const attrDef = brick?.extendedAttributes.find((a) => a.code === attrCode)
-    if (attrDef) {
-      setPendingFill({
-        attr: { code: attrCode, name: attrDef.name },
-        value: currentValue,
-      })
-      setEditingAttrCode(attrCode)
+  const handleSubmitValue = (attr: ResolvedAttribute, value: string) => {
+    if (!value || value === attr.value) {
+      setEditingAttrCode(null)
+      return
     }
+    setPendingFill({ attr: { code: attr.code, name: attr.name }, value })
   }
 
   return (
@@ -259,16 +306,30 @@ export function ScreenSupplierProductAttributes({
             <div className="flex items-center gap-2">
               <Dot color="#16A34A" />
               <span className="font-light text-[#6B7280]">
-                <span className="font-medium text-[#111827]">{providedAttrs.length}</span> provided
+                <span className="font-medium text-[#111827]">
+                  {providedCount} of {attributes.length}
+                </span>{" "}
+                provided
               </span>
             </div>
             <span style={{ color: "#E0E4E8" }}>|</span>
             <div className="flex items-center gap-2">
               <Dot color="#F59E0B" />
               <span className="font-light text-[#6B7280]">
-                <span className="font-medium text-[#111827]">{missingAttrs.length}</span> missing/gap
+                <span className="font-medium text-[#111827]">{missingCount}</span> missing/gap
               </span>
             </div>
+            {waivedCount > 0 && (
+              <>
+                <span style={{ color: "#E0E4E8" }}>|</span>
+                <div className="flex items-center gap-2">
+                  <Dot color="#9CA3AF" />
+                  <span className="font-light text-[#6B7280]">
+                    <span className="font-medium text-[#111827]">{waivedCount}</span> waived
+                  </span>
+                </div>
+              </>
+            )}
             {missingImages.length > 0 && (
               <>
                 <span style={{ color: "#E0E4E8" }}>|</span>
@@ -291,13 +352,15 @@ export function ScreenSupplierProductAttributes({
           </div>
         </div>
 
-        {/* Provided Attributes */}
-        {providedAttrs.length > 0 && (
+        {/* Every attribute in this category — provided, missing and waived, in
+            pool order, each one editable. */}
+        {attributes.length > 0 && (
           <section className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <h2 className="text-sm font-semibold text-[#111827]">Provided Attributes</h2>
+              <h2 className="text-sm font-semibold text-[#111827]">All Attributes</h2>
               <p className="text-xs font-light text-[#6B7280]">
-                Supplier has provided these values. Click the pencil to edit.
+                Every attribute {targetLabel} assesses for this category. Click a value to change it
+                — the value applies to every GTIN within this product.
               </p>
             </div>
             <div
@@ -306,123 +369,53 @@ export function ScreenSupplierProductAttributes({
             >
               <table className="w-full text-sm">
                 <tbody>
-                  {providedAttrs.map((attr, idx) => {
-                    const cfg = AttributeTone({ status: "provided" })
-                    return (
-                      <tr
-                        key={attr.code}
-                        style={{
-                          borderBottom: idx < providedAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
-                        }}
-                      >
-                        <td className="px-4 py-3 w-8 align-middle">
-                          <Dot color={cfg.dot} />
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <span className="font-medium text-[#111827]">{attr.name}</span>
-                          <span className="ml-2 text-xs font-light text-[#9CA3AF]">
-                            TGC: {attr.name} ({attr.code})
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <span className="text-sm text-[#6B7280]">{attr.value}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right align-middle w-12">
-                          <button
-                            onClick={() => handleEditExisting(attr.code, attr.value)}
-                            className="inline-flex items-center justify-center p-1.5 rounded hover:bg-[#F3F4F6] transition-colors"
-                            aria-label={`Edit ${attr.name}`}
-                          >
-                            <Edit2 className="w-4 h-4" style={{ color: "#6B7280" }} />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {/* Missing / Gap Attributes */}
-        {missingAttrs.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-sm font-semibold text-[#111827]">Missing / Gap Attributes</h2>
-              <p className="text-xs font-light text-[#6B7280]">
-                Required but not yet provided. Pick a value to fill.
-              </p>
-            </div>
-            <div
-              className="rounded-lg overflow-hidden"
-              style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
-            >
-              <table className="w-full text-sm">
-                <tbody>
-                  {missingAttrs.map((attr, idx) => {
-                    const cfg = AttributeTone({ status: "missing" })
-                    const allowedValues = getAllowedValues(attr.code)
+                  {attributes.map((attr, idx) => {
+                    const tone = STATUS_TONE[attr.status]
+                    const isEditing = editingAttrCode === attr.code
+                    const isWaived = attr.status === "waived"
                     return (
                       <tr
                         key={attr.code}
                         style={{
                           borderBottom:
-                            idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
+                            idx < attributes.length - 1 ? "1px solid #F3F4F6" : undefined,
                         }}
                       >
                         <td className="px-4 py-3 w-8 align-middle">
-                          <Dot color={cfg.dot} />
+                          <Dot color={tone.dot} />
                         </td>
                         <td className="px-4 py-3 align-middle">
-                          <span className="font-medium text-[#111827]">{attr.name}</span>
-                          <span className="ml-2 text-xs font-light text-[#9CA3AF]">
-                            TGC: {attr.name} ({attr.code})
+                          <span
+                            className="font-medium"
+                            style={{ color: isWaived ? "#6B7280" : "#111827" }}
+                          >
+                            {attr.name}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right align-middle w-56">
-                          {allowedValues && allowedValues.length > 0 ? (
-                            <Select
-                              value=""
-                              onValueChange={(value) => setPendingFill({ attr, value })}
-                            >
-                              <SelectTrigger
-                                className="ml-auto h-8 w-52 text-xs"
-                                aria-label={`Select a value for ${attr.name}`}
-                              >
-                                <SelectValue placeholder="Select a value…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {allowedValues.map((v) => (
-                                  <SelectItem key={v.value} value={v.value} className="text-xs">
-                                    {v.value}
-                                    {v.code && (
-                                      <span className="ml-1.5 font-mono text-[10px] text-[#9CA3AF]">
-                                        {v.code}
-                                      </span>
-                                    )}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <input
-                              type="text"
-                              placeholder="Enter a value…"
-                              aria-label={`Enter a value for ${attr.name}`}
-                              onKeyDown={(e) => {
-                                if (e.nativeEvent.isComposing) return
-                                if (e.key === "Enter") {
-                                  const target = e.currentTarget
-                                  if (target.value) {
-                                    setPendingFill({ attr, value: target.value })
-                                    target.value = ""
-                                  }
-                                }
-                              }}
-                              className="ml-auto h-8 w-52 text-xs px-3 py-1 rounded border"
-                              style={{ borderColor: "#E0E4E8" }}
+                        <td className="px-4 py-3 align-middle text-right w-64">
+                          {isWaived ? (
+                            <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
+                              Waived by {targetLabel}
+                            </span>
+                          ) : attr.status === "missing" || isEditing ? (
+                            <AttributeValueEditor
+                              attr={attr}
+                              initialValue={attr.value}
+                              onSubmit={(value) => handleSubmitValue(attr, value)}
                             />
+                          ) : (
+                            <span className="text-sm text-[#6B7280]">{attr.value}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right align-middle w-12">
+                          {attr.status === "provided" && !isEditing && (
+                            <button
+                              onClick={() => setEditingAttrCode(attr.code)}
+                              className="inline-flex items-center justify-center p-1.5 rounded hover:bg-[#F3F4F6] transition-colors"
+                              aria-label={`Edit ${attr.name}`}
+                            >
+                              <Edit2 className="w-4 h-4" style={{ color: "#6B7280" }} />
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -435,7 +428,7 @@ export function ScreenSupplierProductAttributes({
         )}
 
         {/* Empty state */}
-        {providedAttrs.length === 0 && missingAttrs.length === 0 && (
+        {attributes.length === 0 && (
           <div
             className="flex items-center gap-2 px-4 py-3 rounded-lg"
             style={{ backgroundColor: "#F0FDF4", border: "1px solid #DCFCE7" }}
