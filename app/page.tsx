@@ -553,7 +553,11 @@ export default function RetailerPortal() {
       />
 
       {perspective === "retailer" && aiEnabled && (
-        <ComplianceAgentPanel profiles={profiles} onCreateProfile={handleCreateProfile} />
+        <ComplianceAgentPanel
+          profiles={profiles}
+          onCreateProfile={handleCreateProfile}
+          onOpenAiAccess={() => setRetailerScreen("ai-access")}
+        />
       )}
 
       {/* Body */}

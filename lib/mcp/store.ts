@@ -8,7 +8,9 @@
 
 import {
   ATTRIBUTE_PROFILES,
+  VENDOR_EXCEPTIONS,
   type AttributeProfile,
+  type ExceptionRow,
 } from "@/lib/retailer-requirements"
 
 export interface AttributeRequirement {
@@ -47,10 +49,16 @@ export interface ProfileExtras {
   excludedGs1Names: string[]
 }
 
+/** A vendor exception, with the synthetic id the store uses to match a later update. */
+export interface VendorException extends ExceptionRow {
+  id: string
+}
+
 export interface DemoStore {
   profiles: AttributeProfile[]
   /** Keyed by GS1 category (brick) code */
   profileExtras: Record<string, ProfileExtras>
+  vendorExceptions: VendorException[]
 }
 
 // The 8 baseline core attributes every profile shares, regardless of category
@@ -89,6 +97,7 @@ function seed(): DemoStore {
         excludedGs1Names: [],
       },
     },
+    vendorExceptions: VENDOR_EXCEPTIONS.map((e, i) => ({ ...e, id: `seed-${i}` })),
   }
 }
 
@@ -97,6 +106,13 @@ const globalScope = globalThis as typeof globalThis & { __tgcDemoStore?: DemoSto
 export function getStore(): DemoStore {
   globalScope.__tgcDemoStore ??= seed()
   return globalScope.__tgcDemoStore
+}
+
+/** Active exceptions for one vendor — the shape the compliance-report engine needs. */
+export function activeExceptionsForVendor(vendor: string): VendorException[] {
+  return getStore().vendorExceptions.filter(
+    (e) => e.status === "Active" && e.vendor.toLowerCase() === vendor.toLowerCase()
+  )
 }
 
 /** Read-only view of a profile's extras — never persists a new entry. */

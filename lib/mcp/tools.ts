@@ -20,6 +20,7 @@ import {
   getStore,
   type AttributeRequirement,
   type ImageRequirement,
+  type VendorException,
 } from "@/lib/mcp/store"
 import {
   assembleBrickAttributes,
@@ -193,6 +194,84 @@ export function runComplianceReport(args: {
   }
 }
 
+/** List vendor exceptions on file, optionally filtered by vendor name or status. */
+export function listVendorExceptions(vendor?: string, status?: "Active" | "Expired") {
+  const { vendorExceptions } = getStore()
+  let matches = vendorExceptions
+  if (vendor) {
+    const q = vendor.toLowerCase().trim()
+    matches = matches.filter((e) => e.vendor.toLowerCase().includes(q))
+  }
+  if (status) matches = matches.filter((e) => e.status === status)
+
+  if (matches.length === 0) {
+    const knownVendors = [...new Set(vendorExceptions.map((e) => e.vendor))].sort()
+    return {
+      matches: [],
+      knownVendorsWithExceptions: knownVendors,
+      note: vendor
+        ? `No vendor exceptions matched "${vendor}"${status ? ` with status "${status}"` : ""}. Vendors with exceptions on file: ${knownVendors.join(", ")}.`
+        : `No vendor exceptions with status "${status}". Call list_vendor_exceptions with no filters to see all ${vendorExceptions.length}.`,
+    }
+  }
+  return matches
+}
+
+/**
+ * Create or update a vendor exception. Pass `id` (from list_vendor_exceptions)
+ * to update an existing exception; omit it to create a new one. An Active
+ * exception's attributes are excluded from that vendor's gap count in
+ * run_compliance_report and the portal's own Compliance Reports screen —
+ * see waivedAttributes() in lib/compliance-report.ts.
+ */
+export function setVendorException(args: {
+  id?: string
+  vendor: string
+  profile: string
+  exceptionType: "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"
+  attributes: string[]
+  validUntil: string
+  status?: "Active" | "Expired"
+}) {
+  if (args.attributes.length === 0) {
+    return { error: "At least one attribute must be listed for the exception (e.g. 'Sustainable Materials Y/N')." }
+  }
+  const store = getStore()
+
+  if (args.id) {
+    const idx = store.vendorExceptions.findIndex((e) => e.id === args.id)
+    if (idx < 0) {
+      return {
+        error: `No vendor exception with id "${args.id}". Use list_vendor_exceptions to find the right id, or omit id to create a new exception.`,
+      }
+    }
+    const updated: VendorException = {
+      ...store.vendorExceptions[idx],
+      vendor: args.vendor,
+      profile: args.profile,
+      exceptionType: args.exceptionType,
+      attributes: args.attributes,
+      validUntil: args.validUntil,
+      status: args.status ?? store.vendorExceptions[idx].status,
+    }
+    store.vendorExceptions[idx] = updated
+    return { updated, demo_note: DEMO_NOTE }
+  }
+
+  const created: VendorException = {
+    id: `exc-${Date.now()}-${store.vendorExceptions.length}`,
+    vendor: args.vendor,
+    profile: args.profile,
+    exceptionType: args.exceptionType,
+    attributes: args.attributes,
+    validUntil: args.validUntil,
+    status: args.status ?? "Active",
+    actions: ["Edit", "Revoke"],
+  }
+  store.vendorExceptions.push(created)
+  return { created, demo_note: DEMO_NOTE }
+}
+
 // Plain-English catalog of what this connector can do, plus a live snapshot of
 // the demo data so the model can answer "what can I ask?" without guessing.
 // Built from the store, so it never drifts from the actual seeded data.
@@ -242,11 +321,21 @@ export function getCapabilities() {
           "Require a lifestyle image on Handbags, JPEG, white background.",
         ],
       },
+      manageExceptions: {
+        summary:
+          "Grant, look up, or revoke vendor exceptions — waivers, extended deadlines, or reduced scope on specific attributes. Active exceptions reduce that vendor's compliance gap count.",
+        examples: [
+          "Give Levi's a 60-day extension on sustainable-materials fields.",
+          "Show all active exceptions.",
+          "Waive the Heel Height requirement for J.Renée.",
+        ],
+      },
     },
     writeActions: [
       "create_attribute_profile",
       "add_attribute_requirement",
       "set_image_requirement",
+      "set_vendor_exception",
     ],
     liveSnapshot: {
       attributeProfiles: store.profiles.map((p) => ({
@@ -259,6 +348,7 @@ export function getCapabilities() {
       categoriesWithSupplierData: categoriesWithData,
       gs1Segments: getSegments(),
       systemFilters: SYSTEM_FILTERS.map((f) => f.id),
+      activeVendorExceptions: store.vendorExceptions.filter((e) => e.status === "Active").length,
     },
     note: "All data is mock/demo and watermarked; write tools store changes in memory only and reset periodically. Out of scope in this demo: supplier-side tools, sales/logistics, and anything outside retailer requirements + supplier compliance.",
   }

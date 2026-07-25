@@ -16,7 +16,6 @@ import {
 } from "@/lib/supplier-catalogue"
 import {
   getProfileBricks,
-  VENDOR_EXCEPTIONS,
   type AttributeProfile,
   type SupplierComplianceRow,
 } from "@/lib/retailer-requirements"
@@ -29,7 +28,7 @@ import {
   getSystemFilter,
   type SystemFilterId,
 } from "@/lib/system-filters"
-import { BASELINE_CORE_ATTRIBUTES } from "@/lib/mcp/store"
+import { BASELINE_CORE_ATTRIBUTES, activeExceptionsForVendor } from "@/lib/mcp/store"
 
 // Core attribute names that are always present on every product by design.
 // They must never appear in any report's missing-attribute list.
@@ -303,9 +302,7 @@ export function runSupplierReport(
  *  case-insensitive substring in either direction so "Heel Height" waives
  *  "Heel Height Range" — the exception vocabulary predates the GS1 names. */
 function waivedAttributes(supplier: string): string[] {
-  return VENDOR_EXCEPTIONS.filter((e) => e.vendor === supplier && e.status === "Active").flatMap(
-    (e) => e.attributes
-  )
+  return activeExceptionsForVendor(supplier).flatMap((e) => e.attributes)
 }
 
 function isWaived(name: string, waived: string[]): boolean {

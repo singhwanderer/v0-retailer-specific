@@ -26,6 +26,8 @@ interface PendingProposal {
 interface ComplianceAgentPanelProps {
   profiles: AttributeProfile[]
   onCreateProfile: (profile: AttributeProfile) => void
+  /** Open the external MCP connector signpost screen */
+  onOpenAiAccess: () => void
 }
 
 const STARTER_PROMPTS = [
@@ -38,7 +40,7 @@ function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-export function ComplianceAgentPanel({ profiles, onCreateProfile }: ComplianceAgentPanelProps) {
+export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess }: ComplianceAgentPanelProps) {
   const [sheetOpen, setSheetOpen] = useState(true)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [proposals, setProposals] = useState<PendingProposal[]>([])
@@ -188,6 +190,13 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile }: ComplianceAg
             <div className="flex flex-col">
               <span className="text-base font-semibold text-[#111827]">TGC Compliance Agent</span>
               <span className="text-xs text-[#6B7280]">Retailer Requirements &amp; Compliance</span>
+              <button
+                onClick={onOpenAiAccess}
+                className="mt-1 text-xs font-medium text-left hover:underline w-fit"
+                style={{ color: "#0168B3" }}
+              >
+                Prefer Claude.ai or ChatGPT? Connect via MCP →
+              </button>
             </div>
           </div>
           <button
