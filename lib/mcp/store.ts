@@ -8,7 +8,10 @@
 
 import {
   ATTRIBUTE_PROFILES,
+  VENDOR_EXCEPTIONS,
   type AttributeProfile,
+  type ExceptionRow,
+  type ExceptionType,
 } from "@/lib/retailer-requirements"
 
 export interface AttributeRequirement {
@@ -47,10 +50,16 @@ export interface ProfileExtras {
   excludedGs1Names: string[]
 }
 
+/** A vendor exception, with the synthetic id the store uses to match a later update. */
+export interface VendorException extends ExceptionRow {
+  id: string
+}
+
 export interface DemoStore {
   profiles: AttributeProfile[]
   /** Keyed by GS1 category (brick) code */
   profileExtras: Record<string, ProfileExtras>
+  vendorExceptions: VendorException[]
 }
 
 // The 8 baseline core attributes every profile shares, regardless of category
@@ -89,6 +98,7 @@ function seed(): DemoStore {
         excludedGs1Names: [],
       },
     },
+    vendorExceptions: VENDOR_EXCEPTIONS.map((e, i) => ({ ...e, id: `seed-${i}` })),
   }
 }
 
@@ -97,6 +107,54 @@ const globalScope = globalThis as typeof globalThis & { __tgcDemoStore?: DemoSto
 export function getStore(): DemoStore {
   globalScope.__tgcDemoStore ??= seed()
   return globalScope.__tgcDemoStore
+}
+
+/** Active exceptions for one vendor — the shape the compliance-report engine needs. */
+export function activeExceptionsForVendor(vendor: string, exceptionType?: ExceptionType): VendorException[] {
+  return getStore().vendorExceptions.filter(
+    (e) =>
+      e.status === "Active" &&
+      e.vendor.toLowerCase() === vendor.toLowerCase() &&
+      (exceptionType === undefined || e.exceptionType === exceptionType)
+  )
+}
+
+// ── Shared waiver vocabulary ─────────────────────────────────────────────────
+// Both gap engines — the retailer one (lib/compliance-report.ts, vendor
+// aggregates) and the supplier one (lib/supplier-catalogue.ts, per product) —
+// resolve waivers through these two functions, so the two sides can never
+// disagree about which attributes an exception covers. They live here because
+// supplier-catalogue cannot import compliance-report without a cycle.
+
+/**
+ * Case-insensitive substring match in either direction, so an exception naming
+ * "Heel Height" also waives "Heel Height Range" — the exception vocabulary
+ * predates the GS1 attribute names. Note this is deliberately loose: a name
+ * that is a substring of a sibling attribute waives that sibling too, which
+ * is why the seed is collision-checked (scripts/check-exception-seed.ts).
+ */
+export function isAttributeWaived(attributeName: string, waivedNames: string[]): boolean {
+  const n = attributeName.toLowerCase()
+  return waivedNames.some((w) => {
+    const wl = w.toLowerCase()
+    return n.includes(wl) || wl.includes(n)
+  })
+}
+
+/**
+ * Attribute names covered by a vendor's Active exceptions. Narrow with
+ * `exceptionType` (only "Attribute Waiver" reduces gap counts) and/or
+ * `brickCode` (an exception only applies to the category it was scoped to —
+ * an exception with no brickCode matches nothing when a brickCode is asked
+ * for, so unscoped rows can never reduce a count).
+ */
+export function waivedAttributeNames(
+  vendor: string,
+  opts?: { exceptionType?: ExceptionType; brickCode?: string }
+): string[] {
+  return activeExceptionsForVendor(vendor, opts?.exceptionType)
+    .filter((e) => opts?.brickCode === undefined || e.brickCode === opts.brickCode)
+    .flatMap((e) => e.attributes)
 }
 
 /** Read-only view of a profile's extras — never persists a new entry. */

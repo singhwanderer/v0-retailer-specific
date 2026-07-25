@@ -12,11 +12,11 @@
 
 import {
   getCategory,
+  waivedAttributesForTarget,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
 import {
   getProfileBricks,
-  VENDOR_EXCEPTIONS,
   type AttributeProfile,
   type SupplierComplianceRow,
 } from "@/lib/retailer-requirements"
@@ -29,7 +29,11 @@ import {
   getSystemFilter,
   type SystemFilterId,
 } from "@/lib/system-filters"
-import { BASELINE_CORE_ATTRIBUTES } from "@/lib/mcp/store"
+import {
+  BASELINE_CORE_ATTRIBUTES,
+  isAttributeWaived,
+  waivedAttributeNames,
+} from "@/lib/mcp/store"
 
 // Core attribute names that are always present on every product by design.
 // They must never appear in any report's missing-attribute list.
@@ -200,6 +204,21 @@ function supplierGapAllocation(
   const missing = pool.slice(0, fromPool)
   const overflow = Math.min(rawGaps - fromPool, IMAGE_OVERFLOW.length)
   for (let i = 0; i < overflow; i++) missing.push({ name: IMAGE_OVERFLOW[i] })
+
+  // Honour the same waivers the supplier's Compliance screens apply, so the
+  // supplier's own report can't contradict them. Account filters only — a
+  // retailer's waiver has no authority over a global System filter.
+  if (filter.kind === "account") {
+    const waived = waivedAttributesForTarget(product.brickCode, {
+      kind: "retailer",
+      name: filter.retailer,
+    })
+    if (waived.length > 0) {
+      const kept = missing.filter((m) => !isAttributeWaived(m.name, waived))
+      return { effectiveGaps: kept.length, missing: kept }
+    }
+  }
+
   return { effectiveGaps: missing.length, missing }
 }
 
@@ -299,22 +318,8 @@ export function runSupplierReport(
 
 // ── Retailer engine ───────────────────────────────────────────────────────────
 
-/** Attribute names an Active exception row waives for a vendor. Matched by
- *  case-insensitive substring in either direction so "Heel Height" waives
- *  "Heel Height Range" — the exception vocabulary predates the GS1 names. */
-function waivedAttributes(supplier: string): string[] {
-  return VENDOR_EXCEPTIONS.filter((e) => e.vendor === supplier && e.status === "Active").flatMap(
-    (e) => e.attributes
-  )
-}
-
-function isWaived(name: string, waived: string[]): boolean {
-  const n = name.toLowerCase()
-  return waived.some((w) => {
-    const wl = w.toLowerCase()
-    return n.includes(wl) || wl.includes(n)
-  })
-}
+// Waiver resolution lives in lib/mcp/store.ts so the supplier-side engine
+// resolves the exact same names — see waivedAttributeNames/isAttributeWaived.
 
 /**
  * Scan the retailer's vendor base. The vendor data is aggregate (per-vendor
@@ -381,11 +386,26 @@ export function runRetailerReport(
     }
     // Core attributes are always populated — they must never appear as gaps.
     pool = pool.filter((a) => !CORE_ATTR_NAMES.has(a.name))
-    const waived = waivedAttributes(s.supplier)
-    pool = pool.filter((a) => !isWaived(a.name, waived))
+    // Every exception type, scoped to this category, drops its attributes from
+    // the blame pool — an attribute under an exception shouldn't be named as
+    // this vendor's problem regardless of the exception's kind.
+    const waived = waivedAttributeNames(s.supplier, { brickCode: s.brickCode })
+
+    // Only an Active "Attribute Waiver" reduces the gap count itself (a waived
+    // requirement is no longer outstanding). An Extended Deadline or Reduced
+    // Scope changes which attributes are named, but the gaps stay open.
+    // Scoped by brickCode because a vendor can supply several categories; an
+    // exception with no brickCode never reduces a count.
+    const waiverOnly = waivedAttributeNames(s.supplier, {
+      exceptionType: "Attribute Waiver",
+      brickCode: s.brickCode,
+    })
+    const waivedGapCount = pool.filter((a) => isAttributeWaived(a.name, waiverOnly)).length
+
+    pool = pool.filter((a) => !isAttributeWaived(a.name, waived))
 
     // Distribute this vendor's gaps over the first k pool attributes.
-    const gaps = s.openGaps
+    const gaps = Math.max(0, s.openGaps - waivedGapCount)
     const k = Math.min(pool.length, gaps)
     for (let i = 0; i < k; i++) {
       const share = Math.floor(gaps / k) + (i < gaps % k ? 1 : 0)

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { BadgeCheck, ChevronDown, Search, X } from "lucide-react"
 import { getBrickByCode } from "@/lib/gs1-standard-library"
+import { getGapCount } from "@/lib/supplier-catalogue"
 import type { GapTarget, RetailerStatus, SupplierProduct } from "@/lib/supplier-catalogue"
 
 // ── Shared product leaf ───────────────────────────────────────────────────────
@@ -44,15 +45,21 @@ type StatusFilter = "all" | "gaps" | "complete"
 // The view is scoped to a single partner, so this shows only that partner's
 // status for the product — a gap count that drills into gap detail, or Complete.
 function ComplianceTrigger({
-  status,
+  row,
+  partnerName,
   onNavigateToGapDetail,
 }: {
-  status?: RetailerStatus
+  row: ProductRow
+  partnerName: string
   onNavigateToGapDetail: () => void
 }) {
+  const status = row.retailers?.find((r) => r.retailer === partnerName)
   if (!status) return <span className="text-sm font-light text-[#6B7280]">No requirements set</span>
 
-  const isComplete = status.gaps === "complete"
+  // Via getGapCount so attributes filled in by us, or waived by this retailer,
+  // are reflected here exactly as they are in the selection-code totals.
+  const open = getGapCount(row, { kind: "retailer", name: partnerName })
+  const isComplete = open === 0
   return (
     <button
       onClick={() => !isComplete && onNavigateToGapDetail()}
@@ -67,7 +74,7 @@ function ComplianceTrigger({
         className="w-1.5 h-1.5 rounded-full shrink-0"
         style={{ backgroundColor: isComplete ? "#16A34A" : "#F59E0B" }}
       />
-      {isComplete ? "Complete" : `${status.gaps} gap${status.gaps !== 1 ? "s" : ""}`}
+      {isComplete ? "Complete" : `${open} gap${open !== 1 ? "s" : ""}`}
     </button>
   )
 }
@@ -125,13 +132,14 @@ function Gs1Status({
   if (row.state === "uncategorised") {
     return <StatusPill tone="red" label="Cannot be assessed" />
   }
-  if ((row.gs1Gaps ?? 0) === 0) {
+  const gs1Gaps = getGapCount(row, { kind: "gs1" })
+  if (gs1Gaps === 0) {
     return <StatusPill tone="green" label="GS1 complete" />
   }
   return (
     <StatusPill
       tone="amber"
-      label={`${row.gs1Gaps} GS1 gap${row.gs1Gaps !== 1 ? "s" : ""}`}
+      label={`${gs1Gaps} GS1 gap${gs1Gaps !== 1 ? "s" : ""}`}
       onClick={onNavigateToGapDetail}
     />
   )
@@ -148,9 +156,14 @@ function CodeComplianceCell({
   row: ProductRow
   onNavigateToGapDetail: (target: GapTarget) => void
 }) {
-  const gs1Gaps = row.gs1Gaps ?? 0
+  // Every count here goes through getGapCount so fills and retailer waivers are
+  // reflected — a retailer that has waived its way to zero collapses into the
+  // green "complete" summary rather than showing a stale open count.
+  const gs1Gaps = getGapCount(row, { kind: "gs1" })
   const retailers = row.retailers ?? []
-  const withGaps = retailers.filter((r) => r.gaps !== "complete")
+  const withGaps = retailers
+    .map((r) => ({ retailer: r.retailer, open: getGapCount(row, { kind: "retailer", name: r.retailer }) }))
+    .filter((r) => r.open > 0)
   const completeCount = retailers.length - withGaps.length
 
   return (
@@ -168,7 +181,7 @@ function CodeComplianceCell({
         <StatusPill
           key={r.retailer}
           tone="amber"
-          label={`${r.retailer} · ${r.gaps}`}
+          label={`${r.retailer} · ${r.open}`}
           onClick={() => onNavigateToGapDetail({ kind: "retailer", name: r.retailer })}
         />
       ))}
@@ -278,7 +291,10 @@ export function ScreenSupplierProducts({
         row.id.toLowerCase().includes(search.toLowerCase()) ||
         row.description.toLowerCase().includes(search.toLowerCase())
       const hasAnyGap =
-        (row.gs1Gaps ?? 0) > 0 || (row.retailers ?? []).some((r) => r.gaps !== "complete")
+        getGapCount(row, { kind: "gs1" }) > 0 ||
+        (row.retailers ?? []).some(
+          (r) => getGapCount(row, { kind: "retailer", name: r.retailer }) > 0
+        )
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "gaps" && hasAnyGap) ||
@@ -296,10 +312,11 @@ export function ScreenSupplierProducts({
       search.trim() === "" ||
       row.id.toLowerCase().includes(search.toLowerCase()) ||
       row.description.toLowerCase().includes(search.toLowerCase())
+    const open = getGapCount(row, { kind: "retailer", name: partnerName })
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "gaps" && rs.gaps !== "complete") ||
-      (statusFilter === "complete" && rs.gaps === "complete")
+      (statusFilter === "gaps" && open > 0) ||
+      (statusFilter === "complete" && open === 0)
     return matchesSearch && matchesStatus
   })
 
@@ -622,7 +639,8 @@ export function ScreenSupplierProducts({
                         />
                       ) : (
                         <ComplianceTrigger
-                          status={partnerStatus(row)}
+                          row={row}
+                          partnerName={partnerName}
                           onNavigateToGapDetail={() =>
                             onNavigateToGapDetail(row.id, { kind: "retailer", name: partnerName })
                           }

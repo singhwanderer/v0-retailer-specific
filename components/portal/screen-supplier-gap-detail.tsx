@@ -100,7 +100,7 @@ export function ScreenSupplierGapDetail({
 
   // Canonical gap records — the same derivation every other screen uses, so the
   // named gaps here always add up to the count that was clicked.
-  const { missingAttrs, missingImages, totalAttrCount, totalImageCount } =
+  const { missingAttrs, missingImages, waivedAttrs, totalAttrCount, totalImageCount } =
     getGapRecords(product, target)
   const missingImageNames = new Set(missingImages.map((img) => img.name))
 
@@ -283,6 +283,50 @@ export function ScreenSupplierGapDetail({
           )}
         </div>
       </section>
+
+      {/* Waived by this retailer — not gaps, but shown so the count is explicable */}
+      {waivedAttrs.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-semibold text-[#111827]">Waived by {targetLabel}</h2>
+            <p className="text-xs font-light text-[#6B7280]">
+              {targetLabel} has granted an exception for these attributes, so they are not counted
+              as gaps against you. Other trading partners may still require them.
+            </p>
+          </div>
+          <div
+            className="rounded-lg overflow-hidden"
+            style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
+          >
+            <table className="w-full text-sm">
+              <tbody>
+                {waivedAttrs.map((attr, idx) => (
+                  <tr
+                    key={attr.code}
+                    style={{
+                      borderBottom: idx < waivedAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
+                    }}
+                  >
+                    <td className="px-4 py-3 w-8 align-middle">
+                      <Dot color="#9CA3AF" />
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="font-medium" style={{ color: "#6B7280" }}>
+                        {attr.name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 align-middle text-right">
+                      <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
+                        Waived
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Section B — Image Requirements */}
       <section className="flex flex-col gap-3">

@@ -7,6 +7,7 @@
 // screen keeping its own copy that can drift out of agreement.
 
 import { getBrickByCode } from "@/lib/gs1-standard-library"
+import { isAttributeWaived, waivedAttributeNames } from "@/lib/mcp/store"
 
 export type RetailerStatus = {
   retailer: string
@@ -563,10 +564,26 @@ export type MissingImage = { name: string; spec: string }
 export type GapRecords = {
   missingAttrs: MissingAttribute[]
   missingImages: MissingImage[]
+  /**
+   * Attributes that would be missing, except this retailer has waived them.
+   * Not counted as gaps — surfaced so a screen can show "waived by <retailer>"
+   * instead of the requirement vanishing with no explanation.
+   */
+  waivedAttrs: MissingAttribute[]
   /** Pool sizes, for "X of Y provided" summaries */
   totalAttrCount: number
   totalImageCount: number
 }
+
+/** The supplier persona this prototype is logged in as. */
+export const SUPPLIER_PERSONA = "J.Renée"
+
+/**
+ * The one retailer whose exceptions are modelled — the live persona on the
+ * other side of this prototype. The other trading partners are static mocks
+ * and grant no exceptions.
+ */
+export const EXCEPTION_GRANTING_RETAILER = "Dillard's"
 
 export const IMAGE_REQUIREMENT_POOL: MissingImage[] = [
   { name: "Hero Shot", spec: "pure white background, 2000 × 2000 px, square" },
@@ -579,17 +596,24 @@ export function countFilledAttributes(product: SupplierProduct): number {
 }
 
 /**
- * Open gap count for a product against one target (0 when complete or not
- * assessed). Attributes the supplier has filled in reduce the count for every
- * target, since a filled attribute is a product-level fact.
+ * Attribute names the exception-granting retailer has waived for this supplier
+ * in this GS1 category.
+ *
+ * Empty for the GS1 baseline (a retailer's waiver has no authority over the
+ * industry standard) and for every retailer other than Dillard's — the other
+ * trading partners are static mocks in this prototype and grant no exceptions.
  */
-export function getGapCount(product: SupplierProduct, target: GapTarget): number {
-  if (product.state !== "categorised") return 0
-  const filled = countFilledAttributes(product)
-  if (target.kind === "gs1") return Math.max(0, (product.gs1Gaps ?? 0) - filled)
-  const rs = product.retailers?.find((r) => r.retailer === target.name)
-  if (!rs || rs.gaps === "complete") return 0
-  return Math.max(0, rs.gaps - filled)
+export function waivedAttributesForTarget(
+  brickCode: string | undefined,
+  target: GapTarget
+): string[] {
+  if (target.kind !== "retailer") return []
+  if (target.name !== EXCEPTION_GRANTING_RETAILER) return []
+  if (!brickCode) return []
+  return waivedAttributeNames(SUPPLIER_PERSONA, {
+    exceptionType: "Attribute Waiver",
+    brickCode,
+  })
 }
 
 /** Stable small hash of a string — deterministic across renders and reloads. */
@@ -599,17 +623,28 @@ function stableHash(s: string): number {
   return h
 }
 
-export function getGapRecords(
+type BrickAttribute = { name: string; code: string }
+
+type GapAllocation = {
+  /** The head-slice of the brick pool this product's gaps resolve to. */
+  allocatedAttrs: BrickAttribute[]
+  imageGaps: MissingImage[]
+  attrPoolSize: number
+}
+
+/**
+ * Resolve a product's opaque gap count into the specific attribute and image
+ * requirements it stands for. Both getGapCount and getGapRecords route through
+ * this, so the number on a pill can never disagree with the list on the detail
+ * screen — they are derived from one allocation.
+ */
+function allocateGaps(
   product: SupplierProduct | undefined,
   target: GapTarget
-): GapRecords {
+): GapAllocation {
   const brick = product?.brickCode ? getBrickByCode(product.brickCode) : undefined
   const attrPool = brick?.extendedAttributes ?? []
 
-  // The image split is derived from the ORIGINAL gap count (before any fills) so
-  // that filling an attribute never disturbs which image requirements show —
-  // fills only ever reduce the attribute portion.
-  const filledCodes = new Set(product?.filledAttributes ? Object.keys(product.filledAttributes) : [])
   const originalGapCount =
     product && product.state === "categorised"
       ? target.kind === "gs1"
@@ -627,7 +662,6 @@ export function getGapRecords(
   // requirements unreachable given the seed's modest gap counts.
   const targetKey = target.kind === "gs1" ? "gs1" : `r:${target.name}`
   const hash = product ? stableHash(`${product.id}|${targetKey}`) : 0
-  // Distribution across products with gaps: ~1/3 none, ~1/3 one, ~1/3 two.
   const desiredImageGaps = originalGapCount === 0 ? 0 : hash % 3
 
   let imageGapCount = Math.min(desiredImageGaps, originalGapCount, IMAGE_REQUIREMENT_POOL.length)
@@ -639,18 +673,54 @@ export function getGapRecords(
     attrCount = attrPool.length
   }
 
-  // The originally-missing attributes, then drop the ones the supplier has since
-  // filled in so they read as provided and no longer count as gaps.
-  const missingAttrs = attrPool
-    .slice(0, attrCount)
-    .filter((a) => !filledCodes.has(a.code))
-    .map((a) => ({ name: a.name, code: a.code }))
-  const missingImages = IMAGE_REQUIREMENT_POOL.slice(0, imageGapCount)
+  return {
+    allocatedAttrs: attrPool.slice(0, attrCount).map((a) => ({ name: a.name, code: a.code })),
+    imageGaps: IMAGE_REQUIREMENT_POOL.slice(0, imageGapCount),
+    attrPoolSize: attrPool.length,
+  }
+}
+
+/**
+ * Open gap count for a product against one target (0 when complete or not
+ * assessed). Attributes the supplier has filled in reduce the count for every
+ * target, since a filled attribute is a product-level fact; attributes the
+ * retailer has waived reduce it for that retailer's target only.
+ */
+export function getGapCount(product: SupplierProduct, target: GapTarget): number {
+  const { missingAttrs, missingImages } = getGapRecords(product, target)
+  return missingAttrs.length + missingImages.length
+}
+
+export function getGapRecords(
+  product: SupplierProduct | undefined,
+  target: GapTarget
+): GapRecords {
+  // The image split is derived from the ORIGINAL gap count (before any fills or
+  // waivers) so that filling or waiving an attribute never disturbs which image
+  // requirements show — both only ever reduce the attribute portion.
+  const { allocatedAttrs, imageGaps, attrPoolSize } = allocateGaps(product, target)
+
+  const filledCodes = new Set(product?.filledAttributes ? Object.keys(product.filledAttributes) : [])
+  const waivedNames = waivedAttributesForTarget(product?.brickCode, target)
+
+  // Attributes this retailer has waived for us: no longer outstanding, but
+  // surfaced separately so the detail screen can say "waived by Dillard's"
+  // rather than having the requirement silently disappear.
+  const waivedAttrs = allocatedAttrs.filter(
+    (a) => !filledCodes.has(a.code) && isAttributeWaived(a.name, waivedNames)
+  )
+  const waivedCodes = new Set(waivedAttrs.map((a) => a.code))
+
+  // What's genuinely still open: not filled in by us, not waived by them.
+  const missingAttrs = allocatedAttrs.filter(
+    (a) => !filledCodes.has(a.code) && !waivedCodes.has(a.code)
+  )
 
   return {
     missingAttrs,
-    missingImages,
-    totalAttrCount: attrPool.length,
+    missingImages: imageGaps,
+    waivedAttrs,
+    totalAttrCount: attrPoolSize,
     totalImageCount: IMAGE_REQUIREMENT_POOL.length,
   }
 }
@@ -702,11 +772,13 @@ export function getTargetCompletion(
     const category = getCategory(p)
     if (category === null) continue // uncategorised — cannot be assessed
     if (isGs1) {
-      assessed.push({ category, complete: (p.gs1Gaps ?? 0) === 0 })
+      assessed.push({ category, complete: getGapCount(p, { kind: "gs1" }) === 0 })
     } else {
       const rs = p.retailers?.find((r) => r.retailer === target)
       if (!rs) continue // this retailer publishes nothing against the product
-      assessed.push({ category, complete: rs.gaps === "complete" })
+      // Via getGapCount, not rs.gaps, so a product whose every gap has been
+      // filled in or waived reads as complete here too.
+      assessed.push({ category, complete: getGapCount(p, { kind: "retailer", name: target }) === 0 })
     }
   }
 
@@ -819,9 +891,11 @@ export function getSelectionCodesForPartner(
       let gaps = 0
       let complete = 0
       for (const p of rows) {
-        const rs = p.retailers!.find((r) => r.retailer === partnerName)!
-        if (rs.gaps === "complete") complete += 1
-        else gaps += rs.gaps
+        // Via getGapCount so fills and this retailer's waivers are reflected,
+        // rather than reading the raw seeded count.
+        const open = getGapCount(p, { kind: "retailer", name: partnerName })
+        if (open === 0) complete += 1
+        else gaps += open
       }
       return {
         id: String(i + 1).padStart(3, "0"),

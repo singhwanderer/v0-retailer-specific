@@ -17,9 +17,11 @@ import {
   listAttributeProfiles,
   listMySuppliers,
   listSystemFilters,
+  listVendorExceptions,
   runComplianceReport,
   searchGs1Bricks,
   setImageRequirement,
+  setVendorException,
 } from "@/lib/mcp/tools"
 
 function asText(data: unknown) {
@@ -91,6 +93,16 @@ const handler = createMcpHandler(
       async (args) => asText(runComplianceReport(args))
     )
 
+    server.tool(
+      "list_vendor_exceptions",
+      "List vendor exceptions on file — waivers, extended deadlines, or reduced-scope exclusions granted against a supplier's requirements. Optionally filter by vendor name or status (Active/Expired). These are the exceptions that reduce a vendor's gap count in run_compliance_report.",
+      {
+        vendor: z.string().optional().describe("Vendor name to filter by, e.g. 'Levi Strauss & Co.'"),
+        status: z.enum(["Active", "Expired"]).optional().describe("Filter by exception status"),
+      },
+      async ({ vendor, status }) => asText(listVendorExceptions(vendor, status))
+    )
+
     // ── Writes (in-memory demo store) ───────────────────────────────────────
     server.tool(
       "create_attribute_profile",
@@ -134,6 +146,31 @@ const handler = createMcpHandler(
         guidanceNote: z.string().optional().describe("Optional note for suppliers, e.g. 'No mannequin, no props.'"),
       },
       async ({ brickCode, ...requirement }) => asText(setImageRequirement(brickCode, requirement))
+    )
+
+    server.tool(
+      "set_vendor_exception",
+      "Create or update a vendor exception — a waiver, extended deadline, or reduced-scope exclusion against one or more attributes for a named vendor, scoped to one category. An Active 'Attribute Waiver' exception's attributes reduce that vendor's gap count for this exact category in run_compliance_report and the portal's own Compliance Reports/Dashboard screens (Extended Deadline and Reduced Scope still change which attribute is named as a gap, but don't reduce the count). To update an existing exception (e.g. revoke it by setting status to Expired, or extend validUntil), pass its id from list_vendor_exceptions; omit id to create a new one. Confirm the exact vendor, category, exception type, attributes, and validity with the user before calling — this changes real compliance numbers.",
+      {
+        id: z.string().optional().describe("Existing exception id to update, from list_vendor_exceptions. Omit to create a new exception."),
+        vendor: z.string().describe("Vendor name, e.g. 'Levi Strauss & Co.'"),
+        brickCode: z
+          .string()
+          .describe(
+            "GS1 category code the exception applies to (find via search_gs1_bricks or list_attribute_profiles). Scopes the exception to this vendor's category so it can't leak into a different category the same vendor also supplies, e.g. Calvin Klein supplies Footwear, Shirts, and Dresses separately."
+          ),
+        profile: z.string().describe("Profile name the exception applies to, e.g. 'Apparel — Extended Sustainability'"),
+        exceptionType: z
+          .enum(["Attribute Waiver", "Extended Deadline", "Reduced Scope"])
+          .describe("Type of exception"),
+        attributes: z
+          .array(z.string())
+          .min(1)
+          .describe("Attribute names this exception waives/extends/reduces, e.g. ['Sustainable Materials Y/N']"),
+        validUntil: z.string().describe("Expiry date as free text, e.g. 'Sep 30, 2026', or 'Permanent'"),
+        status: z.enum(["Active", "Expired"]).optional().describe("Exception status — defaults to Active on create"),
+      },
+      async (args) => asText(setVendorException(args))
     )
 
     // ── Starter prompts ──────────────────────────────────────────────────────
@@ -193,12 +230,12 @@ const handler = createMcpHandler(
     instructions:
       "Trading Grid Catalogue (TGC) demo server — a B2B catalog data-sync network connecting retailer hubs and supplier spokes. " +
       "This connector is built for the RETAILER side (e.g. Dillard's), not suppliers. " +
-      "SCOPE: authoring product requirements (attribute profiles, attributes, image requirements) and monitoring the compliance of the retailer's OWN suppliers (e.g. J.Renée, Nike) against those requirements. " +
+      "SCOPE: authoring product requirements (attribute profiles, attributes, image requirements), monitoring the compliance of the retailer's OWN suppliers (e.g. J.Renée, Nike) against those requirements, and managing vendor exceptions (waivers, extended deadlines, reduced scope) against those suppliers. " +
       "All data is mock data from a watermarked prototype; write tools store changes in an in-memory demo store that resets periodically. " +
       "GROUNDING: answer questions about TGC data strictly from tool results — never invent profiles, suppliers, categories, or numbers. " +
       "When the user asks what they can do, is unsure, or asks something open-ended, call get_capabilities first to see what actions and data actually exist, then guide them. " +
       "EMPTY RESULTS: some read tools return a note with known suppliers/statuses when a filter matches nothing — relay those suggestions instead of just saying 'none found'. " +
-      "OUT OF SCOPE: other retail partners' or peer accounts' data (e.g. asking how Macy's or Belk is doing is not answerable here — this connector only knows the retailer's own suppliers), vendor exceptions (waivers, extended deadlines, reduced scope), supplier-side tools (a supplier asking about their own compliance), sales, logistics, pricing, or anything beyond retailer requirements and supplier compliance-gap monitoring are not in this demo — say so plainly and point to what IS available via get_capabilities, rather than answering from general knowledge as if it were TGC data. " +
+      "OUT OF SCOPE: other retail partners' or peer accounts' data (e.g. asking how Macy's or Belk is doing is not answerable here — this connector only knows the retailer's own suppliers), supplier-side tools (a supplier asking about their own compliance), sales, logistics, pricing, or anything beyond retailer requirements, supplier compliance-gap monitoring, and vendor exceptions are not in this demo — say so plainly and point to what IS available via get_capabilities, rather than answering from general knowledge as if it were TGC data. " +
       "WRITES: before any write tool, restate the exact change to the user and get their explicit confirmation.",
   },
   { basePath: "/api" }

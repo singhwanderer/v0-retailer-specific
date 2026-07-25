@@ -17,6 +17,7 @@ import { ScreenSupplierProductAttributes } from "@/components/portal/screen-supp
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
 import { ScreenComplianceDashboard } from "@/components/portal/screen-compliance-dashboard"
+import { AiAccessModal } from "@/components/portal/screen-retailer-ai-access"
 import { ComplianceAgentPanel } from "@/components/portal/compliance-agent-panel"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
@@ -40,6 +41,7 @@ import {
   runSupplierReport,
   type ReportRequest,
 } from "@/lib/compliance-report"
+import { getStore } from "@/lib/mcp/store"
 
 type Perspective = "retailer" | "supplier"
 
@@ -114,6 +116,9 @@ export default function RetailerPortal() {
     setAiEnabled(enabled)
     localStorage.setItem(AI_ENABLED_KEY, enabled ? "1" : "0")
   }
+
+  // ── External MCP connector signpost — a modal reached from the chat panel ──
+  const [aiAccessOpen, setAiAccessOpen] = useState(false)
 
   function dismissWelcome() {
     localStorage.setItem(WELCOME_DISMISSED_KEY, "1")
@@ -444,6 +449,14 @@ export default function RetailerPortal() {
     setSupplierScreen("image-upload")
   }
 
+  // ── Any other screen showing an image gap → image-upload WIP screen ───────
+  // Establishes the gap context the upload screen (and its "Back") relies on,
+  // then hands off the same way the gap-detail table does.
+  function handleUploadImageFor(productId: string, target: GapTarget, image: MissingImage) {
+    setGapContext({ productId, target, origin: gapContext?.origin ?? "partner-flow" })
+    handleOpenImageUpload(image)
+  }
+
   function handleBackFromImageUpload() {
     setUploadImage(null)
     setSupplierScreen("supplier-gap-detail")
@@ -542,8 +555,14 @@ export default function RetailerPortal() {
       />
 
       {perspective === "retailer" && aiEnabled && (
-        <ComplianceAgentPanel profiles={profiles} onCreateProfile={handleCreateProfile} />
+        <ComplianceAgentPanel
+          profiles={profiles}
+          onCreateProfile={handleCreateProfile}
+          onOpenAiAccess={() => setAiAccessOpen(true)}
+        />
       )}
+
+      {aiAccessOpen && <AiAccessModal onClose={() => setAiAccessOpen(false)} />}
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
@@ -588,7 +607,9 @@ export default function RetailerPortal() {
                 />
               )}
               
-              {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
+              {retailerScreen === "vendor-exceptions" && (
+                <Screen3VendorExceptions exceptions={getStore().vendorExceptions} />
+              )}
 
               {/* Defensive compliance scanning — the retailer's own filters
                   (or a System filter) across its vendor base */}
@@ -699,6 +720,7 @@ export default function RetailerPortal() {
                   requestedBy="J.Renée"
                   reports={supplierReports}
                   onRequestReport={(p) => handleRunReport("supplier", p)}
+                  onUploadImage={handleUploadImageFor}
                 />
               )}
 
@@ -726,6 +748,9 @@ export default function RetailerPortal() {
                   onBack={handleBackFromAttributes}
                   onFillAttribute={handleFillAttribute}
                   onViewGtins={handleViewGtins}
+                  onUploadImage={(image) =>
+                    handleUploadImageFor(attrContext.productId, attrContext.target, image)
+                  }
                 />
               )}
 

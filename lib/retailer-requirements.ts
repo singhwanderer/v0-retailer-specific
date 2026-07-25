@@ -205,6 +205,15 @@ export type ExceptionStatus = "Active" | "Expired"
 export interface ExceptionRow {
   vendor: string
   profile: string
+  /**
+   * GS1 category (brick) the exception is scoped to. A vendor can supply
+   * several categories (Calvin Klein trades Footwear, Shirts and Dresses), so
+   * an unscoped exception would leak across categories that share an
+   * attribute name. Optional at the type level only, so a caller that omits
+   * scope still compiles — but an unscoped exception never reduces a gap
+   * count; see waivedAttributeNames in lib/mcp/store.ts.
+   */
+  brickCode?: string
   exceptionType: ExceptionType
   attributes: string[]
   validUntil: string
@@ -212,76 +221,98 @@ export interface ExceptionRow {
   actions: string[]
 }
 
+// Every row here is checked against the rest of the mock data by
+// scripts/check-exception-seed.ts: the vendor must trade in RETAILER_SUPPLIERS
+// at this exact brickCode, the profile must be a real ATTRIBUTE_PROFILES name
+// covering that brick, and every attribute name must exist in that brick's
+// assembled pool. Attribute names are also checked for substring collisions,
+// because the waiver matcher compares loosely in both directions — waiving
+// "Fur Country of Origin" would silently also waive "Country of Origin".
+//
+// Only an Active "Attribute Waiver" scoped to a brick the vendor supplies
+// reduces reported gap counts. Extended Deadline and Reduced Scope change
+// which attributes are named as gaps, but not how many are open.
 export const VENDOR_EXCEPTIONS: ExceptionRow[] = [
   {
     vendor: "J.Renée",
-    profile: "Footwear — Core Compliance",
+    profile: "Footwear",
+    brickCode: "10001077",
     exceptionType: "Attribute Waiver",
-    attributes: ["Heel Height", "Platform Height"],
+    // Origin copy is brand-owned; care codes ship on the physical label.
+    attributes: ["Advertised Origin", "Care Instructions Code"],
     validUntil: "Jun 30, 2026",
     status: "Active",
     actions: ["Edit", "Revoke"],
   },
   {
-    vendor: "Levi Strauss & Co.",
-    profile: "Apparel — Extended Sustainability",
-    exceptionType: "Extended Deadline",
-    attributes: ["Sustainable Materials Y/N", "Sustainable Materials Desc"],
-    validUntil: "Apr 15, 2026",
-    status: "Active",
-    actions: ["Edit", "Revoke"],
-  },
-  {
-    vendor: "Fossil Group",
-    profile: "Jewellery — Base Requirements",
+    vendor: "Calvin Klein",
+    profile: "Dresses",
+    brickCode: "10001333",
     exceptionType: "Attribute Waiver",
-    attributes: ["CPSIA Certified Y/N"],
+    // No fur content in this line — scoped to Dresses only, so Calvin Klein's
+    // Footwear and Shirts rows are untouched.
+    attributes: ["Fur Animal Name", "Fur Treatment"],
     validUntil: "Dec 31, 2026",
     status: "Active",
     actions: ["Edit", "Revoke"],
   },
   {
-    vendor: "Calvin Klein",
-    profile: "Apparel — Extended Sustainability",
+    vendor: "Levi Strauss & Co.",
+    profile: "Apparel",
+    brickCode: "10001352",
     exceptionType: "Extended Deadline",
-    attributes: ["Chemical Certifications", "Social Certifications"],
-    validUntil: "Mar 1, 2026",
-    status: "Expired",
-    actions: ["Renew", "Archive"],
+    attributes: ["Fiber", "Fabric or Material Code"],
+    validUntil: "Apr 15, 2026",
+    status: "Active",
+    actions: ["Edit", "Revoke"],
   },
   {
-    vendor: "York and Jones",
-    profile: "Jewellery — Base Requirements",
+    vendor: "Nike Golf",
+    profile: "Footwear",
+    brickCode: "10001077",
     exceptionType: "Reduced Scope",
-    attributes: ["Gold Karat", "Stone Details", "Stone"],
+    attributes: ["Faux Fur", "Fur Animal Name", "Fur Treatment"],
     validUntil: "Permanent",
     status: "Active",
     actions: ["Edit", "Revoke"],
   },
   {
     vendor: "Michael Kors",
-    profile: "Handbags — Base Requirements",
-    exceptionType: "Attribute Waiver",
-    attributes: ["Lining Material", "Strap Type"],
-    validUntil: "Aug 31, 2026",
+    profile: "Belts",
+    brickCode: "10001326",
+    exceptionType: "Reduced Scope",
+    attributes: ["Fur Animal Name", "Fur Treatment"],
+    validUntil: "Permanent",
     status: "Active",
     actions: ["Edit", "Revoke"],
   },
   {
-    vendor: "Nike",
-    profile: "Activewear — Performance",
+    vendor: "Tommy Hilfiger",
+    profile: "Apparel",
+    brickCode: "10001352",
     exceptionType: "Extended Deadline",
-    attributes: ["Compression Level"],
+    attributes: ["Wrinkle Resistant"],
     validUntil: "May 15, 2026",
     status: "Active",
     actions: ["Edit", "Revoke"],
   },
   {
     vendor: "Ralph Lauren",
-    profile: "Outerwear — Core Compliance",
-    exceptionType: "Reduced Scope",
-    attributes: ["Fill Power", "Fur Treatment"],
+    profile: "Outerwear",
+    brickCode: "10001350",
+    exceptionType: "Attribute Waiver",
+    attributes: ["Water Repellent", "Hooded"],
     validUntil: "Feb 1, 2026",
+    status: "Expired",
+    actions: ["Renew", "Archive"],
+  },
+  {
+    vendor: "Lauren Ralph Lauren",
+    profile: "Outerwear",
+    brickCode: "10001350",
+    exceptionType: "Reduced Scope",
+    attributes: ["Gauge", "Lined"],
+    validUntil: "Mar 1, 2026",
     status: "Expired",
     actions: ["Renew", "Archive"],
   },

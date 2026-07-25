@@ -2,6 +2,7 @@
 
 import { ChevronRight, Download, Globe, Building2 } from "lucide-react"
 import { reportToCsv, type ReportRequest } from "@/lib/compliance-report"
+import { IMAGE_REQUIREMENT_POOL, type GapTarget, type MissingImage } from "@/lib/supplier-catalogue"
 
 // ── In-app scorecard for one completed Compliance Report ─────────────────────
 // Pure presentational: stat tiles, ranked missing attributes, per-category
@@ -72,10 +73,16 @@ interface ReportScorecardProps {
   report: ReportRequest
   accent: string
   onBack: () => void
+  /** Open the image-upload flow for one missing image requirement on a product row */
+  onUploadImage?: (productId: string, target: GapTarget, image: MissingImage) => void
 }
 
-export function ReportScorecard({ report, accent, onBack }: ReportScorecardProps) {
+export function ReportScorecard({ report, accent, onBack, onUploadImage }: ReportScorecardProps) {
   const r = report.result
+  // The report is scoped to one filter for every row — translate it once into
+  // the GapTarget shape the gap-detail/image-upload screens key off of.
+  const gapTarget: GapTarget =
+    report.filter.kind === "account" ? { kind: "retailer", name: report.filter.retailer } : { kind: "gs1" }
   const itemNoun = report.side === "supplier" ? "products" : "vendor products"
   const maxCount = r.missingAttributes[0]?.count ?? 1
   const excludedTotal = r.excluded.uncategorised + r.excluded.discontinued + r.excluded.updatedBefore
@@ -275,7 +282,7 @@ export function ReportScorecard({ report, accent, onBack }: ReportScorecardProps
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: "1px solid #E0E4E8" }}>
-                {["Product ID", "Description", "Category", "Gaps", "Missing"].map((h) => (
+                {["Product ID", "Description", "Category", "Gaps", "Missing", ""].map((h) => (
                   <th key={h} className="text-left px-4 py-2.5 font-medium text-[#6B7280] whitespace-nowrap">
                     {h}
                   </th>
@@ -283,28 +290,42 @@ export function ReportScorecard({ report, accent, onBack }: ReportScorecardProps
               </tr>
             </thead>
             <tbody>
-              {r.rows.map(
-                (row, i) =>
-                  row.kind === "product" && (
-                    <tr key={row.id} style={{ borderBottom: i < r.rows.length - 1 ? "1px solid #F3F4F6" : undefined }}>
-                      <td className="px-4 py-2.5 font-medium text-[#111827] whitespace-nowrap">{row.id}</td>
-                      <td className="px-4 py-2.5 font-light text-[#6B7280]">{row.description}</td>
-                      <td className="px-4 py-2.5 font-light text-[#6B7280] whitespace-nowrap">{row.category}</td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
-                          style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+              {r.rows.map((row, i) => {
+                if (row.kind !== "product") return null
+                const missingImage = IMAGE_REQUIREMENT_POOL.find((img) =>
+                  row.missing.includes(img.name)
+                )
+                return (
+                  <tr key={row.id} style={{ borderBottom: i < r.rows.length - 1 ? "1px solid #F3F4F6" : undefined }}>
+                    <td className="px-4 py-2.5 font-medium text-[#111827] whitespace-nowrap">{row.id}</td>
+                    <td className="px-4 py-2.5 font-light text-[#6B7280]">{row.description}</td>
+                    <td className="px-4 py-2.5 font-light text-[#6B7280] whitespace-nowrap">{row.category}</td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+                        style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#F59E0B" }} />
+                        {row.gaps} gap{row.gaps !== 1 ? "s" : ""}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 font-light text-xs" style={{ color: "#6B7280" }}>
+                      {row.missing.join(", ")}
+                    </td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                      {missingImage && onUploadImage && (
+                        <button
+                          onClick={() => onUploadImage(row.id, gapTarget, missingImage)}
+                          className="px-3 py-1.5 rounded-md text-xs font-medium text-white hover:opacity-90 transition-opacity"
+                          style={{ backgroundColor: "#0168B3" }}
                         >
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#F59E0B" }} />
-                          {row.gaps} gap{row.gaps !== 1 ? "s" : ""}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 font-light text-xs" style={{ color: "#6B7280" }}>
-                        {row.missing.join(", ")}
-                      </td>
-                    </tr>
-                  )
-              )}
+                          Upload Image
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         ) : (

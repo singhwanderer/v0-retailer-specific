@@ -126,12 +126,25 @@ their rules correctly and enforce them.
 
 | Category | Tools |
 | --- | --- |
-| **Read (6)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, run a compliance report across the vendor base, and a `get_capabilities` "what can you do" helper |
-| **Write (3)** | create a requirement profile, add an attribute requirement to it, set an image requirement (format/background/dimensions/etc.) |
+| **Read (9)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, list global System filters, run a compliance report across the vendor base, list vendor exceptions on file, and a `get_capabilities` "what can you do" helper |
+| **Write (4)** | create a requirement profile, add an attribute requirement to it, set an image requirement (format/background/dimensions/etc.), grant or update a vendor exception (waiver / extended deadline / reduced scope) |
 
 This is retailer-facing only (e.g. a Dillard's-style user asking about their
 own suppliers) — not a supplier-facing tool set, and not able to see other
 retailers' data.
+
+### Vendor exceptions are chat-operable, and actually move the numbers
+
+Earlier drafts of this doc's own example prompts ("Give Levi's a 60-day
+extension on sustainable-materials fields," "Show all active exceptions")
+promised this before it existed — it's now real. Granting an **Attribute
+Waiver** exception through the AI immediately reduces that vendor's reported
+gap count for that exact category, the next time a compliance report runs —
+in the same conversation, in both `run_compliance_report` and the portal's
+own Compliance Reports/Dashboard screens (they share one engine). Extended
+Deadline and Reduced Scope exceptions still change which attribute gets
+named as a gap, but — deliberately — don't reduce the count, since a
+deadline extension doesn't erase the requirement, only delays it.
 
 ### Two things we specifically designed for real-world (not scripted-demo) use
 
