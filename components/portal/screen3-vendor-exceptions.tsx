@@ -1,16 +1,20 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, Search, X, ChevronDown } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Info, Search } from "lucide-react"
 
-import {
-  VENDOR_EXCEPTIONS,
-  type ExceptionRow,
-  type ExceptionType,
-  type ExceptionStatus,
-} from "@/lib/retailer-requirements"
+import { RETAILER_SUPPLIERS, type ExceptionType, type ExceptionStatus } from "@/lib/retailer-requirements"
+import type { VendorException } from "@/lib/mcp/store"
+import { describeExceptionEffect, describeEffectText } from "@/lib/vendor-exceptions"
+import { getBrickByCode } from "@/lib/gs1-standard-library"
 
-// ── Pill components ───────────────────────────────────────────────────────────
+// ── Vendor-level attribute exceptions — read-only ────────────────────────────
+// Authoring exceptions happens conversationally through the AI connector
+// (set_vendor_exception); this screen is the record of what's on file and,
+// crucially, what each row actually does to the reported numbers. Only an
+// Active Attribute Waiver scoped to a category the vendor really supplies
+// reduces a gap count — without saying so, a reader reasonably assumes all
+// three types behave the same and concludes the dashboard is wrong.
 
 function ExceptionTypePill({ type }: { type: ExceptionType }) {
   const cfg: Record<ExceptionType, { bg: string; text: string }> = {
@@ -21,7 +25,7 @@ function ExceptionTypePill({ type }: { type: ExceptionType }) {
   const { bg, text } = cfg[type]
   return (
     <span
-      className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium"
+      className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
       style={{ backgroundColor: bg, color: text }}
     >
       {type}
@@ -57,288 +61,170 @@ function AttributeChip({ label }: { label: string }) {
   )
 }
 
-// ── Table data ────────────────────────────────────────────────────────────────
-const exceptions: ExceptionRow[] = VENDOR_EXCEPTIONS
-
-// ── Add Exception Modal ────────────────────────────────────────────────────────
-function AddExceptionModal({ onClose }: { onClose: () => void }) {
-  const [permanent, setPermanent] = useState(false)
-
+function EffectCell({ exception }: { exception: VendorException }) {
+  const effect = describeExceptionEffect(exception, RETAILER_SUPPLIERS)
+  const color =
+    effect.kind === "reduces" ? "#15803D" : effect.kind === "reassigns" ? "#1E40AF" : "#9CA3AF"
   return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-    >
-      <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden"
-        style={{ border: "1px solid #E0E4E8" }}
-      >
-        {/* Modal header */}
-        <div
-          className="flex items-center justify-between px-6 py-4 shrink-0"
-          style={{ borderBottom: "1px solid #E0E4E8" }}
-        >
-          <h2 className="text-base font-semibold text-[#111827]">Add Vendor Exception</h2>
-          <button
-            onClick={onClose}
-            className="text-[#9CA3AF] hover:text-[#6B7280] transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Modal body — scrollable */}
-        <div className="overflow-y-auto flex-1 px-6 py-5">
-          <div className="flex flex-col gap-5">
-            {/* Row 1: Vendor Name + Affected Profile */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#374151]">
-                  Vendor Name <span className="text-[#DC2626]">*</span>
-                </label>
-                <div
-                  className="flex items-center gap-2 border rounded-md px-3 py-2"
-                  style={{ borderColor: "#E0E4E8" }}
-                >
-                  <Search className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
-                  <input
-                    type="text"
-                    className="flex-1 text-sm outline-none placeholder:text-[#9CA3AF]"
-                    placeholder="Search vendor by name or account ID"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#374151]">
-                  Affected Profile <span className="text-[#DC2626]">*</span>
-                </label>
-                <div
-                  className="flex items-center border rounded-md px-3 py-2"
-                  style={{ borderColor: "#E0E4E8" }}
-                >
-                  <select className="flex-1 text-sm outline-none bg-transparent text-[#9CA3AF] cursor-pointer">
-                    <option value="">Select profile</option>
-                    <option value="footwear">Footwear Core Compliance</option>
-                    <option value="apparel">Apparel Extended Sustainability</option>
-                    <option value="jewellery">Jewellery Base Requirements</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Attributes to Except + Valid Until */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#374151]">
-                  Attributes to Except <span className="text-[#DC2626]">*</span>
-                </label>
-                <div
-                  className="flex items-center gap-2 border rounded-md px-3 py-2 min-h-[38px]"
-                  style={{ borderColor: "#E0E4E8" }}
-                >
-                  <Search className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
-                  <input
-                    type="text"
-                    className="flex-1 text-sm outline-none placeholder:text-[#9CA3AF]"
-                    placeholder="Search and select attributes"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#374151]">
-                  Valid Until <span className="text-[#DC2626]">*</span>
-                </label>
-                <div className="flex flex-col gap-2">
-                  <input
-                    type="date"
-                    disabled={permanent}
-                    className="border rounded-md px-3 py-2 text-sm outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{ borderColor: "#E0E4E8" }}
-                  />
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={permanent}
-                      onChange={(e) => setPermanent(e.target.checked)}
-                      className="cursor-pointer accent-[#0168B3]"
-                    />
-                    <span className="text-xs text-[#6B7280]">Make permanent</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Internal Reason */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#374151]">
-                Internal Reason{" "}
-                <span className="text-[#9CA3AF] font-normal">(for audit trail)</span>
-              </label>
-              <textarea
-                className="border rounded-md px-3 py-2 text-sm outline-none resize-none leading-relaxed placeholder:text-[#9CA3AF]"
-                style={{ borderColor: "#E0E4E8" }}
-                rows={3}
-                placeholder="e.g. Brand-specific product construction does not use standard heel height measurement."
-              />
-            </div>
-
-
-          </div>
-        </div>
-
-        {/* Modal footer */}
-        <div
-          className="flex items-center justify-end gap-3 px-6 py-4 shrink-0"
-          style={{ borderTop: "1px solid #E0E4E8" }}
-        >
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md text-sm font-medium border hover:bg-[#F4F6F8] transition-colors cursor-pointer"
-            style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
-          >
-            Cancel
-          </button>
-          <button
-            className="px-4 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity cursor-pointer"
-            style={{ backgroundColor: "#0168B3" }}
-          >
-            Save Exception
-          </button>
-        </div>
-      </div>
-    </div>
+    <span className="text-xs font-light leading-snug" style={{ color }}>
+      {describeEffectText(effect)}
+    </span>
   )
 }
 
-// ── Main Screen 3 ─────────────────────────────────────────────────────────────
-export function Screen3VendorExceptions() {
-  const [modalOpen, setModalOpen] = useState(false)
+interface Screen3Props {
+  /** Exceptions on file — passed in so the data source stays a single call site. */
+  exceptions: VendorException[]
+}
+
+export function Screen3VendorExceptions({ exceptions }: Screen3Props) {
+  const [query, setQuery] = useState("")
+
+  const rows = useMemo(() => {
+    const q = query.toLowerCase().trim()
+    if (!q) return exceptions
+    return exceptions.filter(
+      (e) =>
+        e.vendor.toLowerCase().includes(q) ||
+        e.profile.toLowerCase().includes(q) ||
+        e.attributes.some((a) => a.toLowerCase().includes(q))
+    )
+  }, [exceptions, query])
 
   return (
-    <>
-      <div className="flex flex-col gap-6 p-8 max-w-7xl">
-        {/* Page header */}
-        <div>
-          <h1 className="text-2xl font-semibold text-[#111827] text-balance">
-            Vendor-Level Attribute Exceptions
-          </h1>
-          <p className="mt-1 text-sm leading-relaxed" style={{ color: "#6B7280" }}>
-            Override profile requirements for specific suppliers. Exceptions apply only to
-            the named vendor and do not affect the published profile.
-          </p>
-        </div>
-
-        {/* Action bar */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-end">
-            <button
-              onClick={() => setModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity cursor-pointer"
-              style={{ backgroundColor: "#0168B3" }}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Exception
-            </button>
-          </div>
-
-          {/* Filter row */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {["All Profiles", "All Categories", "Status: All"].map((label) => (
-              <div
-                key={label}
-                className="flex items-center gap-1.5 border rounded-md px-3 py-1.5 text-sm cursor-pointer hover:bg-[#F4F6F8] transition-colors"
-                style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
-              >
-                {label}
-                <ChevronDown className="w-3.5 h-3.5" />
-              </div>
-            ))}
-            <div
-              className="flex items-center gap-2 border rounded-md px-3 py-1.5 flex-1 max-w-xs"
-              style={{ borderColor: "#E0E4E8" }}
-            >
-              <Search className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
-              <input
-                type="text"
-                className="flex-1 text-sm outline-none placeholder:text-[#9CA3AF]"
-                placeholder="Search vendor name"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Exceptions table */}
-        <div
-          className="rounded-lg border bg-white overflow-hidden"
-          style={{ borderColor: "#E0E4E8" }}
-        >
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F4F6F8" }}>
-                <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Vendor Name</th>
-                <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Affected Profile</th>
-                <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Attributes Affected</th>
-                <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Valid Until</th>
-                <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-[#6B7280]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {exceptions.map((row, idx) => (
-                <tr
-                  key={row.vendor}
-                  style={{
-                    borderBottom: idx < exceptions.length - 1 ? "1px solid #E0E4E8" : undefined,
-                  }}
-                  className="hover:bg-[#F4F6F8]/50 transition-colors"
-                >
-                  <td className="px-4 py-3.5">
-                    <span className="font-medium cursor-pointer hover:underline" style={{ color: "#0168B3" }}>
-                      {row.vendor}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-[#374151] text-xs">{row.profile}</td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex flex-wrap gap-1">
-                      {row.attributes.map((attr) => (
-                        <AttributeChip key={attr} label={attr} />
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-[#374151] text-xs whitespace-nowrap">
-                    {row.validUntil}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <StatusPill status={row.status} />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      {row.actions.map((action, i) => (
-                        <span key={action} className="flex items-center gap-3">
-                          <button
-                            className="text-[#6B7280] hover:text-[#111827] transition-colors cursor-pointer text-xs"
-                          >
-                            {action}
-                          </button>
-                          {i < row.actions.length - 1 && (
-                            <span className="text-[#E0E4E8]">·</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-
+    <div className="flex flex-col gap-6 p-8 max-w-7xl">
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-[#111827] text-balance">
+          Vendor-Level Attribute Exceptions
+        </h1>
+        <p className="mt-1 text-sm leading-relaxed" style={{ color: "#6B7280" }}>
+          Requirements relaxed for a specific supplier in a specific category. Exceptions apply
+          only to the named vendor and category, and never change the published profile.
+        </p>
       </div>
 
-      {/* Modal */}
-      {modalOpen && <AddExceptionModal onClose={() => setModalOpen(false)} />}
-    </>
+      {/* How exceptions affect the numbers — the thing the raw row doesn't tell you */}
+      <div
+        className="flex items-start gap-2.5 rounded-md px-4 py-3"
+        style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
+      >
+        <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#0168B3" }} />
+        <p className="text-xs leading-relaxed" style={{ color: "#1E40AF" }}>
+          Only an <span className="font-semibold">Active Attribute Waiver</span>, scoped to a
+          category the vendor actually supplies, reduces reported gap counts on the Dashboard and
+          in Compliance Reports. <span className="font-semibold">Extended Deadline</span> and{" "}
+          <span className="font-semibold">Reduced Scope</span> change which attributes get named as
+          gaps, but the gaps stay open. Suppliers see the same waivers reflected in their own
+          Compliance screens.
+        </p>
+      </div>
+
+      {/* Search */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div
+          className="flex items-center gap-2 border rounded-md px-3 py-1.5 flex-1 max-w-xs"
+          style={{ borderColor: "#E0E4E8" }}
+        >
+          <Search className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="flex-1 text-sm outline-none placeholder:text-[#9CA3AF]"
+            placeholder="Search vendor, category or attribute"
+          />
+        </div>
+        <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
+          {rows.length} of {exceptions.length} exception{exceptions.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      {/* Table */}
+      <div
+        className="rounded-lg overflow-hidden"
+        style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
+      >
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
+              {["Vendor", "Category", "Type", "Attributes", "Valid Until", "Status", "Effect"].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className="text-left px-4 py-2.5 font-medium text-[#6B7280] whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
+                )
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-8 text-sm font-light text-center"
+                  style={{ color: "#9CA3AF" }}
+                >
+                  No exceptions match &ldquo;{query}&rdquo;.
+                </td>
+              </tr>
+            ) : (
+              rows.map((e, i) => {
+                const brickName = e.brickCode ? getBrickByCode(e.brickCode)?.brickName : undefined
+                return (
+                  <tr
+                    key={e.id}
+                    style={{ borderBottom: i < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
+                  >
+                    <td className="px-4 py-3 font-medium text-[#111827] align-top whitespace-nowrap">
+                      {e.vendor}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span className="text-[#111827]">{e.profile}</span>
+                      {brickName && (
+                        <span className="block text-[11px] font-light mt-0.5" style={{ color: "#9CA3AF" }}>
+                          {brickName} · {e.brickCode}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <ExceptionTypePill type={e.exceptionType} />
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span className="flex flex-wrap gap-1">
+                        {e.attributes.map((a) => (
+                          <AttributeChip key={a} label={a} />
+                        ))}
+                      </span>
+                    </td>
+                    <td
+                      className="px-4 py-3 align-top font-light whitespace-nowrap"
+                      style={{ color: "#6B7280" }}
+                    >
+                      {e.validUntil}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <StatusPill status={e.status} />
+                    </td>
+                    <td className="px-4 py-3 align-top max-w-[14rem]">
+                      <EffectCell exception={e} />
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] font-light leading-relaxed" style={{ color: "#9CA3AF" }}>
+        Read-only in this prototype. Exceptions are granted and revoked conversationally through
+        the AI connector (<span className="font-mono">set_vendor_exception</span>); changes made
+        that way appear here on the next reload.
+      </p>
+    </div>
   )
 }

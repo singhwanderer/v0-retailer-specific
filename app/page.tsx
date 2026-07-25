@@ -41,6 +41,7 @@ import {
   runSupplierReport,
   type ReportRequest,
 } from "@/lib/compliance-report"
+import { getStore } from "@/lib/mcp/store"
 
 type Perspective = "retailer" | "supplier"
 
@@ -606,7 +607,9 @@ export default function RetailerPortal() {
                 />
               )}
               
-              {retailerScreen === "vendor-exceptions" && <Screen3VendorExceptions />}
+              {retailerScreen === "vendor-exceptions" && (
+                <Screen3VendorExceptions exceptions={getStore().vendorExceptions} />
+              )}
 
               {/* Defensive compliance scanning — the retailer's own filters
                   (or a System filter) across its vendor base */}

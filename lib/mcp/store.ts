@@ -53,14 +53,6 @@ export interface ProfileExtras {
 /** A vendor exception, with the synthetic id the store uses to match a later update. */
 export interface VendorException extends ExceptionRow {
   id: string
-  /**
-   * GS1 category code the exception is scoped to. A vendor can supply
-   * multiple categories (e.g. Calvin Klein: Footwear, Shirts, Dresses), so
-   * an exception without this scope could otherwise leak across categories
-   * that happen to share an attribute name. Optional only because the 8
-   * seeded rows predate this field — see activeExceptionsForVendor.
-   */
-  brickCode?: string
 }
 
 export interface DemoStore {
@@ -125,6 +117,44 @@ export function activeExceptionsForVendor(vendor: string, exceptionType?: Except
       e.vendor.toLowerCase() === vendor.toLowerCase() &&
       (exceptionType === undefined || e.exceptionType === exceptionType)
   )
+}
+
+// ── Shared waiver vocabulary ─────────────────────────────────────────────────
+// Both gap engines — the retailer one (lib/compliance-report.ts, vendor
+// aggregates) and the supplier one (lib/supplier-catalogue.ts, per product) —
+// resolve waivers through these two functions, so the two sides can never
+// disagree about which attributes an exception covers. They live here because
+// supplier-catalogue cannot import compliance-report without a cycle.
+
+/**
+ * Case-insensitive substring match in either direction, so an exception naming
+ * "Heel Height" also waives "Heel Height Range" — the exception vocabulary
+ * predates the GS1 attribute names. Note this is deliberately loose: a name
+ * that is a substring of a sibling attribute waives that sibling too, which
+ * is why the seed is collision-checked (scripts/check-exception-seed.ts).
+ */
+export function isAttributeWaived(attributeName: string, waivedNames: string[]): boolean {
+  const n = attributeName.toLowerCase()
+  return waivedNames.some((w) => {
+    const wl = w.toLowerCase()
+    return n.includes(wl) || wl.includes(n)
+  })
+}
+
+/**
+ * Attribute names covered by a vendor's Active exceptions. Narrow with
+ * `exceptionType` (only "Attribute Waiver" reduces gap counts) and/or
+ * `brickCode` (an exception only applies to the category it was scoped to —
+ * an exception with no brickCode matches nothing when a brickCode is asked
+ * for, so unscoped rows can never reduce a count).
+ */
+export function waivedAttributeNames(
+  vendor: string,
+  opts?: { exceptionType?: ExceptionType; brickCode?: string }
+): string[] {
+  return activeExceptionsForVendor(vendor, opts?.exceptionType)
+    .filter((e) => opts?.brickCode === undefined || e.brickCode === opts.brickCode)
+    .flatMap((e) => e.attributes)
 }
 
 /** Read-only view of a profile's extras — never persists a new entry. */
