@@ -219,14 +219,22 @@ export function listVendorExceptions(vendor?: string, status?: "Active" | "Expir
 
 /**
  * Create or update a vendor exception. Pass `id` (from list_vendor_exceptions)
- * to update an existing exception; omit it to create a new one. An Active
- * exception's attributes are excluded from that vendor's gap count in
- * run_compliance_report and the portal's own Compliance Reports screen —
- * see waivedAttributes() in lib/compliance-report.ts.
+ * to update an existing exception; omit it to create a new one. `brickCode`
+ * scopes the exception to one category — required because a vendor can
+ * supply multiple categories (e.g. Calvin Klein: Footwear, Shirts, Dresses),
+ * and without an explicit scope a waiver could leak into an unrelated
+ * category that happens to share an attribute name.
+ * An Active "Attribute Waiver" exception's attributes reduce that vendor's
+ * gap count for this exact category in run_compliance_report and the
+ * portal's own Compliance Reports/Dashboard screens (Extended Deadline and
+ * Reduced Scope exceptions still affect which attribute is named as a gap,
+ * but don't reduce the count — see waivedAttributes()/runRetailerReport()
+ * in lib/compliance-report.ts).
  */
 export function setVendorException(args: {
   id?: string
   vendor: string
+  brickCode: string
   profile: string
   exceptionType: "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"
   attributes: string[]
@@ -248,6 +256,7 @@ export function setVendorException(args: {
     const updated: VendorException = {
       ...store.vendorExceptions[idx],
       vendor: args.vendor,
+      brickCode: args.brickCode,
       profile: args.profile,
       exceptionType: args.exceptionType,
       attributes: args.attributes,
@@ -261,6 +270,7 @@ export function setVendorException(args: {
   const created: VendorException = {
     id: `exc-${Date.now()}-${store.vendorExceptions.length}`,
     vendor: args.vendor,
+    brickCode: args.brickCode,
     profile: args.profile,
     exceptionType: args.exceptionType,
     attributes: args.attributes,

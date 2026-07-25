@@ -1,23 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import {
-  Bot,
-  Check,
-  Copy,
-  KeyRound,
-  ListChecks,
-  ShieldAlert,
-  SlidersHorizontal,
-} from "lucide-react"
+import { Bot, Check, Copy, X } from "lucide-react"
 
 // ── AI Assistant Access — signpost for the external MCP connector ────────────
 // This account can be operated by an AI assistant (Claude, ChatGPT, etc.) over
-// MCP — that connector already exists (app/api/[transport]/route.ts) but had no
-// in-app signpost telling a retailer user it's there. This screen tells them
-// what it is, how to connect, exactly what it can do, and — honestly — that it
-// has no authentication yet. The "planned hardening" controls below follow the
-// same convention as the image-upload screen: shown, clearly labeled, inert.
+// MCP — that connector already exists (app/api/[transport]/route.ts). Reached
+// via a link in the internal Compliance Agent chat panel, so it renders as a
+// modal (covering the panel too) rather than a separate nav-level screen.
 
 const MCP_ENDPOINT = "https://v0-retailer-specific.vercel.app/api/mcp"
 
@@ -32,9 +22,11 @@ const TOOLS: ToolRow[] = [
   { name: "get_supplier_compliance", kind: "Read", description: "Get compliance detail for one named supplier." },
   { name: "list_system_filters", kind: "Read", description: "List global System filters (e.g. GS1 Core, GS1 Extended)." },
   { name: "run_compliance_report", kind: "Read", description: "Run a defensive compliance report across your vendor base." },
+  { name: "list_vendor_exceptions", kind: "Read", description: "List vendor exceptions on file (waivers, extended deadlines, reduced scope)." },
   { name: "create_attribute_profile", kind: "Write", description: "Create a new attribute profile for a product category." },
   { name: "add_attribute_requirement", kind: "Write", description: "Add a custom attribute requirement to a profile." },
   { name: "set_image_requirement", kind: "Write", description: "Add or update an image requirement on a profile." },
+  { name: "set_vendor_exception", kind: "Write", description: "Grant or update a vendor exception for one category." },
 ]
 
 function ToolKindPill({ kind }: { kind: "Read" | "Write" }) {
@@ -94,186 +86,104 @@ function ConnectStep({ n, children }: { n: number; children: React.ReactNode }) 
   )
 }
 
-export function ScreenRetailerAiAccess() {
+interface AiAccessModalProps {
+  onClose: () => void
+}
+
+export function AiAccessModal({ onClose }: AiAccessModalProps) {
   return (
-    <div className="p-8 flex flex-col gap-6 max-w-4xl">
-      {/* Header */}
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2.5">
-          <Bot className="w-5 h-5" style={{ color: "#0168B3" }} />
-          <h1 className="text-xl font-semibold text-[#111827]">AI Assistant Access</h1>
-        </div>
-        <p className="text-sm font-light text-[#6B7280]">
-          Let an AI assistant (Claude, ChatGPT, etc.) author requirements and monitor supplier
-          compliance on your behalf, over MCP.
-        </p>
-      </div>
-
-      {/* What this is */}
-      <section
-        className="rounded-lg px-4 py-3.5 flex items-start gap-2.5"
-        style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden"
+        style={{ border: "1px solid #E0E4E8" }}
       >
-        <ListChecks className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#0168B3" }} />
-        <p className="text-xs leading-relaxed" style={{ color: "#1E40AF" }}>
-          This account publishes a small connector (an <span className="font-semibold">MCP server</span>).
-          Once added to your AI assistant, it can read your requirement profiles and supplier
-          compliance, and create requirements — in plain English, on your behalf. It only ever
-          acts as this retailer account; it cannot see other retailers' or peer accounts' data.
-        </p>
-      </section>
-
-      {/* How to connect */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-[#111827]">How to connect</h2>
+        {/* Modal header */}
         <div
-          className="rounded-lg overflow-hidden flex flex-col gap-3 p-4"
-          style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
+          className="flex items-center justify-between px-6 py-4 shrink-0"
+          style={{ borderBottom: "1px solid #E0E4E8" }}
         >
-          <div className="flex items-center gap-2">
-            <code
-              className="flex-1 px-3 py-2 rounded-md text-xs font-mono overflow-x-auto whitespace-nowrap"
-              style={{ backgroundColor: "#F9FAFB", border: "1px solid #E0E4E8", color: "#374151" }}
-            >
-              {MCP_ENDPOINT}
-            </code>
-            <CopyEndpointButton />
+          <div className="flex items-center gap-2.5">
+            <Bot className="w-5 h-5" style={{ color: "#0168B3" }} />
+            <h2 className="text-base font-semibold text-[#111827]">AI Assistant Access</h2>
           </div>
-          <ol className="flex flex-col gap-2">
-            <ConnectStep n={1}>
-              In Claude.ai, Claude Desktop, or ChatGPT (Developer mode), open{" "}
-              <span className="font-medium text-[#111827]">Settings → Connectors</span> and add a
-              custom connector.
-            </ConnectStep>
-            <ConnectStep n={2}>
-              Paste the URL above. Leave authentication blank — see the security note below.
-            </ConnectStep>
-            <ConnectStep n={3}>
-              Start a new chat, enable the connector for that chat, and ask it a question — e.g.
-              &ldquo;which of my suppliers has the most open gaps?&rdquo;
-            </ConnectStep>
-          </ol>
+          <button
+            onClick={onClose}
+            className="text-[#9CA3AF] hover:text-[#6B7280] transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      </section>
 
-      {/* What it can do */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-[#111827]">What it can do</h2>
-        <div
-          className="rounded-lg overflow-hidden"
-          style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
-        >
-          <table className="w-full text-sm">
-            <tbody>
-              {TOOLS.map((tool, idx) => (
-                <tr
-                  key={tool.name}
-                  style={{
-                    borderBottom: idx < TOOLS.length - 1 ? "1px solid #F3F4F6" : undefined,
-                  }}
+        {/* Modal body — scrollable */}
+        <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-6">
+          {/* How to connect */}
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-[#111827]">How to connect</h3>
+            <div
+              className="rounded-lg overflow-hidden flex flex-col gap-3 p-4"
+              style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
+            >
+              <div className="flex items-center gap-2">
+                <code
+                  className="flex-1 px-3 py-2 rounded-md text-xs font-mono overflow-x-auto whitespace-nowrap"
+                  style={{ backgroundColor: "#F9FAFB", border: "1px solid #E0E4E8", color: "#374151" }}
                 >
-                  <td className="px-4 py-2.5 w-20 align-top">
-                    <ToolKindPill kind={tool.kind} />
-                  </td>
-                  <td className="px-4 py-2.5 align-top">
-                    <code className="text-xs font-mono text-[#111827]">{tool.name}</code>
-                  </td>
-                  <td className="px-4 py-2.5 align-top text-xs font-light" style={{ color: "#6B7280" }}>
-                    {tool.description}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Security */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-[#111827]">Security</h2>
-
-        <div
-          className="rounded-lg px-4 py-3.5 flex items-start gap-2.5"
-          style={{ backgroundColor: "#FEF3C7", border: "1px solid #FDE68A" }}
-        >
-          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#92400E" }} />
-          <p className="text-xs leading-relaxed" style={{ color: "#92400E" }}>
-            <span className="font-semibold">This prototype's connector has no authentication.</span>{" "}
-            Anyone with the URL above can use it against this demo's mock data. Do not connect it
-            to a real account, and do not treat this as a template for a production connector
-            until the controls below are actually built.
-          </p>
-        </div>
-
-        <div
-          className="rounded-lg overflow-hidden"
-          style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
-        >
-          <div className="px-4 py-3" style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F9FAFB" }}>
-            <h3 className="text-xs font-medium text-[#111827]">Planned hardening — not built yet</h3>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 px-4 py-3" style={{ borderBottom: "1px solid #F3F4F6" }}>
-            <div className="flex items-center gap-2.5">
-              <KeyRound className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-[#111827]">API key per connection</span>
-                <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
-                  Issue and revoke a scoped key instead of leaving the endpoint open.
-                </span>
+                  {MCP_ENDPOINT}
+                </code>
+                <CopyEndpointButton />
               </div>
+              <ol className="flex flex-col gap-2">
+                <ConnectStep n={1}>
+                  In Claude.ai, Claude Desktop, or ChatGPT (Developer mode), open{" "}
+                  <span className="font-medium text-[#111827]">Settings → Connectors</span> and add a
+                  custom connector.
+                </ConnectStep>
+                <ConnectStep n={2}>Paste the URL above. Leave authentication blank.</ConnectStep>
+                <ConnectStep n={3}>
+                  Start a new chat, enable the connector for that chat, and ask it a question — e.g.
+                  &ldquo;which of my suppliers has the most open gaps?&rdquo;
+                </ConnectStep>
+              </ol>
             </div>
-            <button
-              disabled
-              title="Work in progress — out of scope for this prototype"
-              className="px-3.5 py-2 rounded-md text-sm font-medium text-white cursor-not-allowed opacity-60 shrink-0"
-              style={{ backgroundColor: "#0168B3" }}
-            >
-              Generate API Key
-            </button>
-          </div>
+          </section>
 
-          <div className="flex items-center justify-between gap-4 px-4 py-3" style={{ borderBottom: "1px solid #F3F4F6" }}>
-            <div className="flex items-center gap-2.5">
-              <SlidersHorizontal className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-[#111827]">Per-tool write permissions</span>
-                <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
-                  Turn off create/update tools independently of read access.
-                </span>
-              </div>
-            </div>
-            <button
-              disabled
-              title="Work in progress — out of scope for this prototype"
-              className="px-3.5 py-2 rounded-md text-sm border cursor-not-allowed opacity-60 shrink-0"
-              style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
+          {/* What it can do */}
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-[#111827]">What it can do</h3>
+            <div
+              className="rounded-lg overflow-hidden"
+              style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}
             >
-              Manage Permissions
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <ListChecks className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-[#111827]">Access log</span>
-                <span className="text-xs font-light" style={{ color: "#9CA3AF" }}>
-                  See every call an AI assistant made against this account, and when.
-                </span>
-              </div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {TOOLS.map((tool, idx) => (
+                    <tr
+                      key={tool.name}
+                      style={{
+                        borderBottom: idx < TOOLS.length - 1 ? "1px solid #F3F4F6" : undefined,
+                      }}
+                    >
+                      <td className="px-4 py-2.5 w-20 align-top">
+                        <ToolKindPill kind={tool.kind} />
+                      </td>
+                      <td className="px-4 py-2.5 align-top">
+                        <code className="text-xs font-mono text-[#111827]">{tool.name}</code>
+                      </td>
+                      <td className="px-4 py-2.5 align-top text-xs font-light" style={{ color: "#6B7280" }}>
+                        {tool.description}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <button
-              disabled
-              title="Work in progress — out of scope for this prototype"
-              className="px-3.5 py-2 rounded-md text-sm border cursor-not-allowed opacity-60 shrink-0"
-              style={{ borderColor: "#E0E4E8", color: "#6B7280" }}
-            >
-              View Access Log
-            </button>
-          </div>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
   )
 }

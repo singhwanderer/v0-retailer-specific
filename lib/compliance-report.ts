@@ -379,10 +379,24 @@ export function runRetailerReport(
     // Core attributes are always populated — they must never appear as gaps.
     pool = pool.filter((a) => !CORE_ATTR_NAMES.has(a.name))
     const waived = waivedAttributes(s.supplier)
+
+    // Active Attribute-Waiver exceptions scoped to this exact category reduce
+    // the gap count itself (a waived requirement is no longer outstanding),
+    // not just which attribute gets blamed. Scoped by brickCode, not vendor
+    // name alone, since a vendor can supply multiple categories — an
+    // unscoped match would leak a waiver into an unrelated category that
+    // happens to share an attribute name. Legacy exceptions with no
+    // brickCode (seeded before this field existed) never reduce the count,
+    // only the blame-redistribution below.
+    const waiverOnly = activeExceptionsForVendor(s.supplier, "Attribute Waiver")
+      .filter((e) => e.brickCode === s.brickCode)
+      .flatMap((e) => e.attributes)
+    const waivedGapCount = pool.filter((a) => isWaived(a.name, waiverOnly)).length
+
     pool = pool.filter((a) => !isWaived(a.name, waived))
 
     // Distribute this vendor's gaps over the first k pool attributes.
-    const gaps = s.openGaps
+    const gaps = Math.max(0, s.openGaps - waivedGapCount)
     const k = Math.min(pool.length, gaps)
     for (let i = 0; i < k; i++) {
       const share = Math.floor(gaps / k) + (i < gaps % k ? 1 : 0)

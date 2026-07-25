@@ -17,7 +17,7 @@ import { ScreenSupplierProductAttributes } from "@/components/portal/screen-supp
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
 import { ScreenComplianceDashboard } from "@/components/portal/screen-compliance-dashboard"
-import { ScreenRetailerAiAccess } from "@/components/portal/screen-retailer-ai-access"
+import { AiAccessModal } from "@/components/portal/screen-retailer-ai-access"
 import { ComplianceAgentPanel } from "@/components/portal/compliance-agent-panel"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
@@ -50,7 +50,6 @@ type RetailerScreen =
   | "vendor-exceptions"
   | "profile-detail"
   | "compliance-reports"
-  | "ai-access"
 
 type SupplierScreen =
   | "compliance"
@@ -116,6 +115,9 @@ export default function RetailerPortal() {
     setAiEnabled(enabled)
     localStorage.setItem(AI_ENABLED_KEY, enabled ? "1" : "0")
   }
+
+  // ── External MCP connector signpost — a modal reached from the chat panel ──
+  const [aiAccessOpen, setAiAccessOpen] = useState(false)
 
   function dismissWelcome() {
     localStorage.setItem(WELCOME_DISMISSED_KEY, "1")
@@ -267,8 +269,7 @@ export default function RetailerPortal() {
       id === "dashboard" ||
       id === "attribute-profiles" ||
       id === "vendor-exceptions" ||
-      id === "compliance-reports" ||
-      id === "ai-access"
+      id === "compliance-reports"
     ) {
       setRetailerScreen(id as RetailerScreen)
     }
@@ -556,9 +557,11 @@ export default function RetailerPortal() {
         <ComplianceAgentPanel
           profiles={profiles}
           onCreateProfile={handleCreateProfile}
-          onOpenAiAccess={() => setRetailerScreen("ai-access")}
+          onOpenAiAccess={() => setAiAccessOpen(true)}
         />
       )}
+
+      {aiAccessOpen && <AiAccessModal onClose={() => setAiAccessOpen(false)} />}
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
@@ -617,11 +620,6 @@ export default function RetailerPortal() {
                   onRequestReport={(p) => handleRunReport("retailer", p)}
                 />
               )}
-
-              {/* Signpost for the external MCP connector — what it is, how to
-                  connect, what it can do, and its current (unauthenticated)
-                  security posture */}
-              {retailerScreen === "ai-access" && <ScreenRetailerAiAccess />}
             </>
           )}
 

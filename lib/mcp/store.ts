@@ -11,6 +11,7 @@ import {
   VENDOR_EXCEPTIONS,
   type AttributeProfile,
   type ExceptionRow,
+  type ExceptionType,
 } from "@/lib/retailer-requirements"
 
 export interface AttributeRequirement {
@@ -52,6 +53,14 @@ export interface ProfileExtras {
 /** A vendor exception, with the synthetic id the store uses to match a later update. */
 export interface VendorException extends ExceptionRow {
   id: string
+  /**
+   * GS1 category code the exception is scoped to. A vendor can supply
+   * multiple categories (e.g. Calvin Klein: Footwear, Shirts, Dresses), so
+   * an exception without this scope could otherwise leak across categories
+   * that happen to share an attribute name. Optional only because the 8
+   * seeded rows predate this field — see activeExceptionsForVendor.
+   */
+  brickCode?: string
 }
 
 export interface DemoStore {
@@ -109,9 +118,12 @@ export function getStore(): DemoStore {
 }
 
 /** Active exceptions for one vendor — the shape the compliance-report engine needs. */
-export function activeExceptionsForVendor(vendor: string): VendorException[] {
+export function activeExceptionsForVendor(vendor: string, exceptionType?: ExceptionType): VendorException[] {
   return getStore().vendorExceptions.filter(
-    (e) => e.status === "Active" && e.vendor.toLowerCase() === vendor.toLowerCase()
+    (e) =>
+      e.status === "Active" &&
+      e.vendor.toLowerCase() === vendor.toLowerCase() &&
+      (exceptionType === undefined || e.exceptionType === exceptionType)
   )
 }
 
