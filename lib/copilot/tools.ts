@@ -34,9 +34,23 @@ export interface CopilotContext {
 }
 
 export interface ProposedAction {
-  tool: "create_attribute_profile" | "add_attribute_requirement" | "set_image_requirement"
+  tool:
+    | "create_attribute_profile"
+    | "add_attribute_requirement"
+    | "set_image_requirement"
+    | "update_attribute_requirement"
+    | "remove_attribute_requirement"
+    | "remove_image_requirement"
   summary: string
   args: Record<string, unknown>
+  /**
+   * Removes something that already exists. The confirm card styles these
+   * differently and states the consequence, because "add an attribute" and
+   * "stop requiring an attribute" should not look like the same decision.
+   */
+  destructive?: boolean
+  /** What the user is actually agreeing to — shown on the confirm card. */
+  consequence?: string
 }
 
 function knownSuppliers(): string[] {
@@ -316,13 +330,114 @@ function makeCreateTools(ctx: CopilotContext) {
         const existing = assembleBrickAttributes(brickCode).imageRequirements.find(
           (r) => r.requirementName.toLowerCase() === requirementName.toLowerCase().trim()
         )
-        if (existing) {
-          return { error: `"${requirementName}" is already an image requirement on "${profile.name}". I can only create new requirements — edit this one manually in Attributes & Images.` }
-        }
         const proposal: ProposedAction = {
           tool: "set_image_requirement",
-          summary: `Add a new image requirement "${requirementName}" to "${profile.name}" (${args.format}, min ${args.minDimensions}).`,
+          summary: `${existing ? "Replace" : "Add"} the image requirement "${requirementName}" on "${profile.name}" (${args.format}, min ${args.minDimensions}).`,
           args,
+          consequence: existing
+            ? `An image requirement named "${requirementName}" already exists here and will be overwritten.`
+            : undefined,
+        }
+        return { proposal }
+      },
+    }),
+  }
+}
+
+// ── Edits and removals (proposal-only, same as creates) ──────────────────────
+//
+// These exist so the agent covers the whole lifecycle rather than only the
+// half that adds. The safety property is unchanged and is the reason it is safe
+// to widen: no tool here mutates anything. Each returns a proposal, and the
+// only code path that writes is the user clicking Apply on the card.
+
+function makeEditTools(ctx: CopilotContext) {
+  return {
+    update_attribute_requirement: tool({
+      description:
+        "Propose changing an existing attribute's display label or supplier guidance on a profile. Works for both custom rows and rows inherited from the GS1 standard. Does not change anything — returns a proposal the user must confirm.",
+      inputSchema: z.object({
+        brickCode: z.string(),
+        gs1Name: z.string().describe("The attribute's GS1 name exactly as get_profile_detail returns it"),
+        name: z.string().optional().describe("New display label"),
+        guidance: z.string().optional().describe("New supplier guidance"),
+      }),
+      execute: async ({ brickCode, gs1Name, name, guidance }) => {
+        const profile = findProfileForBrick(ctx.profiles, brickCode)
+        if (!profile) {
+          return { error: `No attribute profile exists for GS1 category ${brickCode}.` }
+        }
+        if (name === undefined && guidance === undefined) {
+          return { error: "Nothing to change — I need a new label, new guidance, or both." }
+        }
+        const changes = [
+          ...(name !== undefined ? [`label → "${name}"`] : []),
+          ...(guidance !== undefined ? [`guidance → "${guidance}"`] : []),
+        ].join(", ")
+        const proposal: ProposedAction = {
+          tool: "update_attribute_requirement",
+          summary: `Update "${gs1Name}" on "${profile.name}": ${changes}.`,
+          args: { brickCode, gs1Name, name, guidance },
+          consequence:
+            "Changes how the requirement reads for suppliers. Gap counts are unaffected — this does not change whether it is met.",
+        }
+        return { proposal }
+      },
+    }),
+
+    remove_attribute_requirement: tool({
+      description:
+        "Propose removing an attribute from a profile's requirements, so suppliers are no longer asked for it. Does not remove anything — returns a proposal the user must confirm. Always state the consequence before proposing this.",
+      inputSchema: z.object({
+        brickCode: z.string(),
+        gs1Name: z.string().describe("The attribute's GS1 name exactly as get_profile_detail returns it"),
+      }),
+      execute: async ({ brickCode, gs1Name }) => {
+        const profile = findProfileForBrick(ctx.profiles, brickCode)
+        if (!profile) {
+          return { error: `No attribute profile exists for GS1 category ${brickCode}.` }
+        }
+        const proposal: ProposedAction = {
+          tool: "remove_attribute_requirement",
+          summary: `Stop requiring "${gs1Name}" on "${profile.name}".`,
+          args: { brickCode, gs1Name },
+          destructive: true,
+          consequence:
+            "Open gaps against this attribute disappear from reports, so compliance improves without any supplier supplying anything. That is lowering the bar, not closing a gap.",
+        }
+        return { proposal }
+      },
+    }),
+
+    remove_image_requirement: tool({
+      description:
+        "Propose removing an image requirement from a profile. Does not remove anything — returns a proposal the user must confirm.",
+      inputSchema: z.object({
+        brickCode: z.string(),
+        requirementName: z.string(),
+      }),
+      execute: async ({ brickCode, requirementName }) => {
+        const profile = findProfileForBrick(ctx.profiles, brickCode)
+        if (!profile) {
+          return { error: `No attribute profile exists for GS1 category ${brickCode}.` }
+        }
+        const existing = assembleBrickAttributes(brickCode).imageRequirements.find(
+          (r) => r.requirementName.toLowerCase() === requirementName.toLowerCase().trim()
+        )
+        if (!existing) {
+          const names = assembleBrickAttributes(brickCode).imageRequirements.map((r) => r.requirementName)
+          return {
+            error: `No image requirement named "${requirementName}" on "${profile.name}". ${
+              names.length ? `Image requirements here: ${names.join(", ")}.` : "This profile has no image requirements."
+            }`,
+          }
+        }
+        const proposal: ProposedAction = {
+          tool: "remove_image_requirement",
+          summary: `Stop requiring the "${existing.requirementName}" image on "${profile.name}".`,
+          args: { brickCode, requirementName: existing.requirementName },
+          destructive: true,
+          consequence: "Images already supplied are not deleted — only the requirement to supply them.",
         }
         return { proposal }
       },
@@ -331,5 +446,5 @@ function makeCreateTools(ctx: CopilotContext) {
 }
 
 export function buildCopilotTools(ctx: CopilotContext) {
-  return { ...makeReadTools(ctx), ...makeCreateTools(ctx) }
+  return { ...makeReadTools(ctx), ...makeCreateTools(ctx), ...makeEditTools(ctx) }
 }

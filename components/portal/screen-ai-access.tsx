@@ -21,14 +21,15 @@
 // docs/mcp-enterprise-auth-trd.md.
 
 import { useCallback, useEffect, useState } from "react"
-import { Bot, Check, Copy, Lock, RefreshCw, ShieldAlert, Trash2, X, Zap } from "lucide-react"
+import { Bot, Check, Copy, Lock, RefreshCw, Trash2, X, Zap } from "lucide-react"
 
 const MCP_ENDPOINT = "https://v0-retailer-specific.vercel.app/api/mcp"
 
 export type AccessPerspective = "retailer" | "supplier"
 export type AccessRole = "admin" | "member"
 
-type ToolRow = { name: string; kind: "Read" | "Write"; scope: string; description: string }
+type ToolKind = "Read" | "Write" | "Remove"
+type ToolRow = { name: string; kind: ToolKind; scope: string; description: string }
 
 // Mirrors lib/mcp/manifest.ts — each tool's required scope and the tenant class
 // that may call it are part of what the connector publishes about itself, not
@@ -42,10 +43,21 @@ const RETAILER_TOOLS: ToolRow[] = [
   { name: "list_system_filters", kind: "Read", scope: "tgc.read", description: "List global System filters (e.g. GS1 Core, GS1 Extended)." },
   { name: "run_compliance_report", kind: "Read", scope: "tgc.read", description: "Run a defensive compliance report across your vendor base." },
   { name: "list_vendor_exceptions", kind: "Read", scope: "tgc.read", description: "List vendor exceptions on file (waivers, extended deadlines, reduced scope)." },
+  { name: "simulate_requirement_change", kind: "Read", scope: "tgc.read", description: "Model a requirement change against the vendor base without applying it." },
+  { name: "draft_vendor_outreach", kind: "Read", scope: "tgc.read", description: "Draft a remediation message to one supplier from their actual open gaps." },
+  { name: "query_access_log", kind: "Read", scope: "tgc.read", description: "Search this organisation's own AI access log. Administrators only." },
+  { name: "list_pending_changes", kind: "Read", scope: "tgc.read", description: "Proposals awaiting confirmation, with what each would do." },
   { name: "create_attribute_profile", kind: "Write", scope: "tgc.requirements.write", description: "Create a new attribute profile for a product category." },
   { name: "add_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add a custom attribute requirement to a profile." },
+  { name: "update_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Change an attribute's label or supplier guidance." },
   { name: "set_image_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add or update an image requirement on a profile." },
+  { name: "activate_profile", kind: "Write", scope: "tgc.requirements.write", description: "Start or stop enforcing a profile across the vendor base." },
   { name: "set_vendor_exception", kind: "Write", scope: "tgc.exceptions.write", description: "Grant or update a vendor exception for one category." },
+  { name: "confirm_pending_change", kind: "Write", scope: "tgc.read", description: "Apply a proposed change after the user has approved it." },
+  { name: "remove_attribute_requirement", kind: "Remove", scope: "tgc.requirements.write + tgc.destructive", description: "Stop requiring an attribute. Open gaps against it disappear." },
+  { name: "remove_image_requirement", kind: "Remove", scope: "tgc.requirements.write + tgc.destructive", description: "Stop requiring an image on a profile." },
+  { name: "delete_attribute_profile", kind: "Remove", scope: "tgc.requirements.write + tgc.destructive", description: "Delete a whole profile and every rule beneath it." },
+  { name: "revoke_vendor_exception", kind: "Remove", scope: "tgc.exceptions.write + tgc.destructive", description: "Expire or delete a waiver. The vendor's gap count rises again." },
 ]
 
 const SUPPLIER_TOOLS: ToolRow[] = [
@@ -58,6 +70,18 @@ const SUPPLIER_TOOLS: ToolRow[] = [
 const SHARED_TOOLS: ToolRow[] = [
   { name: "get_capabilities", kind: "Read", scope: "tgc.read", description: "Discover what this connector can do for you, and a live snapshot of your data." },
 ]
+
+/**
+ * What a connection that consented to read-only actually sees.
+ *
+ * The Connect tab lists everything this tenant class *could* be granted, which
+ * is the wrong picture if the point is that consent narrows the surface. This
+ * is the same list filtered the way lib/mcp/manifest.ts filters it — a tool is
+ * visible only when every scope it declares has been granted.
+ */
+function toolsAtReadOnly(tools: ToolRow[]): ToolRow[] {
+  return tools.filter((t) => t.scope === "tgc.read" && t.kind === "Read")
+}
 
 interface AuditEntry {
   id: string
@@ -74,22 +98,24 @@ interface AuditEntry {
   latencyMs: number
 }
 
-type Tab = "connect" | "log" | "security"
+type Tab = "connect" | "log"
 
 const TENANT: Record<AccessPerspective, { id: string; name: string; admin: string; member: string }> = {
   retailer: { id: "dillards", name: "Dillard's", admin: "admin@dillards.demo", member: "buyer@dillards.demo" },
   supplier: { id: "jrenee", name: "J.Renée", admin: "admin@jrenee.demo", member: "catalog@jrenee.demo" },
 }
 
-function ToolKindPill({ kind }: { kind: "Read" | "Write" }) {
+function ToolKindPill({ kind }: { kind: ToolKind }) {
+  const style =
+    kind === "Remove"
+      ? { backgroundColor: "#FEE2E2", color: "#991B1B" }
+      : kind === "Write"
+        ? { backgroundColor: "#FEF3C7", color: "#92400E" }
+        : { backgroundColor: "#EFF6FF", color: "#0168B3" }
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0"
-      style={
-        kind === "Write"
-          ? { backgroundColor: "#FEF3C7", color: "#92400E" }
-          : { backgroundColor: "#EFF6FF", color: "#0168B3" }
-      }
+      style={style}
     >
       {kind}
     </span>
@@ -216,6 +242,10 @@ function ConnectTab({ perspective }: { perspective: AccessPerspective }) {
   const isSupplier = perspective === "supplier"
   const mine = isSupplier ? SUPPLIER_TOOLS : RETAILER_TOOLS
   const theirs = isSupplier ? RETAILER_TOOLS : SUPPLIER_TOOLS
+  const [readOnlyView, setReadOnlyView] = useState(false)
+
+  const allTools = [...SHARED_TOOLS, ...mine]
+  const visibleTools = readOnlyView ? toolsAtReadOnly(allTools) : allTools
 
   return (
     <>
@@ -270,7 +300,47 @@ function ConnectTab({ perspective }: { perspective: AccessPerspective }) {
             {perspective} tenant
           </span>
         </div>
-        <ToolTable tools={[...SHARED_TOOLS, ...mine]} />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setReadOnlyView(false)}
+            className="px-3 py-1.5 rounded-md text-xs font-medium"
+            style={
+              readOnlyView
+                ? { border: "1px solid #E0E4E8", color: "#374151" }
+                : { backgroundColor: "#0168B3", color: "#FFFFFF" }
+            }
+          >
+            Everything you can consent to
+          </button>
+          <button
+            onClick={() => setReadOnlyView(true)}
+            className="px-3 py-1.5 rounded-md text-xs font-medium"
+            style={
+              readOnlyView
+                ? { backgroundColor: "#0168B3", color: "#FFFFFF" }
+                : { border: "1px solid #E0E4E8", color: "#374151" }
+            }
+          >
+            What a read-only connection sees
+          </button>
+        </div>
+        <ToolTable tools={visibleTools} />
+        <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
+          {readOnlyView ? (
+            <>
+              Read-only is the default at the consent screen. The {allTools.length - visibleTools.length} tools that
+              write, remove, or confirm are not merely disabled — they are absent from the tool list the assistant is
+              given, and refused if called directly. Filtering the list is the experience; the check at invocation is
+              the boundary.
+            </>
+          ) : (
+            <>
+              This is the full surface a {perspective} may grant, not what any one connection holds. Removals need the
+              destructive scope <em>on top of</em> the relevant write scope, and every write returns a preview and a
+              confirmation token rather than acting — nothing changes until a person approves it.
+            </>
+          )}
+        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -377,8 +447,8 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
           </p>
         ) : entries.length === 0 ? (
           <p className="px-4 py-6 text-xs font-light text-center" style={{ color: "#9CA3AF" }}>
-            No connector activity recorded for {tenant.name} yet. Connect an AI client and ask it something, or run
-            one of the checks on the Security tab.
+            No connector activity recorded for {tenant.name} yet. Connect an AI client from the Connect tab and ask it
+            something — every tool call it makes, allowed or refused, appears here.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -466,103 +536,6 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
   )
 }
 
-// ── Tab: Security ────────────────────────────────────────────────────────────
-
-function SecurityTab({ perspective, role }: { perspective: AccessPerspective; role: AccessRole }) {
-  const tenant = TENANT[perspective]
-  const [output, setOutput] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-
-  async function run(label: string, path: string) {
-    setBusy(label)
-    setOutput(null)
-    try {
-      const res = await fetch(path, { method: "POST" })
-      setOutput(JSON.stringify(await res.json(), null, 2))
-    } catch (err) {
-      setOutput(String(err))
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  if (role !== "admin") return <LockedPanel tenantName={tenant.name} />
-
-  // Both demos are provisioned against the retailer tenant, so showing them on
-  // the supplier side would be misleading — the activity would land in
-  // Dillard's log, which a J.Renée administrator cannot read.
-  if (perspective === "supplier") {
-    return (
-      <SectionCard>
-        <h3 className="text-sm font-semibold text-[#111827]">Security demonstrations</h3>
-        <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-          The proactive-agent and wrong-audience-token demonstrations run under identities provisioned for the
-          retailer tenant, so their activity appears in that organisation&rsquo;s access log — which, correctly, an
-          administrator of {tenant.name} cannot read. Switch the portal to the retailer perspective to run them.
-        </p>
-        <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
-          {tenant.name}&rsquo;s own connector activity appears on the Access log tab.
-        </p>
-      </SectionCard>
-    )
-  }
-
-  return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-[#111827]">Proactive agent (no human in the session)</h3>
-        <SectionCard>
-          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-            Runs a compliance check under an autonomous <span className="font-medium">service identity</span> rather
-            than a signed-in person. It authenticates as itself, is provisioned against one organisation only, and
-            holds read-only scope — so it cannot choose whose data it sees and cannot waive a requirement with
-            nobody to approve it. Watch it appear in the Access log as a service identity.
-          </p>
-          <button
-            onClick={() => run("proactive", "/api/demo/proactive-check")}
-            disabled={busy !== null}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium text-white self-start disabled:opacity-60"
-            style={{ backgroundColor: "#0168B3" }}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            {busy === "proactive" ? "Running…" : "Run proactive check"}
-          </button>
-        </SectionCard>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-[#111827]">Token from another service is refused</h3>
-        <SectionCard>
-          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-            Mints a token that is completely valid — correct issuer, correct signing key, real organisation, full
-            scopes — but issued for a <span className="font-medium">different service</span>. Replayed here it is
-            refused on the audience check alone. Because it never got past authentication, the refusal is logged as
-            unattributed rather than filed under any organisation.
-          </p>
-          <button
-            onClick={() => run("deputy", "/api/demo/confused-deputy")}
-            disabled={busy !== null}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium self-start disabled:opacity-60"
-            style={{ border: "1px solid #E0E4E8", color: "#374151" }}
-          >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            {busy === "deputy" ? "Minting…" : "Mint a wrong-audience token"}
-          </button>
-        </SectionCard>
-      </div>
-
-      {output && (
-        <pre
-          className="text-[11px] font-mono p-3 rounded-lg overflow-x-auto max-h-72 overflow-y-auto"
-          style={{ backgroundColor: "#F9FAFB", border: "1px solid #E0E4E8", color: "#374151" }}
-        >
-          {output}
-        </pre>
-      )}
-    </section>
-  )
-}
-
 // ── Modal shell ──────────────────────────────────────────────────────────────
 
 interface AiAccessModalProps {
@@ -578,7 +551,6 @@ export function AiAccessModal({ onClose, perspective, role }: AiAccessModalProps
   const tabs: { id: Tab; label: string; adminOnly?: boolean }[] = [
     { id: "connect", label: "Connect" },
     { id: "log", label: "Access log", adminOnly: true },
-    { id: "security", label: "Security", adminOnly: true },
   ]
 
   return (
@@ -621,7 +593,6 @@ export function AiAccessModal({ onClose, perspective, role }: AiAccessModalProps
         <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-6">
           {tab === "connect" && <ConnectTab perspective={perspective} />}
           {tab === "log" && <AccessLogTab perspective={perspective} role={role} />}
-          {tab === "security" && <SecurityTab perspective={perspective} role={role} />}
         </div>
       </div>
     </div>

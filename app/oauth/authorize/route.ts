@@ -119,6 +119,7 @@ function consentForm(p: AuthorizeParams, clientName: string, error?: string): st
     ${scopeRow(SCOPES.read, "Read your catalogue", " — profiles, suppliers, compliance reports, exceptions.", p.scopes.includes(SCOPES.read))}
     ${scopeRow(SCOPES.requirementsWrite, "Author requirements", " — create profiles, add attributes and image rules.", p.scopes.includes(SCOPES.requirementsWrite))}
     ${scopeRow(SCOPES.exceptionsWrite, "Grant vendor exceptions", " — waivers and deadline extensions that change compliance numbers.", p.scopes.includes(SCOPES.exceptionsWrite))}
+    ${scopeRow(SCOPES.destructive, "Remove requirements and revoke exceptions", " — delete profiles, drop attributes and image rules, revoke waivers. Required in addition to the write permissions above.", p.scopes.includes(SCOPES.destructive))}
   </fieldset>
 
   <button type="submit">Sign in and allow</button>

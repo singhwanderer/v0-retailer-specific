@@ -21,6 +21,8 @@
 import { z } from "zod"
 import { SCOPES, type CallerContext, type Scope } from "@/lib/mcp/context"
 import type { TenantClass } from "@/lib/mcp/tenants"
+import type { ProfileStatus } from "@/lib/retailer-requirements"
+import type { ToolGuardSpec } from "@/lib/mcp/guard"
 import {
   getMyComplianceStatus,
   getMyOpenGaps,
@@ -30,6 +32,8 @@ import {
 import {
   addAttributeRequirement,
   createAttributeProfile,
+  deleteAttributeProfile,
+  draftVendorOutreach,
   getCapabilities,
   getProfileDetail,
   getSupplierCompliance,
@@ -37,11 +41,27 @@ import {
   listMySuppliers,
   listSystemFilters,
   listVendorExceptions,
+  queryAccessLog,
+  removeAttributeRequirement,
+  removeImageRequirement,
+  revokeVendorException,
   runComplianceReport,
   searchGs1Bricks,
   setImageRequirement,
+  setProfileStatus,
   setVendorException,
+  simulateRequirementChange,
+  updateAttributeRequirement,
 } from "@/lib/mcp/tools"
+import { getStore, readProfileExtras } from "@/lib/mcp/store"
+import { findProfileForBrick } from "@/lib/mcp/attribute-assembly"
+import {
+  createPendingChange,
+  discardPendingChange,
+  listPendingChanges,
+  takePendingChange,
+} from "@/lib/mcp/pending"
+import { runGuarded } from "@/lib/mcp/guard"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ZodRawShape = Record<string, z.ZodType<any, any, any>>
@@ -53,6 +73,31 @@ export interface ToolDefinition {
   schema: ZodRawShape
   /** Whether this tool mutates state — surfaced in the registry and the audit UI. */
   kind: "read" | "write"
+  /**
+   * Removes or deactivates something that already exists. Declared separately
+   * from `kind` because "write" is far too coarse a bucket to consent to:
+   * adding an attribute and deleting the profile it lives on are different
+   * authorities. A destructive tool additionally requires SCOPES.destructive
+   * and is surfaced to clients with MCP's destructiveHint annotation.
+   */
+  destructive?: boolean
+  /**
+   * Two-phase: the first call previews and returns a confirmation token, and
+   * only confirm_pending_change executes. Every mutating tool sets this — see
+   * lib/mcp/pending.ts for why the confirmation lives in the protocol rather
+   * than in a UI card the external clients don't have.
+   */
+  requiresConfirmation?: boolean
+  /**
+   * Describe what the call *would* do, for the preview phase. Returning
+   * `{ error }` refuses before a token is ever minted, so an invalid request
+   * fails at proposal time rather than at confirm time.
+   */
+  preview?: (
+    ctx: CallerContext,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    args: any
+  ) => { summary: string; effect: string[] } | { error: string }
   requiredScope: Scope
   /**
    * Which tenant classes may call this tool. Today's inventory is entirely
@@ -60,14 +105,55 @@ export interface ToolDefinition {
    * field is being enforced, which is the point of declaring it now.
    */
   allowedTenantClasses: TenantClass[]
+  /** Scopes required on top of requiredScope — destructive tools add SCOPES.destructive. */
+  additionalScopes?: Scope[]
   /**
    * May an autonomous workload identity (no human in the session) call this?
    * Writes are human-delegated only: an agent acting on its own must not be
-   * able to waive a compliance requirement with nobody to approve it.
+   * able to waive a compliance requirement with nobody to approve it. This
+   * extends to confirmation: an agent may propose, but only a person approves.
    */
   allowWorkload: boolean
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handler: (ctx: CallerContext, args: any) => unknown
+}
+
+// ── Preview helpers ──────────────────────────────────────────────────────────
+// A preview's job is to state the consequence in the user's terms before a
+// token exists. These resolve the same store the handler will, so a preview
+// that says "this profile doesn't exist" refuses at proposal time rather than
+// letting a token be minted for a change that would fail on confirm.
+
+interface ExceptionArgs {
+  id?: string
+  vendor?: string
+  brickCode: string
+  exceptionType: "Attribute Waiver" | "Extended Deadline" | "Reduced Scope"
+  attributes: string[]
+  validUntil: string
+  status?: "Active" | "Expired"
+}
+
+function findProfile(ctx: CallerContext, name: string) {
+  return getStore(ctx.tenantId).profiles.find((p) => p.name.toLowerCase() === name.toLowerCase().trim())
+}
+
+function unknownProfile(ctx: CallerContext, name: string): string {
+  const names = getStore(ctx.tenantId).profiles.map((p) => p.name)
+  return `No attribute profile named "${name}". Your profiles: ${names.join(", ")}.`
+}
+
+function profileLabel(ctx: CallerContext, brickCode: string): string {
+  const profile = findProfileForBrick(getStore(ctx.tenantId).profiles, brickCode)
+  return profile ? `the "${profile.name}" profile (GS1 category ${brickCode})` : `GS1 category ${brickCode}`
+}
+
+/** Refuse at preview time if the profile a write targets doesn't exist yet. */
+function profileMissing(ctx: CallerContext, brickCode: string): { error: string } | null {
+  if (findProfileForBrick(getStore(ctx.tenantId).profiles, brickCode)) return null
+  return {
+    error: `No attribute profile exists for GS1 category ${brickCode}. Create one first with create_attribute_profile.`,
+  }
 }
 
 const RETAILER_ONLY: TenantClass[] = ["retailer"]
@@ -243,6 +329,16 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     requiredScope: SCOPES.requirementsWrite,
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: { categoryName: string; brickCodes: string[]; category?: string }) => ({
+      summary: `Create a new "${a.categoryName}" requirement profile mapped to ${a.brickCodes.length} GS1 categor${a.brickCodes.length === 1 ? "y" : "ies"}.`,
+      effect: [
+        `Free-text category label: "${a.category ?? a.categoryName}".`,
+        `GS1 categories mapped: ${a.brickCodes.join(", ")}. Each keeps its own attribute set — nothing is merged across them.`,
+        "The profile is seeded with each category's standard GS1 extended attributes.",
+        "It starts as a DRAFT, so nothing is assessed against it until it is activated.",
+      ],
+    }),
     handler: (
       ctx,
       { categoryName, brickCodes, category }: { categoryName: string; brickCodes: string[]; category?: string }
@@ -265,6 +361,22 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     requiredScope: SCOPES.requirementsWrite,
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (
+      ctx,
+      a: { brickCode: string; attributeName: string; target: "core" | "extended"; guidance?: string }
+    ) => {
+      const missing = profileMissing(ctx, a.brickCode)
+      if (missing) return missing
+      return {
+        summary: `Require "${a.attributeName}" as a ${a.target} attribute on ${profileLabel(ctx, a.brickCode)}.`,
+        effect: [
+          ...(a.guidance ? [`Supplier guidance: "${a.guidance}".`] : []),
+          "Every supplier item in this category that lacks the attribute becomes an open gap, so reported compliance will fall until suppliers populate it.",
+          "Run simulate_requirement_change first if the user wants to know how far it would fall before committing.",
+        ],
+      }
+    },
     handler: (
       ctx,
       {
@@ -300,6 +412,33 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     requiredScope: SCOPES.requirementsWrite,
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (
+      ctx,
+      a: {
+        brickCode: string
+        requirementName: string
+        format: string
+        background: string
+        minDimensions: string
+        maxFileSize: string
+      }
+    ) => {
+      const missing = profileMissing(ctx, a.brickCode)
+      if (missing) return missing
+      const existing = readProfileExtras(a.brickCode, ctx.tenantId).imageRequirements.some(
+        (r) => r.requirementName.toLowerCase() === a.requirementName.toLowerCase().trim()
+      )
+      return {
+        summary: `${existing ? "Replace" : "Add"} the "${a.requirementName}" image requirement on ${profileLabel(ctx, a.brickCode)}.`,
+        effect: [
+          `${a.format}, ${a.background.toLowerCase()}, minimum ${a.minDimensions}, up to ${a.maxFileSize}.`,
+          existing
+            ? "An image requirement with this name already exists here and will be overwritten."
+            : "Suppliers in this category will be asked for this image.",
+        ],
+      }
+    },
     handler: (ctx, { brickCode, ...requirement }: { brickCode: string } & Record<string, never>) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setImageRequirement(ctx, brickCode, requirement as any),
@@ -339,7 +478,391 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     requiredScope: SCOPES.exceptionsWrite,
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: ExceptionArgs) => {
+      const vendor = a.vendor?.trim() || "J.Renée"
+      const waives = a.exceptionType === "Attribute Waiver"
+      return {
+        summary: `${a.id ? "Update" : "Grant"} a ${a.exceptionType} for ${vendor} on ${a.attributes.join(", ")}, valid until ${a.validUntil}.`,
+        effect: [
+          `Vendor: ${vendor}${a.vendor?.trim() ? "" : " (assumed — no vendor was named)"}`,
+          `Scoped to GS1 category ${a.brickCode} only — it will not apply to other categories this vendor supplies.`,
+          waives
+            ? `This REDUCES ${vendor}'s reported gap count for this category. Compliance numbers will change.`
+            : `This does not reduce the gap count — an ${a.exceptionType} changes which attribute is named as the gap, but the requirement stays open.`,
+          ...(a.status === "Expired" ? ["Status will be set to Expired, so it stops applying immediately."] : []),
+        ],
+      }
+    },
     handler: (ctx, args) => setVendorException(ctx, args),
+  },
+
+  // ── Edits ──────────────────────────────────────────────────────────────────
+  {
+    name: "update_attribute_requirement",
+    description:
+      "Change an existing attribute row's display label or supplier guidance on a profile. Works for both retailer-added custom rows and rows inherited from the GS1 standard (an inherited row is recorded as an override rather than mutated). Returns a preview and a confirmation token; call confirm_pending_change to apply it.",
+    schema: {
+      brickCode: z.string().describe("GS1 category code of the profile to modify"),
+      gs1Name: z
+        .string()
+        .describe("The attribute's GS1 name as returned by get_profile_detail, e.g. 'Heel Height'"),
+      name: z.string().optional().describe("New display label for the attribute"),
+      guidance: z.string().optional().describe("New guidance text shown to suppliers"),
+    },
+    kind: "write",
+    requiredScope: SCOPES.requirementsWrite,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: { brickCode: string; gs1Name: string; name?: string; guidance?: string }) => {
+      const missing = profileMissing(ctx, a.brickCode)
+      if (missing) return missing
+      if (a.name === undefined && a.guidance === undefined) {
+        return { error: "Nothing to change — provide a new name, new guidance, or both." }
+      }
+      return {
+        summary: `Update "${a.gs1Name}" on ${profileLabel(ctx, a.brickCode)}.`,
+        effect: [
+          ...(a.name !== undefined ? [`Label becomes "${a.name}".`] : []),
+          ...(a.guidance !== undefined ? [`Supplier guidance becomes "${a.guidance}".`] : []),
+          "Suppliers see the new wording the next time they view this requirement. Gap counts are unaffected — this changes how the requirement reads, not whether it is met.",
+        ],
+      }
+    },
+    handler: (
+      ctx,
+      { brickCode, gs1Name, ...updates }: { brickCode: string; gs1Name: string; name?: string; guidance?: string }
+    ) => updateAttributeRequirement(ctx, brickCode, gs1Name, updates),
+  },
+  {
+    name: "activate_profile",
+    description:
+      "Activate a Draft attribute profile so its requirements start being enforced across the vendor base, or return an Active profile to Draft. Returns a preview and a confirmation token; call confirm_pending_change to apply it.",
+    schema: {
+      profileName: z.string().describe("Profile name, e.g. 'Swimwear'"),
+      status: z
+        .enum(["Active", "Draft"])
+        .describe("'Active' to start enforcing this profile, 'Draft' to stop and return it to editing"),
+    },
+    kind: "write",
+    requiredScope: SCOPES.requirementsWrite,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: { profileName: string; status: "Active" | "Draft" }) => {
+      const profile = findProfile(ctx, a.profileName)
+      if (!profile) return { error: unknownProfile(ctx, a.profileName) }
+      if (profile.status === a.status) {
+        return { error: `"${profile.name}" is already ${a.status}. Nothing to change.` }
+      }
+      return {
+        summary: `Set the "${profile.name}" profile from ${profile.status} to ${a.status}.`,
+        effect:
+          a.status === "Active"
+            ? [
+                `Vendor items in ${profile.category} start being assessed against this profile's requirements.`,
+                "Expect reported gap counts to rise the first time a report runs — those gaps already existed, they were simply not being measured.",
+              ]
+            : [
+                `Vendor items in ${profile.category} stop being assessed against this profile.`,
+                "Gaps against these requirements will no longer be reported. The requirements themselves are kept and can be re-activated.",
+              ],
+      }
+    },
+    handler: (ctx, { profileName, status }: { profileName: string; status: ProfileStatus }) =>
+      setProfileStatus(ctx, profileName, status),
+  },
+
+  // ── Removals ───────────────────────────────────────────────────────────────
+  // Every tool below additionally requires SCOPES.destructive. Consenting to
+  // "author requirements" is not consent to delete them, and a connection that
+  // was granted only the write scope does not see these in its tool list.
+  {
+    name: "remove_attribute_requirement",
+    description:
+      "Remove an attribute from a profile's requirements. A retailer-added custom row is deleted; a row inherited from the GS1 standard is recorded as an exclusion (standard rows are derived, not stored). Requires the destructive scope in addition to the requirements-write scope. Returns a preview and a confirmation token; call confirm_pending_change to apply it.",
+    schema: {
+      brickCode: z.string().describe("GS1 category code of the profile to modify"),
+      gs1Name: z.string().describe("The attribute's GS1 name as returned by get_profile_detail"),
+    },
+    kind: "write",
+    destructive: true,
+    requiredScope: SCOPES.requirementsWrite,
+    additionalScopes: [SCOPES.destructive],
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: { brickCode: string; gs1Name: string }) => {
+      const missing = profileMissing(ctx, a.brickCode)
+      if (missing) return missing
+      return {
+        summary: `Remove "${a.gs1Name}" from ${profileLabel(ctx, a.brickCode)}.`,
+        effect: [
+          "Suppliers will no longer be asked for this attribute in this category.",
+          "Any currently open gaps against it disappear from reports — reported compliance will improve without any supplier supplying anything.",
+          "This is the difference between fixing a number and lowering the bar. Confirm only if you mean to stop requiring it.",
+        ],
+      }
+    },
+    handler: (ctx, { brickCode, gs1Name }: { brickCode: string; gs1Name: string }) =>
+      removeAttributeRequirement(ctx, brickCode, gs1Name),
+  },
+  {
+    name: "remove_image_requirement",
+    description:
+      "Remove an image requirement from a profile by its requirement name. Requires the destructive scope in addition to the requirements-write scope. Returns a preview and a confirmation token; call confirm_pending_change to apply it.",
+    schema: {
+      brickCode: z.string().describe("GS1 category code of the profile to modify"),
+      requirementName: z.string().describe("e.g. 'Hero Shot'"),
+    },
+    kind: "write",
+    destructive: true,
+    requiredScope: SCOPES.requirementsWrite,
+    additionalScopes: [SCOPES.destructive],
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: { brickCode: string; requirementName: string }) => {
+      const missing = profileMissing(ctx, a.brickCode)
+      if (missing) return missing
+      const extras = readProfileExtras(a.brickCode, ctx.tenantId)
+      const match = extras.imageRequirements.find(
+        (r) => r.requirementName.toLowerCase() === a.requirementName.toLowerCase().trim()
+      )
+      if (!match) {
+        const names = extras.imageRequirements.map((r) => r.requirementName)
+        return {
+          error: `No image requirement named "${a.requirementName}" on ${profileLabel(ctx, a.brickCode)}. ${
+            names.length ? `Image requirements here: ${names.join(", ")}.` : "This profile has no image requirements."
+          }`,
+        }
+      }
+      return {
+        summary: `Remove the "${match.requirementName}" image requirement from ${profileLabel(ctx, a.brickCode)}.`,
+        effect: [
+          `Suppliers will no longer be asked for a ${match.format} image at ${match.minDimensions} on a ${match.background.toLowerCase()} background.`,
+          "Images already supplied are not deleted — only the requirement to supply them.",
+        ],
+      }
+    },
+    handler: (ctx, { brickCode, requirementName }: { brickCode: string; requirementName: string }) =>
+      removeImageRequirement(ctx, brickCode, requirementName),
+  },
+  {
+    name: "delete_attribute_profile",
+    description:
+      "Delete a whole requirement profile and every attribute and image rule beneath it. This is the widest-reaching action in the connector. Requires the destructive scope in addition to the requirements-write scope. Returns a preview and a confirmation token; call confirm_pending_change to apply it.",
+    schema: {
+      profileName: z.string().describe("Profile name, e.g. 'Swimwear'"),
+    },
+    kind: "write",
+    destructive: true,
+    requiredScope: SCOPES.requirementsWrite,
+    additionalScopes: [SCOPES.destructive],
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: { profileName: string }) => {
+      const profile = findProfile(ctx, a.profileName)
+      if (!profile) return { error: unknownProfile(ctx, a.profileName) }
+      const bricks = profile.bricks?.length ? profile.bricks : [{ code: profile.brickCode, name: profile.brickName }]
+      const images = bricks.reduce(
+        (sum, b) => sum + readProfileExtras(b.code, ctx.tenantId).imageRequirements.length,
+        0
+      )
+      return {
+        summary: `Delete the "${profile.name}" profile (${profile.category}) and everything under it.`,
+        effect: [
+          `${bricks.length} GS1 categor${bricks.length === 1 ? "y" : "ies"} lose their requirements: ${bricks.map((b) => b.name).join(", ")}.`,
+          `Everything the profile carries goes with it — ${profile.attributes}${images ? `, including ${images} stored image rule${images === 1 ? "" : "s"}` : ""}.`,
+          profile.status === "Active"
+            ? "This profile is ACTIVE — vendor items in these categories stop being assessed the moment this applies."
+            : "This profile is a Draft, so nothing is currently being assessed against it.",
+          "There is no undo in this prototype. The profile would have to be recreated from scratch.",
+        ],
+      }
+    },
+    handler: (ctx, { profileName }: { profileName: string }) => deleteAttributeProfile(ctx, profileName),
+  },
+  {
+    name: "revoke_vendor_exception",
+    description:
+      "Revoke a vendor exception — either expiring it (keeping the row with status Expired, the audit-friendly default) or deleting the record outright. Requires the destructive scope in addition to the exceptions-write scope. Returns a preview and a confirmation token; call confirm_pending_change to apply it.",
+    schema: {
+      id: z.string().describe("Exception id from list_vendor_exceptions"),
+      mode: z
+        .enum(["expire", "delete"])
+        .optional()
+        .describe(
+          "'expire' (default) keeps the row visible with status Expired; 'delete' removes the record entirely"
+        ),
+    },
+    kind: "write",
+    destructive: true,
+    requiredScope: SCOPES.exceptionsWrite,
+    additionalScopes: [SCOPES.destructive],
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: false,
+    requiresConfirmation: true,
+    preview: (ctx, a: { id: string; mode?: "expire" | "delete" }) => {
+      const row = getStore(ctx.tenantId).vendorExceptions.find((e) => e.id === a.id)
+      if (!row) {
+        return { error: `No vendor exception with id "${a.id}". Use list_vendor_exceptions to find the right id.` }
+      }
+      const mode = a.mode ?? "expire"
+      const wasWaiver = row.exceptionType === "Attribute Waiver" && row.status === "Active"
+      return {
+        summary: `${mode === "delete" ? "Delete" : "Expire"} the ${row.exceptionType} granted to ${row.vendor} on ${row.attributes.join(", ")}.`,
+        effect: [
+          `Vendor: ${row.vendor}, category ${row.brickCode}, currently ${row.status}.`,
+          wasWaiver
+            ? `${row.vendor}'s reported gap count for this category will RISE — the waived attributes become outstanding again.`
+            : "Gap counts do not change; this exception was not reducing them.",
+          mode === "delete"
+            ? "The record is removed entirely, so there is no trace that the exception was ever granted."
+            : "The row stays visible with status Expired, preserving the record of what applied and when.",
+        ],
+      }
+    },
+    handler: (ctx, { id, mode }: { id: string; mode?: "expire" | "delete" }) =>
+      revokeVendorException(ctx, id, mode ?? "expire"),
+  },
+
+  // ── Confirmation ───────────────────────────────────────────────────────────
+  {
+    name: "confirm_pending_change",
+    description:
+      "Apply a change that was previously proposed. Every mutating tool returns a preview and a confirmation_token instead of acting; pass that token here to execute it. ALWAYS show the user the preview's summary and effects and get their explicit approval before calling this — that approval is the entire purpose of the two-phase flow. Tokens are single-use and expire after 10 minutes.",
+    schema: {
+      confirmation_token: z.string().describe("The confirmation_token returned by the proposing tool"),
+    },
+    kind: "write",
+    // Deliberately the read scope: this tool's own authority is nil. The scopes
+    // and tenant class of the *target* tool are re-checked inside the handler,
+    // so a read-only connection holding a token still cannot execute anything.
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: BOTH_CLASSES,
+    // An agent may propose; only a person approves.
+    allowWorkload: false,
+    handler: (ctx, { confirmation_token }: { confirmation_token: string }) => {
+      const found = takePendingChange(ctx, confirmation_token)
+      if (!found.ok) return { error: found.error }
+
+      const def = getToolDefinition(found.pending.tool)
+      if (!def) {
+        return { error: `The pending change referenced an unknown tool "${found.pending.tool}".` }
+      }
+
+      // The token is not a credential. Authority is re-derived from the
+      // confirming caller's own context, exactly as it would be on a direct
+      // call — a token minted while a scope was held is worthless once it
+      // isn't.
+      const outcome = runGuarded(ctx, guardSpecFor(def), () => def.handler(ctx, found.pending.args))
+      if (!outcome.ok) return outcome.error
+
+      return {
+        confirmed: found.pending.summary,
+        tool: found.pending.tool,
+        result: outcome.result,
+      }
+    },
+  },
+  {
+    name: "list_pending_changes",
+    description:
+      "List changes proposed in this organisation that are still awaiting confirmation, with what each would do and when it expires. Use this if the user loses track of a proposal.",
+    schema: {},
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: BOTH_CLASSES,
+    allowWorkload: true,
+    handler: (ctx) => {
+      const pending = listPendingChanges(ctx)
+      if (pending.length === 0) {
+        return { pending: [], note: "Nothing is awaiting confirmation. Proposals expire 10 minutes after they are made." }
+      }
+      return {
+        pending: pending.map((p) => ({
+          confirmation_token: p.token,
+          tool: p.tool,
+          summary: p.summary,
+          effect: p.effect,
+          expiresInSeconds: Math.max(0, Math.round((p.expiresAt - Date.now()) / 1000)),
+        })),
+      }
+    },
+  },
+  {
+    name: "discard_pending_change",
+    description: "Discard a proposed change without applying it, so its token can no longer be confirmed.",
+    schema: {
+      confirmation_token: z.string().describe("The confirmation_token to discard"),
+    },
+    kind: "write",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: BOTH_CLASSES,
+    allowWorkload: true,
+    handler: (ctx, { confirmation_token }: { confirmation_token: string }) =>
+      discardPendingChange(ctx, confirmation_token)
+        ? { discarded: confirmation_token, note: "The proposal was discarded. Nothing was changed." }
+        : { error: `No pending change with token "${confirmation_token}" — it may have already been confirmed, discarded, or expired.` },
+  },
+
+  // ── Analysis ───────────────────────────────────────────────────────────────
+  {
+    name: "simulate_requirement_change",
+    description:
+      "Answer 'what would this do to my vendor base?' WITHOUT changing anything. Adds or removes an attribute on a profile hypothetically and re-runs the real compliance engine, returning the change in total gaps, overall compliance %, how many vendors would newly fall out of compliance, and the per-vendor impact. Use this BEFORE proposing an authoring change whenever the user is weighing whether to require something.",
+    schema: {
+      profileName: z.string().describe("Profile name, e.g. 'Apparel'"),
+      attributeName: z.string().describe("Attribute to add or remove hypothetically, e.g. 'Sustainable Materials Y/N'"),
+      action: z
+        .enum(["add", "remove"])
+        .optional()
+        .describe("'add' (default) to model requiring it, 'remove' to model dropping it"),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => simulateRequirementChange(ctx, args),
+  },
+  {
+    name: "draft_vendor_outreach",
+    description:
+      "Draft a remediation message to one supplier, built from their actual open gaps ranked worst-first, with attributes already covered by an Active exception excluded. Returns a subject and body for a human to review and send — nothing is sent and no outreach record is stored.",
+    schema: {
+      supplier: z.string().describe("Supplier name, e.g. 'Levi Strauss & Co.'"),
+      tone: z
+        .enum(["direct", "collaborative"])
+        .optional()
+        .describe("'collaborative' (default) offers to discuss exceptions; 'direct' states the requirement"),
+      deadline: z.string().optional().describe("Free-text deadline, e.g. 'March 31'"),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => draftVendorOutreach(ctx, args),
+  },
+  {
+    name: "query_access_log",
+    description:
+      "Search this organisation's AI access log — every tool call an assistant made, allowed or refused, with who acted, which assistant, which tool, and which scope it required. Administrators only, and scoped to this organisation's own activity. Use it to answer 'what has our AI been doing?'.",
+    schema: {
+      outcome: z.enum(["allowed", "denied", "error"]).optional().describe("Filter by outcome"),
+      tool: z.string().optional().describe("Filter to tool names containing this text"),
+      limit: z.number().int().min(1).max(100).optional().describe("Maximum entries to return (default 25)"),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: BOTH_CLASSES,
+    // A workload has no role, and the audit trail is an administrative
+    // artifact — there is no person whose administrative standing it could
+    // borrow.
+    allowWorkload: false,
+    handler: (ctx, args) => queryAccessLog(ctx, args),
   },
 
   // ── Supplier-side reads ────────────────────────────────────────────────────
@@ -409,11 +932,76 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   },
 ]
 
-/** Tools this caller's granted scopes permit them to see and call. */
+/**
+ * Tools this caller's granted scopes permit them to see and call.
+ *
+ * Every declared scope must be held, not just the primary one — otherwise a
+ * connection granted requirements-write but not destructive would be shown the
+ * delete tools and only discover the refusal after proposing a deletion.
+ */
 export function toolsForScopes(scopes: Set<Scope>): ToolDefinition[] {
-  return TOOL_MANIFEST.filter((t) => scopes.has(t.requiredScope))
+  return TOOL_MANIFEST.filter(
+    (t) => scopes.has(t.requiredScope) && (t.additionalScopes ?? []).every((s) => scopes.has(s))
+  )
 }
 
 export function getToolDefinition(name: string): ToolDefinition | undefined {
   return TOOL_MANIFEST.find((t) => t.name === name)
+}
+
+/** The guard spec for one tool — derived from the manifest, never hand-written. */
+export function guardSpecFor(tool: ToolDefinition): ToolGuardSpec {
+  return {
+    name: tool.name,
+    requiredScope: tool.requiredScope,
+    additionalScopes: tool.additionalScopes,
+    allowedTenantClasses: tool.allowedTenantClasses,
+    allowWorkload: tool.allowWorkload,
+  }
+}
+
+/**
+ * MCP tool annotations, so a client can warn a user before a call rather than
+ * after. These are hints for the client's UX — the enforcement is still
+ * runGuarded plus the confirmation step, and a client that ignores them gains
+ * nothing.
+ */
+export function annotationsFor(tool: ToolDefinition) {
+  return {
+    readOnlyHint: tool.kind === "read",
+    destructiveHint: tool.destructive === true,
+    idempotentHint: tool.kind === "read",
+    openWorldHint: false,
+  }
+}
+
+/**
+ * Invoke one tool, interposing the confirmation step.
+ *
+ * A mutating tool's first call never reaches its handler: it previews and mints
+ * a token, and confirm_pending_change is the only path to the handler. Putting
+ * this here rather than in each handler means a newly added write tool is
+ * two-phase by declaring `requiresConfirmation`, and cannot quietly opt out by
+ * forgetting to call something.
+ */
+export function invokeTool(ctx: CallerContext, tool: ToolDefinition, args: unknown): unknown {
+  if (!tool.requiresConfirmation) return tool.handler(ctx, args)
+
+  const preview = tool.preview
+    ? tool.preview(ctx, args)
+    : { summary: `Run ${tool.name}.`, effect: ["This change has no preview declared."] }
+
+  if ("error" in preview) return { error: preview.error }
+
+  const pending = createPendingChange(ctx, tool.name, args, preview.summary, preview.effect)
+  return {
+    status: "confirmation_required",
+    summary: preview.summary,
+    effect: preview.effect,
+    destructive: tool.destructive === true,
+    confirmation_token: pending.token,
+    expiresInSeconds: Math.round((pending.expiresAt - Date.now()) / 1000),
+    next_step:
+      "Nothing has changed yet. Show the summary and effects above to the user, get their explicit approval, then call confirm_pending_change with this confirmation_token. If they decline, call discard_pending_change instead.",
+  }
 }

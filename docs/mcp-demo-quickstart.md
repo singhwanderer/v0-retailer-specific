@@ -62,10 +62,14 @@ stands in for a customer's real IdP (Entra ID / Okta / Ping).
    directly.
 4. **The access log.** See the walkthrough below.
 
-### Access log walkthrough (the security story in 6 steps)
+### Access log walkthrough (the security story in 5 steps)
 
 The log lives at **Administration → AI Assistant Access → Access log** (also
-reachable from the Compliance Agent panel on the retailer side).
+reachable from the Compliance Agent panel on the retailer side). The modal has two
+tabs, **Connect** and **Access log** — there is no Security tab, and deliberately so:
+an administrator opening this screen is there to connect an assistant and review what
+it did, not to run rehearsed attack demos. That material is presenter material and
+lives in [`mcp-pm-presentation.md`](./mcp-pm-presentation.md).
 
 1. Portal as **Dillard's / Standard user** — there is no AI Assistant Access
    item in the sidebar. Open it from the Compliance Agent link: **Connect**
@@ -74,16 +78,18 @@ reachable from the Compliance Agent panel on the retailer side).
    opens, empty.
 3. Connect Claude, sign in as `buyer@dillards.demo`, ask a question. Lines
    appear: the person, the assistant, the tool, the scope it required.
-4. **Security** tab → *Run proactive check* → a line appears as a **service
-   identity**, with no person attached — an agent acting on a schedule with
-   nobody in the session.
-5. **Security** tab → *Mint a wrong-audience token* and replay it → it is
-   refused, and appears under **Refused before sign-in** — unattributed,
-   because a rejected token's own claims are not evidence of who sent it.
-6. Flip the portal to the **supplier** persona (Admin) → the same screen shows
+4. Ask it to change something. Two lines appear, not one — the proposal and then the
+   approval, because no mutating tool acts on its first call.
+5. Flip the portal to the **supplier** persona (Admin) → the same screen shows
    **only J.Renée's** activity. Dillard's lines are gone.
 
-Steps 1-2 show the role gate; step 6 shows the tenant gate.
+For the full 45-minute walkthrough built around these beats, see
+[`demo-script-compliance-mcp.md`](./demo-script-compliance-mcp.md).
+
+Steps 1-2 show the role gate; step 5 shows the tenant gate. A refusal — for
+example, a client that tries to connect without completing sign-in — appears in
+a separate **Refused before sign-in** band rather than under any organisation,
+because a rejected attempt isn't trustworthy evidence of who made it.
 
 > The role and persona toggles are **demo persona switches**, not a login — the
 > prototype portal has no authentication of its own. The connector's equivalents
@@ -110,20 +116,15 @@ The prompts below are illustrations, **not** a fixed command list. The connected
 
 All data is mock and watermarked; writes persist only in the demo server's memory and reset periodically.
 
-## Local test (no deploy needed)
+## One more capability, not yet clickable
 
-```bash
-pnpm build && pnpm start
+The connector can also run checks on its own — for example, scanning for
+suppliers falling behind on a schedule, with nobody signed in at the time. When
+it does this, it acts under its own restricted identity rather than borrowing a
+person's login: it can only look things up, it's tied to one company's data,
+and it can never make a change, because no person is present to approve one.
 
-# Unauthenticated: 401 plus the discovery pointer that starts the OAuth flow.
-curl -i -X POST http://localhost:3000/api/mcp \
-  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{}'
-
-# The metadata documents an MCP client fetches next.
-curl -s http://localhost:3000/.well-known/oauth-protected-resource
-curl -s http://localhost:3000/.well-known/oauth-authorization-server
-```
-
-Tool calls now need a token, so the quickest local check is the browser: open
-the portal, and use **AI Assistant Access → Security** to run the proactive
-agent and mint a wrong-audience token, then watch both land in **Access log**.
+This is a real, standing part of how the connector works — it isn't only for
+demos. There's currently no button in the app to trigger it live and watch it
+happen; it runs automatically when scheduled. If it comes up in conversation,
+it's fine to describe it exactly as above.
