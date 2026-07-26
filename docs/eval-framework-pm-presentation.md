@@ -295,3 +295,9 @@ engineering time — and each one would be flagged and scoped before being built
   before real customer data is in scope, both before either is strictly needed
   today. Mock data means there's nothing to expose yet — that's a grace period,
   not a reason to skip naming the requirement.
+
+**What comes next, and what it becomes for other Aviator agents:**
+[`eval-platform-roadmap.md`](./eval-platform-roadmap.md) — the V1 checklist
+for going from this prototype to something safe against real TGC customer
+data, and the platform pattern once a second Aviator domain agent needs the
+same thing.

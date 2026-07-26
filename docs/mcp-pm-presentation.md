@@ -426,6 +426,13 @@ None of this requires re-architecting the core idea — it's the same "AI reads
 our rulebook live" model from Part 1, extended to more tools, more identities,
 and more callers.
 
+The same "prove it once for TGC, then the same shape for the next agent"
+pattern applies beyond auth, too — see
+[`eval-platform-roadmap.md`](./eval-platform-roadmap.md) for what changes in
+datasets, evaluators, tracing, and experimentation to go from this prototype's
+eval setup to something safe for real customer data, and a platform version of
+it for other Aviator domain agents.
+
 ---
 
 ### Sources for the practices above
