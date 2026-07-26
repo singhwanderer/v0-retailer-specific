@@ -142,14 +142,29 @@ is framed positively — a **% ready** readiness figure alongside raw gap counts
 so filling a GS1-baseline gap visibly advances every retailer at once, the
 concrete payoff of "comply once, benefit everywhere."
 
-## Possible future direction — in-product chat
+## In-product chat — the TGC Compliance Agent panel
 
-A natural next step, not built here: a docked chat panel inside the portal that
-reuses `lib/mcp/tools.ts` the same way the external MCP connector does, so a
-user could ask questions and make changes in plain English without leaving the
-app. A simple version needs no LLM at all — a deterministic intent-matcher over
-the existing tool functions; a fuller version would run an LLM agent loop behind
-a new API route calling the same tools. Not part of this build.
+A docked chat panel inside the portal (`components/portal/compliance-agent-panel.tsx`),
+retailer-side, toggled from the top bar and off by default. It runs an LLM agent
+loop behind `/api/copilot` (`lib/copilot/agent.ts`) over its own tool set in
+`lib/copilot/tools.ts`.
+
+**How it relates to the connector.** Its *read* tools proxy the same functions in
+`lib/mcp/tools.ts` that the external MCP connector calls, so both surfaces answer
+from one data model. Its *write* tools deliberately do not: they never mutate
+server-side, returning a `proposal` the panel renders as a confirm card, and only
+an "Apply" click calls the same create/update functions Screen 1 and Screen 2
+already use. The connector's equivalent is protocol-level — a pending change plus
+a single-use token redeemed through `confirm_pending_change` — because an outside
+assistant has no UI of ours to render a card in. The panel also has a narrower
+surface overall: no simulation, exceptions, delete or audit tools.
+
+**This is the surface under evaluation.** Every panel turn is traced to LangSmith
+(`lib/copilot/agent.ts`), and `lib/copilot/run-eval.ts` runs an uploaded golden
+set with bound scorers through the *same* agent function, so an eval score speaks
+to production behaviour rather than to a harness. Connector calls are not traced
+and not covered by the golden set — that gap is named in
+[`docs/eval-framework-pm-presentation.md`](docs/eval-framework-pm-presentation.md).
 
 ## Running locally
 

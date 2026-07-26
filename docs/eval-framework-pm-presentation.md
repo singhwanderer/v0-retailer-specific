@@ -171,13 +171,19 @@ small one-off script); it never passes through our application code.
   LangSmith.
 - ✅ Offline evaluation is wired — the in-app button runs the golden set
   through the real agent and produces a comparable Experiment.
-- ⏳ Golden dataset needs to be (re-)uploaded to LangSmith — this was
-  previously uploaded to Braintrust as part of an earlier evaluation of that
-  vendor; moving to LangSmith means the same CSV needs pushing into a
-  LangSmith dataset named `tgc-compliance-eval`.
-- ⏳ Not yet configured: evaluators/scorers (so eval runs don't have a score
-  attached until one is bound in the LangSmith UI), and prompt-library
-  migration (the system prompt still lives in code).
+- ✅ Golden dataset is uploaded to LangSmith (`tgc-compliance-eval`).
+- ✅ Evaluators/scorers are bound to that dataset in the LangSmith UI, so an
+  experiment comes back with scores attached rather than as an unscored run.
+- ⏳ Coverage stops at the in-product agent. The golden set runs through
+  `runCopilotAgent` — the same path `/api/copilot` uses — and does **not**
+  exercise the external MCP connector's tool layer (`lib/mcp/tools.ts`). A
+  question asked from claude.ai produces no trace and is not graded. Extending
+  the loop to the connector path is the next piece of work.
+- ⏳ Prompt-library migration — the system prompt still lives in code.
+
+The loop is demonstrable end-to-end today: see Beat 4b of
+[`demo-script-compliance-mcp.md`](./demo-script-compliance-mcp.md), which drives
+it live from the panel into the LangSmith UI.
 
 ---
 
@@ -185,9 +191,14 @@ small one-off script); it never passes through our application code.
 
 To keep the footprint minimal and reviewable, we did **not** add:
 
-- Automated scoring/evaluators (by design — authored in the UI, when the team
-  is ready to define "correct")
-- CI gating on eval results
+- **Eval coverage of the MCP connector path.** The golden set grades the
+  in-product agent only. This is the most substantive gap of the four and the
+  next one to close — the connector is where the write, delete and confirmation
+  tools live, so it is the surface where behaviour matters most.
+- **CI gating on eval results.** A sequencing call: gating means committing to a
+  threshold, and a threshold set before the tool surface has settled mostly
+  teaches the team to ignore a red build. Worth adding once scores are stable
+  enough that a failure means something.
 - Any new hosting/infrastructure (AWS, a new Vercel route beyond the existing
   button, etc.) — everything runs on infrastructure we already have
 - A prompt-library migration (the system prompt is still a code constant)
