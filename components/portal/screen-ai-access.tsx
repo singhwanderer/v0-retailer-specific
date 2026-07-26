@@ -21,7 +21,7 @@
 // docs/mcp-enterprise-auth-trd.md.
 
 import { useCallback, useEffect, useState } from "react"
-import { Bot, Check, Copy, Lock, RefreshCw, ShieldAlert, Trash2, X, Zap } from "lucide-react"
+import { Bot, Check, Copy, Lock, RefreshCw, Trash2, X, Zap } from "lucide-react"
 
 const MCP_ENDPOINT = "https://v0-retailer-specific.vercel.app/api/mcp"
 
@@ -43,8 +43,6 @@ const RETAILER_TOOLS: ToolRow[] = [
   { name: "list_system_filters", kind: "Read", scope: "tgc.read", description: "List global System filters (e.g. GS1 Core, GS1 Extended)." },
   { name: "run_compliance_report", kind: "Read", scope: "tgc.read", description: "Run a defensive compliance report across your vendor base." },
   { name: "list_vendor_exceptions", kind: "Read", scope: "tgc.read", description: "List vendor exceptions on file (waivers, extended deadlines, reduced scope)." },
-  { name: "create_attribute_profile", kind: "Write", scope: "tgc.requirements.write", description: "Create a new attribute profile for a product category." },
-  { name: "add_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add a custom attribute requirement to a profile." },
   { name: "simulate_requirement_change", kind: "Read", scope: "tgc.read", description: "Model a requirement change against the vendor base without applying it." },
   { name: "draft_vendor_outreach", kind: "Read", scope: "tgc.read", description: "Draft a remediation message to one supplier from their actual open gaps." },
   { name: "query_access_log", kind: "Read", scope: "tgc.read", description: "Search this organisation's own AI access log. Administrators only." },
@@ -100,7 +98,7 @@ interface AuditEntry {
   latencyMs: number
 }
 
-type Tab = "connect" | "log" | "security"
+type Tab = "connect" | "log"
 
 const TENANT: Record<AccessPerspective, { id: string; name: string; admin: string; member: string }> = {
   retailer: { id: "dillards", name: "Dillard's", admin: "admin@dillards.demo", member: "buyer@dillards.demo" },
@@ -449,8 +447,8 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
           </p>
         ) : entries.length === 0 ? (
           <p className="px-4 py-6 text-xs font-light text-center" style={{ color: "#9CA3AF" }}>
-            No connector activity recorded for {tenant.name} yet. Connect an AI client and ask it something, or run
-            one of the checks on the Security tab.
+            No connector activity recorded for {tenant.name} yet. Connect an AI client from the Connect tab and ask it
+            something — every tool call it makes, allowed or refused, appears here.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -538,280 +536,6 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
   )
 }
 
-// ── Tab: Security ────────────────────────────────────────────────────────────
-
-/**
- * The visible outcome of one security demonstration.
- *
- * These used to be a raw JSON dump. A refusal is the *point* of two of the
- * three demos, so it needs to read as a refusal at a glance rather than as a
- * wall of keys — with the underlying payload still one click away for anyone
- * who wants to check the claim rather than take it.
- */
-interface DemoResult {
-  title: string
-  outcome: "refused" | "completed"
-  verdict: string
-  detail: string
-}
-
-function DemoResultCard({ result }: { result: DemoResult }) {
-  const [showDetail, setShowDetail] = useState(false)
-  const refused = result.outcome === "refused"
-
-  return (
-    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}>
-      <div className="flex items-start gap-3 p-4">
-        <span
-          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 mt-0.5"
-          style={
-            refused
-              ? { backgroundColor: "#FEE2E2", color: "#991B1B" }
-              : { backgroundColor: "#DCFCE7", color: "#166534" }
-          }
-        >
-          {refused ? "Refused" : "Completed"}
-        </span>
-        <div className="flex flex-col gap-1 min-w-0">
-          <p className="text-sm font-medium text-[#111827]">{result.title}</p>
-          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-            {result.verdict}
-          </p>
-          <button
-            onClick={() => setShowDetail((v) => !v)}
-            className="text-[11px] font-medium self-start mt-1"
-            style={{ color: "#0168B3" }}
-          >
-            {showDetail ? "Hide details" : "Show details"}
-          </button>
-        </div>
-      </div>
-      {showDetail && (
-        <pre
-          className="text-[11px] font-mono p-3 overflow-x-auto max-h-64 overflow-y-auto"
-          style={{ backgroundColor: "#F9FAFB", borderTop: "1px solid #E0E4E8", color: "#374151" }}
-        >
-          {result.detail}
-        </pre>
-      )}
-    </div>
-  )
-}
-
-function SecurityTab({ perspective, role }: { perspective: AccessPerspective; role: AccessRole }) {
-  const tenant = TENANT[perspective]
-  const [result, setResult] = useState<DemoResult | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  // Held so the token can be replayed without minting a second one — the demo
-  // is "this exact token is refused", not "some token is refused".
-  const [mintedToken, setMintedToken] = useState<string | null>(null)
-
-  async function runProactive() {
-    setBusy("proactive")
-    setResult(null)
-    try {
-      const res = await fetch("/api/demo/proactive-check", { method: "POST" })
-      const data = await res.json()
-      const alerts = Array.isArray(data?.vendorAlerts) ? data.vendorAlerts.length : 0
-      setResult({
-        title: "Proactive check ran under a service identity",
-        outcome: "completed",
-        verdict: `No human was in the session. The agent authenticated as itself, held read-only scope, and flagged ${alerts} vendor${alerts === 1 ? "" : "s"} above the alert threshold. It appears in the Access log as a service identity with no person attached.`,
-        detail: JSON.stringify(data, null, 2),
-      })
-    } catch (err) {
-      setResult({
-        title: "Proactive check could not run",
-        outcome: "refused",
-        verdict: "The demo endpoint could not be reached.",
-        detail: String(err),
-      })
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function mintToken() {
-    setBusy("deputy")
-    setResult(null)
-    try {
-      const res = await fetch("/api/demo/confused-deputy", { method: "POST" })
-      const data = await res.json()
-      setMintedToken(data?.access_token ?? null)
-      setResult({
-        title: "A valid token was minted for a different service",
-        outcome: "completed",
-        verdict: `Correct issuer, correct signing key, real organisation, full scopes — but its audience is ${data?.issued_for ?? "another service"} rather than this connector. Nothing has been refused yet. Replay it to see what happens.`,
-        detail: JSON.stringify(data, null, 2),
-      })
-    } catch (err) {
-      setResult({
-        title: "Could not mint the token",
-        outcome: "refused",
-        verdict: "The demo endpoint could not be reached.",
-        detail: String(err),
-      })
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  /**
-   * Replay whatever credential we have against the real endpoint.
-   *
-   * This is the beat that used to require a terminal. It calls /api/mcp exactly
-   * as an external client would — so the refusal, and the unattributed audit
-   * line it produces, are the genuine article rather than a simulation.
-   */
-  async function replay(kind: "deputy" | "anonymous") {
-    setBusy(kind === "deputy" ? "deputy-replay" : "anonymous")
-    setResult(null)
-    try {
-      const res = await fetch("/api/mcp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json, text/event-stream",
-          ...(kind === "deputy" && mintedToken ? { Authorization: `Bearer ${mintedToken}` } : {}),
-        },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
-      })
-      const body = await res.text()
-      const challenge = res.headers.get("WWW-Authenticate")
-      const refused = !res.ok
-
-      setResult({
-        title:
-          kind === "deputy"
-            ? `Replayed the wrong-audience token — ${res.status} ${refused ? "refused" : "accepted"}`
-            : `Called the connector with no token at all — ${res.status} ${refused ? "refused" : "accepted"}`,
-        outcome: refused ? "refused" : "completed",
-        verdict: refused
-          ? kind === "deputy"
-            ? "Refused on the audience check alone, before any tool was reachable. Because it never got past authentication, the refusal cannot be attributed to any organisation — open the Access log and it appears under “Refused before sign-in”."
-            : "Refused, and the response carries the discovery pointer an AI client uses to find the sign-in unaided — which is why pasting the URL into Claude or ChatGPT is all the setup there is. The refusal appears in the Access log under “Refused before sign-in”."
-          : "The endpoint accepted this call, which it should not have. Worth investigating.",
-        detail: [challenge ? `WWW-Authenticate: ${challenge}` : null, body].filter(Boolean).join("\n\n"),
-      })
-    } catch (err) {
-      setResult({
-        title: "The replay could not be sent",
-        outcome: "refused",
-        verdict: "The connector endpoint could not be reached from the browser.",
-        detail: String(err),
-      })
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  if (role !== "admin") return <LockedPanel tenantName={tenant.name} />
-
-  // Both demos are provisioned against the retailer tenant, so showing them on
-  // the supplier side would be misleading — the activity would land in
-  // Dillard's log, which a J.Renée administrator cannot read.
-  if (perspective === "supplier") {
-    return (
-      <SectionCard>
-        <h3 className="text-sm font-semibold text-[#111827]">Security demonstrations</h3>
-        <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-          The proactive-agent and wrong-audience-token demonstrations run under identities provisioned for the
-          retailer tenant, so their activity appears in that organisation&rsquo;s access log — which, correctly, an
-          administrator of {tenant.name} cannot read. Switch the portal to the retailer perspective to run them.
-        </p>
-        <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
-          {tenant.name}&rsquo;s own connector activity appears on the Access log tab.
-        </p>
-      </SectionCard>
-    )
-  }
-
-  return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-[#111827]">Proactive agent (no human in the session)</h3>
-        <SectionCard>
-          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-            Runs a compliance check under an autonomous <span className="font-medium">service identity</span> rather
-            than a signed-in person. It authenticates as itself, is provisioned against one organisation only, and
-            holds read-only scope — so it cannot choose whose data it sees and cannot waive a requirement with
-            nobody to approve it. Watch it appear in the Access log as a service identity.
-          </p>
-          <button
-            onClick={runProactive}
-            disabled={busy !== null}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium text-white self-start disabled:opacity-60"
-            style={{ backgroundColor: "#0168B3" }}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            {busy === "proactive" ? "Running…" : "Run proactive check"}
-          </button>
-        </SectionCard>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-[#111827]">Token from another service is refused</h3>
-        <SectionCard>
-          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-            Mints a token that is completely valid — correct issuer, correct signing key, real organisation, full
-            scopes — but issued for a <span className="font-medium">different service</span>. Replay it against this
-            connector and it is refused on the audience check alone. Because it never got past authentication, the
-            refusal is logged as unattributed rather than filed under any organisation.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={mintToken}
-              disabled={busy !== null}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium self-start disabled:opacity-60"
-              style={{ border: "1px solid #E0E4E8", color: "#374151" }}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              {busy === "deputy" ? "Minting…" : "Mint a wrong-audience token"}
-            </button>
-            <button
-              onClick={() => replay("deputy")}
-              disabled={busy !== null || !mintedToken}
-              title={mintedToken ? undefined : "Mint a token first"}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium text-white self-start disabled:opacity-40"
-              style={{ backgroundColor: "#B91C1C" }}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              {busy === "deputy-replay" ? "Replaying…" : "Replay it against the connector"}
-            </button>
-          </div>
-        </SectionCard>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-[#111827]">No token at all</h3>
-        <SectionCard>
-          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
-            Calls the connector with no credential whatsoever. There is no anonymous mode and no API key to leak — the
-            endpoint refuses and hands back the discovery pointer an AI client follows to find the sign-in on its own.
-            That is the whole of the setup a user does: paste one URL.
-          </p>
-          <button
-            onClick={() => replay("anonymous")}
-            disabled={busy !== null}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium self-start disabled:opacity-60"
-            style={{ border: "1px solid #E0E4E8", color: "#374151" }}
-          >
-            <Lock className="w-3.5 h-3.5" />
-            {busy === "anonymous" ? "Calling…" : "Try without signing in"}
-          </button>
-        </SectionCard>
-      </div>
-
-      {result && <DemoResultCard result={result} />}
-
-      <p className="text-[11px] font-light leading-relaxed" style={{ color: "#6B7280" }}>
-        Every one of these lands in the Access log — the two refusals under “Refused before sign-in”, the proactive
-        check as a service identity. Open the Access log tab to see them.
-      </p>
-    </section>
-  )
-}
-
 // ── Modal shell ──────────────────────────────────────────────────────────────
 
 interface AiAccessModalProps {
@@ -827,7 +551,6 @@ export function AiAccessModal({ onClose, perspective, role }: AiAccessModalProps
   const tabs: { id: Tab; label: string; adminOnly?: boolean }[] = [
     { id: "connect", label: "Connect" },
     { id: "log", label: "Access log", adminOnly: true },
-    { id: "security", label: "Security", adminOnly: true },
   ]
 
   return (
@@ -870,7 +593,6 @@ export function AiAccessModal({ onClose, perspective, role }: AiAccessModalProps
         <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-6">
           {tab === "connect" && <ConnectTab perspective={perspective} />}
           {tab === "log" && <AccessLogTab perspective={perspective} role={role} />}
-          {tab === "security" && <SecurityTab perspective={perspective} role={role} />}
         </div>
       </div>
     </div>

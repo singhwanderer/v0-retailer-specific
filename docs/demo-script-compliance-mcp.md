@@ -195,7 +195,11 @@ not.
 
 ## Act 3 — Why it's only safe because of the controls (13 min)
 
-**This is the act the session exists for. Slow down. Everything here is a click.**
+**This is the act the session exists for. Slow down.**
+
+Three of the five beats are live on screen — the consent screen, the read-only tool
+list, and the access log. Beat 10 is you talking, because the product has no
+attack-demo surface and shouldn't grow one.
 
 ### Beat 7 — Scope the problem (2 min, no screens)
 
@@ -248,25 +252,48 @@ And the line at the bottom:
 > Filtering the list is the experience. The check at invocation is the boundary.
 > You need both, and neither substitutes for the other."
 
-### Beat 10 — The two refusals (4 min)
+### Beat 10 — The two refusals (4 min) — **spoken, not clicked**
 
-**Click:** the **Security** tab.
+There is no Security tab in the product, deliberately: staged attack demos are
+presenter material, not an admin feature. So this beat is you talking, with the
+building-pass framing below to carry it. It sits between two beats that *are*
+live — the consent screen you just showed, and the log you are about to.
 
-**First:** *Try without signing in.*
+**The framing to open with** (this is the whole reason the beat lands):
 
-> "No credential at all. Refused — and the refusal hands back the discovery
-> pointer the AI client follows to find the sign-in by itself. That is the entire
-> setup a user does: paste one URL. There is no anonymous mode."
+> "Think of what an assistant carries on every request as a building pass. It says
+> who printed it, which building it's for, which doors it opens, and whose floor
+> the holder may stand on. Three ways someone could try that door."
 
-**Then:** *Mint a wrong-audience token* → *Replay it against the connector*.
+**First — no pass at all.**
 
-> "This token is genuinely valid. Correct issuer, correct signing key, real
-> organisation, full scopes. The one thing wrong with it is that it was issued for
-> a *different service* on the same platform.
+> "There's no guest mode. No shared key sitting in a config file for someone to
+> leak, because there is no key. And what comes back with the refusal is
+> *directions to reception* — that's how an assistant configures itself knowing
+> nothing but the address, and why the entire setup is pasting one URL."
+
+**Second — a real pass, for the building next door.**
+
+> "This is the one people find hardest to picture, so take it slowly. Imagine a
+> pass that is completely genuine: printed by the right security desk, signed
+> correctly, real employee, every door ticked. Its only flaw is that it was issued
+> for a *different service* on our platform.
 >
-> Four-oh-one. Refused on the audience check alone, before any tool was reachable.
-> Without that check, anyone who could get a token for *any* service on the
-> platform could use TGC as their deputy."
+> We refuse it. On the audience check alone, before it reaches a single piece of
+> catalogue data. Without that, anyone who can get a pass to *any* Aviator service
+> could walk into TGC on it and have us act on their behalf. That's the confused
+> deputy, and it's why tokens are bound to one resource."
+
+**Third — a pass belonging to a robot rather than a person.** That is the
+service-identity line you are about to point at in the log, so don't spend it
+here; just set it up: *"and the third is an agent with its own pass, which is the
+next thing on screen."*
+
+> **If someone asks to see the refusals rather than hear about them:** the
+> endpoints that stage them still exist, but nothing in the UI reaches them any
+> more. Say that plainly — "I can show you the code path, not a button" — and
+> offer the Access log instead, where real refusals from a real assistant appear
+> the same way.
 
 ### Beat 11 — The access log (3 min) — **the closer**
 
@@ -275,21 +302,23 @@ And the line at the bottom:
 > "Every AI action against this organisation: who, which assistant, which tool,
 > which scope it required, allowed or refused."
 
-Point at **Refused before sign-in**.
+Point at the **Refused before sign-in** band — if it is empty, say what would land
+there rather than pretending; a refused connection from any client populates it.
 
-> "Both of those refusals are here, in their own band, unattributed. That band
-> exists on purpose. A call rejected *before* authentication has no trustworthy
-> tenant — the token names one, but the entire reason we refused it is that we
-> don't believe it. File it under the named organisation and anyone can write into
-> any customer's audit log with a forged token. We can't drop them either: a burst
-> of rejected tokens is exactly what an administrator needs to see."
+> "Refusals sit in their own band, filed under nobody. That's on purpose. A call
+> rejected *before* authentication has no trustworthy tenant — the token names one,
+> but the entire reason we refused it is that we don't believe it. File it under
+> the named organisation and anyone can write junk into any customer's audit log
+> with a forged token. We can't drop them either: a burst of rejected tokens is
+> exactly what an administrator needs to see."
 
-**Click:** *Run proactive check* on the Security tab, then back to the log.
+Point at any line whose actor is a **service identity** — the robot's pass from
+Beat 10.
 
-> "A service identity. No person attached — an agent on a schedule with nobody in
-> the session. Which is also why it is read-only, and why it can propose but never
-> confirm. An agent must not be able to waive a compliance requirement with nobody
-> to approve it."
+> "No person attached. An agent on a schedule with nobody in the session. Which is
+> also why its pass is read-only, and why it can propose a change but never approve
+> one. An agent must not be able to waive a compliance requirement with nobody
+> there to approve it."
 
 **Click:** the **Role** toggle → **Standard**.
 
@@ -401,7 +430,11 @@ is already built for it.
       Practise this once: it only appears mid-flow, so you need a real reconnect
 - [ ] A second browser profile signed in as the supplier for Beat 6
 - [ ] Access log **cleared** before you start, so the lines you generate are the
-      only lines
+      only lines. Then make a couple of real calls from the assistant during Act 2
+      so Beat 11 has something to point at — the log is now your only live security
+      evidence, and an empty table is a weak closer
+- [ ] Rehearse Beat 10 out loud. It is the one beat with no screen carrying you,
+      and the confused-deputy idea does not survive being improvised
 - [ ] Role toggle starting on **Admin** for Act 3, but plan to flip to Standard at
       Beat 11
 - [ ] Welcome overlay dismissed

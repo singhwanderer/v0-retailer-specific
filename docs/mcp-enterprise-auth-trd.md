@@ -460,9 +460,11 @@ Run it: see [`mcp-demo-quickstart.md`](./mcp-demo-quickstart.md).
 | Peer isolation | ENT-05 | Write as Dillard's; absent for Belk |
 | **Two audiences, one URL** | ENT-05 | Sign in as J.Renée → four *supplier* tools and none of the retailer set; sign in as Dillard's → the reverse |
 | Bilateral read | ENT-05a | Grant J.Renée an exception as Dillard's; J.Renée sees that row labelled `grantedBy`, and nothing else Dillard's holds |
-| Read-only consent | ENT-06 | Write tools absent from the tool list; refused if called |
-| Wrong-audience token | ENT-02 | Portal → AI Assistant Access → Security |
-| Proactive agent | ENT-04 | Same screen; runs with no human, read-only |
+| Read-only consent | ENT-06 | Write tools absent from the tool list; refused if called. The Connect tab's "what a read-only connection sees" toggle shows the same filtering |
+| Destructive scope separated | ENT-06 | Consent to requirements-write only: the removal tools are still absent |
+| Two-phase confirmation | ENT-06a | Call any mutating tool: it returns a preview and a token and changes nothing. Confirm as another tenant → refused. Confirm as the right one → applied, exactly once |
+| Wrong-audience token | ENT-02 | `POST /api/demo/confused-deputy`, then replay the token it returns against `/api/mcp` |
+| Proactive agent | ENT-04 | `POST /api/demo/proactive-check` — runs with no human, read-only |
 | Access log, tenant-scoped | ENT-10 | Dillard's admin sees only Dillard's lines; flip to J.Renée and Dillard's activity is gone |
 | Role gate | ENT-10 | As a Standard user the log is locked; switch to Admin and it opens |
 

@@ -62,11 +62,14 @@ stands in for a customer's real IdP (Entra ID / Okta / Ping).
    directly.
 4. **The access log.** See the walkthrough below.
 
-### Access log walkthrough (the security story in 6 steps)
+### Access log walkthrough (the security story in 5 steps)
 
 The log lives at **Administration → AI Assistant Access → Access log** (also
-reachable from the Compliance Agent panel on the retailer side). Every step below
-is a click — nothing here needs a terminal.
+reachable from the Compliance Agent panel on the retailer side). The modal has two
+tabs, **Connect** and **Access log** — there is no Security tab, and deliberately so:
+an administrator opening this screen is there to connect an assistant and review what
+it did, not to run rehearsed attack demos. That material is presenter material and
+lives in [`mcp-pm-presentation.md`](./mcp-pm-presentation.md).
 
 1. Portal as **Dillard's / Standard user** — there is no AI Assistant Access
    item in the sidebar. Open it from the Compliance Agent link: **Connect**
@@ -75,20 +78,19 @@ is a click — nothing here needs a terminal.
    opens, empty.
 3. Connect Claude, sign in as `buyer@dillards.demo`, ask a question. Lines
    appear: the person, the assistant, the tool, the scope it required.
-4. **Security** tab → *Run proactive check* → a line appears as a **service
-   identity**, with no person attached — an agent acting on a schedule with
-   nobody in the session.
-5. **Security** tab → *Try without signing in*, then *Mint a wrong-audience
-   token* followed by *Replay it against the connector*. Both are refused, and
-   both appear under **Refused before sign-in** — unattributed, because a
-   rejected token's own claims are not evidence of who sent it.
-6. Flip the portal to the **supplier** persona (Admin) → the same screen shows
+4. Ask it to change something. Two lines appear, not one — the proposal and then the
+   approval, because no mutating tool acts on its first call.
+5. Flip the portal to the **supplier** persona (Admin) → the same screen shows
    **only J.Renée's** activity. Dillard's lines are gone.
 
 For the full 45-minute walkthrough built around these beats, see
 [`demo-script-compliance-mcp.md`](./demo-script-compliance-mcp.md).
 
-Steps 1-2 show the role gate; step 6 shows the tenant gate.
+Steps 1-2 show the role gate; step 5 shows the tenant gate. Refusals — a connection
+with no token, or one carrying a token minted for another service — appear in a
+separate **Refused before sign-in** band, unattributed, because a rejected token's
+own claims are not evidence of who sent it. To produce one, point a client at the
+endpoint without completing sign-in, or use the curl below.
 
 > The role and persona toggles are **demo persona switches**, not a login — the
 > prototype portal has no authentication of its own. The connector's equivalents
@@ -129,9 +131,19 @@ curl -s http://localhost:3000/.well-known/oauth-protected-resource
 curl -s http://localhost:3000/.well-known/oauth-authorization-server
 ```
 
-Tool calls need a token, so the quickest local check is the browser: open the
-portal and use **AI Assistant Access → Security**, which runs all three
-demonstrations — the proactive agent, an unauthenticated call, and minting *and
-replaying* a wrong-audience token — and watch them land in **Access log**. The
-curl above is only there for anyone who wants to see the raw 401 and the
-discovery documents; the Security tab covers the same ground by clicking.
+Two endpoints stage the scenarios that are awkward to reproduce by hand. They are
+not surfaced in the UI — nothing in the portal calls them — so they are reachable
+only like this:
+
+```bash
+# An autonomous agent running with no human in the session: authenticates as
+# itself, tied to one tenant, read scope only. Produces a service-identity line.
+curl -s -X POST http://localhost:3000/api/demo/proactive-check
+
+# A genuinely valid token minted for a DIFFERENT resource. Replay the
+# access_token it returns against /api/mcp and it is refused on the audience
+# check alone, landing in the unattributed band.
+curl -s -X POST http://localhost:3000/api/demo/confused-deputy
+```
+
+Then open **AI Assistant Access → Access log** to see what each one wrote.

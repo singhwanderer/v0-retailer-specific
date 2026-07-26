@@ -208,6 +208,46 @@ that retailer holds. Not their other suppliers, not their requirements, not
 their reports. "Rows about me" is a different thing from "their data", and the
 server enforces the difference on every call.
 
+### Explaining the security model to a non-technical room
+
+Three of the eleven rows in §4A below are the ones people ask about, and all three
+are hard to picture in the abstract. One framing carries all of them: **what an AI
+assistant carries on every request is a building pass.** It says who printed it,
+which building it is for, which doors it opens, and whose floor the holder may
+stand on.
+
+- **No pass** — refused. There is no guest mode and no shared key in a config file
+  for someone to leak, because there is no key. What comes back instead is
+  *directions to reception*: the refusal tells the assistant where to sign in,
+  which is why the whole of a user's setup is pasting one URL.
+- **A real pass, for the building next door** — also refused, and this is the one
+  worth slowing down on. Picture a pass that is entirely genuine: right security
+  desk, correct signature, real employee, every door ticked. Its only flaw is that
+  it was issued for a *different service on the same platform*. We refuse it on the
+  audience check alone, before it reaches any catalogue data. Without that, anyone
+  who can obtain a pass to any Aviator service could walk in on it and have us act
+  on their behalf — the "confused deputy". It is why tokens are bound to one
+  resource.
+- **A pass belonging to a robot rather than a person** — allowed, but capped in
+  advance. A scheduled agent authenticates as itself rather than borrowing an
+  employee's session, its identity is tied to one organisation, and it carries read
+  access only. It can raise a flag; it cannot waive a requirement, because there is
+  nobody present to approve that.
+
+And the detail that makes the audit trail trustworthy rather than decorative: a
+call refused *before* authentication is filed under **nobody**. The token names an
+organisation, but the entire reason we rejected it is that we do not believe the
+token. File it under the named organisation and anyone could write junk into any
+customer's audit log with a forgery. Dropping them is not an option either — a
+burst of rejected tokens is exactly what an administrator needs to see.
+
+> **A note on where this lives.** This framing is presenter and reader material. It
+> is deliberately *not* in the product: an earlier build had a "Security" tab in the
+> AI Assistant Access screen that staged these three refusals as clickable demos,
+> and it was removed. An administrator opening that screen has a real job — connect
+> an assistant, review what it did — and a rehearsed attack demo dressed as an admin
+> feature is not that job. The screen is now Connect and Access log.
+
 ### Who can see the audit trail
 
 Every AI action against an account is logged — who, which assistant, which
