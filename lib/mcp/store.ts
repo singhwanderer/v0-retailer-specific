@@ -6,6 +6,7 @@
 // while the serverless instance stays warm and resets on cold start — every
 // write tool says so in its response.
 
+import { PORTAL_TENANT_ID } from "@/lib/mcp/tenants"
 import {
   ATTRIBUTE_PROFILES,
   VENDOR_EXCEPTIONS,
@@ -102,11 +103,37 @@ function seed(): DemoStore {
   }
 }
 
-const globalScope = globalThis as typeof globalThis & { __tgcDemoStore?: DemoStore }
+// ── Tenant-keyed storage ─────────────────────────────────────────────────────
+//
+// §4A row 5 requires the tenant to be re-checked on every tool call, which is
+// only meaningful if tenants don't share storage in the first place. So the
+// store is keyed by tenant rather than being one process-wide singleton.
+//
+// Honest demo caveats, both recorded in docs/mcp-enterprise-auth-trd.md:
+//   - Every tenant seeds from the SAME mock fixture, so two retailer tenants
+//     start out looking alike. What proves isolation is divergence: a write
+//     made as one tenant is absent for the other. Production tenants hold
+//     genuinely distinct data.
+//   - This is still process memory. Production needs a real datastore with
+//     tenant as a first-class column plus row-level security — per-tenant
+//     isolation is not properly testable against module state.
 
-export function getStore(): DemoStore {
-  globalScope.__tgcDemoStore ??= seed()
-  return globalScope.__tgcDemoStore
+const globalScope = globalThis as typeof globalThis & {
+  __tgcDemoStores?: Record<string, DemoStore>
+}
+
+/**
+ * The demo store for one tenant.
+ *
+ * `tenantId` defaults to the portal's own tenant so the in-portal prototype
+ * (which calls this layer in-process, not over MCP) keeps working unchanged.
+ * The MCP path never relies on that default — it always passes the tenant
+ * derived from the authenticated identity.
+ */
+export function getStore(tenantId: string = PORTAL_TENANT_ID): DemoStore {
+  globalScope.__tgcDemoStores ??= {}
+  globalScope.__tgcDemoStores[tenantId] ??= seed()
+  return globalScope.__tgcDemoStores[tenantId]
 }
 
 /**
@@ -123,8 +150,12 @@ export function hydrateVendorExceptions(exceptions: VendorException[]): void {
 }
 
 /** Active exceptions for one vendor — the shape the compliance-report engine needs. */
-export function activeExceptionsForVendor(vendor: string, exceptionType?: ExceptionType): VendorException[] {
-  return getStore().vendorExceptions.filter(
+export function activeExceptionsForVendor(
+  vendor: string,
+  exceptionType?: ExceptionType,
+  tenantId: string = PORTAL_TENANT_ID
+): VendorException[] {
+  return getStore(tenantId).vendorExceptions.filter(
     (e) =>
       e.status === "Active" &&
       e.vendor.toLowerCase() === vendor.toLowerCase() &&
@@ -163,17 +194,17 @@ export function isAttributeWaived(attributeName: string, waivedNames: string[]):
  */
 export function waivedAttributeNames(
   vendor: string,
-  opts?: { exceptionType?: ExceptionType; brickCode?: string }
+  opts?: { exceptionType?: ExceptionType; brickCode?: string; tenantId?: string }
 ): string[] {
-  return activeExceptionsForVendor(vendor, opts?.exceptionType)
+  return activeExceptionsForVendor(vendor, opts?.exceptionType, opts?.tenantId ?? PORTAL_TENANT_ID)
     .filter((e) => opts?.brickCode === undefined || e.brickCode === opts.brickCode)
     .flatMap((e) => e.attributes)
 }
 
 /** Read-only view of a profile's extras — never persists a new entry. */
-export function readProfileExtras(brickCode: string): ProfileExtras {
+export function readProfileExtras(brickCode: string, tenantId: string = PORTAL_TENANT_ID): ProfileExtras {
   return (
-    getStore().profileExtras[brickCode] ?? {
+    getStore(tenantId).profileExtras[brickCode] ?? {
       customAttributes: [],
       imageRequirements: [],
       overrides: {},
@@ -184,8 +215,8 @@ export function readProfileExtras(brickCode: string): ProfileExtras {
 
 /** Mutable extras for a brick — creates and persists an entry if none exists.
  *  Only call from write paths that have already confirmed a profile exists. */
-export function getProfileExtras(brickCode: string): ProfileExtras {
-  const store = getStore()
+export function getProfileExtras(brickCode: string, tenantId: string = PORTAL_TENANT_ID): ProfileExtras {
+  const store = getStore(tenantId)
   store.profileExtras[brickCode] ??= {
     customAttributes: [],
     imageRequirements: [],

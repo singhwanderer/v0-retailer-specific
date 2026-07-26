@@ -1,0 +1,381 @@
+# Enterprise auth for the TGC MCP server — technical requirements
+
+**Status:** requirements + working reference implementation in this prototype
+**Companion doc:** [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) §4A, which lists the eleven
+things an enterprise-ready, external-facing MCP server needs. This document turns
+that list into numbered, testable requirements and records which of them are
+demonstrable here.
+
+---
+
+## 1. Scope and non-goals
+
+**State this first, because it halves the apparent scope:** TGC is a **resource
+server**. It does not authenticate people, it does not hold a customer user
+directory, and it does not run an authorization server in production.
+
+| Role | Who owns it | What they decide |
+| --- | --- | --- |
+| **Identity provider** | The customer's own Entra ID / Okta / Ping | Is this a real, current employee of this customer? Their SSO, their MFA, their conditional access, their offboarding. |
+| **Authorization server** | TG Aviator's IdP, federated to the customer's | Issues the token. Owns the OAuth endpoints. |
+| **Resource server** | **TGC — this is our job** | What may this already-authenticated caller do here? Scopes, per-call tenant checks, audit. |
+
+Three consequences worth being explicit about with customers:
+
+- A Dillard's employee signs in with their **Dillard's work account**. TGC never
+  sees a password.
+- When Dillard's offboards someone, their TGC access dies at Dillard's — no
+  ticket to us, no lag.
+- "May our staff use this connector at all" is an **admin consent decision on
+  the customer's side** (the enterprise-managed authorization pattern; see the
+  MCP blog post in the presentation's source list). SCIM covers group-level
+  provisioning where a customer wants finer control.
+
+**Non-goals for TGC:** running an IdP, federating to customer directories,
+per-tenant runtime isolation, and platform-wide rate limiting. Those belong to
+the TG Aviator MCP Gateway, for which TGC is the named first implementation.
+
+### 1.1 The rule everything else hangs off
+
+> **A caller can never assert its own tenant.**
+
+Tenant is *derived* from the authenticated identity — home-realm discovery on
+the federated issuer — and never read from a parameter, a form field, a header,
+or a picker. This holds for autonomous agents too: a workload identity is
+provisioned against exactly one tenant, so it cannot choose either.
+
+A tenant selector is a privilege-escalation surface. **This prototype therefore
+does not have one, not even as a demo shortcut** — see §5.1.
+
+---
+
+## 2. Requirements
+
+Traceability: **§4A row** is the row in the presentation's checklist.
+**Owner** is TGC / Aviator / shared. **Demo** is the status in this prototype.
+
+| ID | §4A row | Requirement | Owner | Demo |
+| --- | --- | --- | --- | --- |
+| ENT-01 | 1 | The MCP endpoint is an OAuth 2.1 protected resource. Unauthenticated calls are refused with a discovery pointer. Users authenticate against their own organisation's IdP. | Shared | ✅ Demoed (with a local demo AS standing in for the customer IdP) |
+| ENT-02 | 2 | Access tokens are audience-bound to this exact resource (RFC 8707). A token minted for any other service is refused even if otherwise valid. | TGC | ✅ Demoed |
+| ENT-03 | 3 | Every call carries tenant and agent as **separate, independently checkable claims** — no shared service account. | TGC | ✅ Demoed |
+| ENT-04 | 4 | Agent-initiated actions run under their own scoped, short-lived workload identity, not a borrowed user token. | TGC | ✅ Demoed |
+| ENT-05 | 5 | Tenant is re-checked **on every tool call**, across both tenant classes — retailer↔supplier and peer↔peer. | TGC | ✅ Demoed |
+| ENT-06 | 6 | Least privilege: connections start read-only; write scopes are granted separately and enforced at discovery **and** invocation. | TGC | ✅ Demoed |
+| ENT-07 | 7 | No token passthrough: never accept a token issued to another service, never forward an inbound token downstream. | TGC | ⚠️ Half demoed (inbound refusal is real; outbound rule is a constraint on code that doesn't exist yet) |
+| ENT-08 | 8 | Rate limits and bounded retrieval per call. | Shared | ⚠️ Partial (bounded retrieval only) |
+| ENT-09 | 9 | Container / process isolation per tenant or session. | Aviator | ❌ Not demoable here — see §6 |
+| ENT-10 | 10 | Full audit logging: who, which agent, which tenant, which tool, which scope, what outcome. | TGC | ✅ Demoed |
+| ENT-11 | 11 | A curated tool registry — vetted catalog with declared authority per tool, not ad-hoc tool sprawl. | Shared | ✅ Demoed |
+
+### ENT-01 — OAuth 2.1 protected resource
+
+**Requirement.** No anonymous access to any tool. An unauthenticated request
+returns `401` with `WWW-Authenticate: Bearer …, resource_metadata="…"` so a
+client can discover the authorization server unaided. Tokens are validated for
+signature, issuer, and expiry on every request.
+
+**Acceptance criteria**
+1. `POST /api/mcp` with no token → `401` carrying a resolvable
+   `resource_metadata` URL.
+2. `/.well-known/oauth-protected-resource` and
+   `/.well-known/oauth-authorization-server` fetch and parse.
+3. A real MCP client (claude.ai) completes registration → consent → token with
+   no manual configuration beyond pasting the connector URL.
+4. A garbage or expired token → `401`, never a partial success.
+
+**Production delta.** The demo AS in `lib/mcp/oauth.ts` and `app/oauth/*` is
+replaced by Aviator's IdP federated to the customer's. TGC keeps only the
+verification half (`lib/mcp/auth.ts`) and the metadata documents.
+
+### ENT-02 — Resource Indicators (RFC 8707)
+
+**Requirement.** Tokens carry `aud` equal to this deployment's MCP endpoint.
+Verification requires an exact match. A validly signed, unexpired token issued
+for a different Aviator service is refused.
+
+**Acceptance criteria**
+1. A token with `aud` = another resource → `401`, with an error that names
+   audience as the reason.
+2. The refusal is recorded in the audit trail (an unauthenticated refusal still
+   produces a log line — that is the case you most need during an incident).
+
+**Why it matters in one sentence.** Without it, anyone who can obtain a token
+for *any* service on the platform can use TGC as their deputy.
+
+### ENT-03 — Delegated identity, not a shared account
+
+**Requirement.** Every action carries, as separate claims: the tenant, the
+acting subject, the agent/client, and the subject type. No bucket credential.
+
+**Acceptance criteria**
+1. Two different users of the same tenant produce distinguishable audit lines.
+2. The same user through two different AI clients produces different `agent_id`
+   values.
+3. Tenant **class** is resolved server-side from the tenant registry, not read
+   from the token — one less thing a forged token can assert.
+
+### ENT-04 — Workload identity for agent-initiated actions
+
+**Requirement.** An agent acting with no human in the session authenticates as
+itself via client credentials. Its identity is provisioned against one tenant
+and a restricted scope set. It cannot call tools marked human-delegated.
+
+**Acceptance criteria**
+1. A client-credentials token is issued with `subject_type: workload` and no
+   human subject.
+2. It may narrow its provisioned scopes but never widen them.
+3. Write tools are unavailable to it — both absent from discovery and refused on
+   direct invocation.
+4. Its activity is auditable and visually distinguishable from human activity.
+
+**Why this row exists.** §4B's proactive agent is not safe to build until this
+one is checked. An agent must not be able to waive a compliance requirement with
+nobody to approve it.
+
+### ENT-05 — Per-call tenant enforcement, both tenant classes
+
+**Requirement.** A valid token is not proof the caller may see *this* tenant's
+data. The check runs again at every individual tool invocation. Retailer and
+supplier tenants are isolated from each other, and peers within a class are
+isolated from each other.
+
+**Acceptance criteria**
+1. Tenant A's token never returns tenant B's stored data.
+2. A supplier-class token is refused from retailer-only tools, and sees none of
+   them in discovery.
+3. Revoking or downgrading mid-session takes effect on the **next** call, not at
+   the next reconnect.
+4. No code path derives a tenant from user input.
+
+**This is the largest change and the load-bearing one.** It is why every
+function in `lib/mcp/tools.ts` takes a `CallerContext` first parameter rather
+than resolving identity once at the edge.
+
+### ENT-06 — Least privilege / progressive scopes
+
+**Requirement.** Three scopes: `tgc.read`, `tgc.requirements.write`,
+`tgc.exceptions.write`. Consent defaults to read-only. Enforced at discovery
+(a read-only connection is not shown write tools) **and** at invocation.
+
+**Acceptance criteria**
+1. A read-only connection's `tools/list` contains zero write tools.
+2. Calling a write tool directly with a read-only token is refused.
+3. Granting requirements-write does not grant exceptions-write — the tool that
+   changes compliance numbers is separately consented.
+
+**Note.** Discovery filtering is UX. The invocation check is the security
+boundary. Both are required; neither substitutes for the other.
+
+### ENT-07 — No token passthrough
+
+**Requirement.** TGC never accepts a token it wasn't issued, and never forwards
+an inbound token to a downstream service. When tool handlers eventually call
+real TGC services, they use a credential this server obtained for itself.
+
+**Acceptance criteria**
+1. Inbound: issuer and audience are both checked (covered by ENT-01/02).
+2. Outbound: no code path passes the caller's raw token to any downstream call.
+   Enforced in a service-client layer, not per call site.
+
+**Honest status.** The inbound half is real and demonstrated. The outbound half
+is currently a constraint on code that does not exist yet, because every tool
+still reads mock data. It is listed so it is designed in rather than
+retrofitted.
+
+### ENT-08 — Rate limits and bounded retrieval
+
+**Requirement.** Caps on how much one call can fetch and how often a tenant or
+agent can call. Without this, tool-surface growth means unpredictable cost and
+blast radius, not only a security gap.
+
+**Acceptance criteria**
+1. Every list-returning tool has an explicit cap and marks truncation.
+2. Per-tenant and per-agent call quotas exist with a visible refusal.
+3. Counters are durable — **not** process memory, which is per-instance in a
+   serverless deployment and therefore not a limit at all.
+
+**Honest status.** Bounded retrieval exists in part (`maxAttributes` on
+`run_compliance_report`). Quotas belong at the gateway; implementing them in
+this prototype's process memory would demo something that isn't true.
+
+One deliberate exception: `list_my_suppliers` is uncapped on purpose. It is the
+fixture for testing whether an agent reports a large tool output accurately
+rather than hallucinating over it. That is a product decision, recorded here so
+it is not "fixed" as an oversight.
+
+### ENT-09 — Container / process isolation per tenant
+
+**Requirement.** One tenant's — or one compromised agent's — blast radius must
+not reach another tenant's runtime, not just their data.
+
+**Owner: Aviator.** This cannot be solved inside a single Next.js route, and
+this prototype makes no claim to it. TGC's obligation is narrower and *is* met:
+hold no cross-tenant state in module scope, which ENT-05 delivers.
+
+### ENT-10 — Full audit logging
+
+**Requirement.** Every tool call — allowed, denied, or errored — produces
+exactly one log line recording timestamp, tenant, tenant class, subject type,
+subject, agent, tool, required scope, outcome, reason, and latency.
+Authentication refusals that never reach a tool are logged too.
+
+**Acceptance criteria**
+1. Every call in every other requirement's tests produces exactly one line.
+2. Refusals are logged with the reason, not silently dropped.
+3. There is a single emit point, so a new tool cannot skip auditing.
+
+**Production delta.** Ship to the platform log sink; scope reads to the tenant's
+own administrators. The demo's ring buffer is per instance and resets on cold
+start, and the read endpoint is unauthenticated because the portal has no login
+of its own.
+
+### ENT-11 — Curated tool registry
+
+**Requirement.** Tools are declared as data — name, schema, required scope,
+permitted tenant classes, read/write kind, workload eligibility — in one vetted
+catalog, rather than each being wired up ad hoc.
+
+**Acceptance criteria**
+1. Adding a tool without declaring its required scope and tenant classes is a
+   type error.
+2. Discovery filtering and audit are derived from the manifest, not repeated
+   per tool.
+
+**Strategic note.** Because TGC is the named first implementation behind the TG
+Aviator MCP Gateway, this manifest shape is a candidate **platform** registry
+schema. A gateway needs exactly this metadata to publish a vetted catalog. Rick
+raised tool sprawl as a current gap; this is the artifact that answers it.
+
+---
+
+## 3. Architecture
+
+Five pieces, each solving one thing:
+
+| File | Role |
+| --- | --- |
+| `lib/mcp/tenants.ts` | Tenant registry + **home-realm resolution**. The only place a tenant is ever derived. |
+| `lib/mcp/context.ts` | `CallerContext` — tenant, tenant class, subject type, subject, agent, scopes. Threaded as the first parameter of every tool. |
+| `lib/mcp/auth.ts` | Resource-server verification: signature, issuer, expiry, **audience**. Builds the `CallerContext`. |
+| `lib/mcp/manifest.ts` | The curated registry: schema **and declared authority** per tool. |
+| `lib/mcp/guard.ts` | `runGuarded()` — the single choke point. Re-checks tenant class and scope per call, emits the audit line. |
+
+Request path:
+
+```
+  request → auth.ts (401 + discovery pointer if unauthenticated)
+          → CallerContext (tenant DERIVED from token, class from registry)
+          → manifest filtered by scope + tenant class   ← what the AI can see
+          → runGuarded() re-checks scope + tenant class ← the security boundary
+          → tool handler, scoped by ctx.tenantId
+          → audit line (always, including refusals)
+```
+
+Two design points worth defending in review:
+
+- **Why `ctx` on every tool function** rather than resolving tenancy at the
+  edge. Per-call enforcement is only meaningful if the data access itself is
+  tenant-scoped. Resolving once at the edge is exactly the failure mode §4A
+  names as the most common one.
+- **Why one guard wrapper** rather than checks inside each tool. Thirteen copies
+  of a security check is thirteen chances to omit one. The guard also makes
+  auditing unskippable, which is the property that matters in an incident.
+
+### 3.1 Storage
+
+`lib/mcp/store.ts` is keyed by tenant rather than being a process-wide
+singleton, because per-call tenant checks are not meaningfully testable against
+shared state.
+
+Two honest caveats:
+
+- Every tenant seeds from the **same mock fixture**, so two retailer tenants
+  start out looking alike. Isolation is proven by **divergence**: a write made
+  as one tenant is absent for the other. Production tenants hold genuinely
+  distinct data.
+- The supplier list (`RETAILER_SUPPLIERS`) is a shared fixture and is *not*
+  tenant-partitioned. Isolation is real for everything **stored** — profiles,
+  profile extras, vendor exceptions — which is where every write lands.
+
+---
+
+## 4. Sequencing
+
+1. **Tool manifest** (ENT-11) — the spine; everything else hangs off it.
+2. **`CallerContext` + `runGuarded` + audit** (ENT-03, ENT-10).
+3. **Tenant-keyed storage**, then a real datastore with tenant column + RLS
+   (ENT-05).
+4. **OAuth resource server**: metadata, 401 challenge, JWKS, audience check
+   (ENT-01, ENT-02).
+5. **Scopes and discovery filtering** (ENT-06); **workload tokens** (ENT-04).
+6. **Bounded retrieval everywhere + durable quotas** (ENT-08).
+7. **Gateway integration**; no-passthrough service-client layer (ENT-07,
+   ENT-09).
+
+### 4.1 What §4B is gated on
+
+| §4B capability | Blocked until |
+| --- | --- |
+| Supplier-side tools | ENT-05 (two-tenant-class isolation) |
+| Proactive / event-triggered agents | ENT-04 (workload identity) |
+| Agent-to-agent (A2A) access | ENT-03 + ENT-04 + ENT-10 |
+| Real TGC service integration | ENT-07 (no passthrough) |
+| Larger tool catalog | ENT-08 + ENT-11 |
+
+We are not adding scope faster than we are adding the controls it requires.
+
+---
+
+## 5. What is demonstrable in this prototype
+
+Run it: see [`mcp-demo-quickstart.md`](./mcp-demo-quickstart.md).
+
+| Demo | Shows | How |
+| --- | --- | --- |
+| Connect claude.ai with no token | ENT-01 | `curl` the endpoint → 401 + discovery pointer |
+| Sign in as two different people | ENT-01, ENT-05 | Same URL, same tool, different data |
+| Peer isolation | ENT-05 | Write as Dillard's; absent for Belk |
+| Cross-class isolation | ENT-05 | J.Renée (supplier) sees **zero** retailer tools |
+| Read-only consent | ENT-06 | Write tools absent from the tool list; refused if called |
+| Wrong-audience token | ENT-02 | Portal → AI Assistant Access → Security |
+| Proactive agent | ENT-04 | Same screen; runs with no human, read-only |
+| Access log | ENT-10 | Portal → AI Assistant Access → Access log |
+
+### 5.1 The one structural divergence
+
+The demo authorization server is **local**, standing in for a real Entra/Okta
+tenant federated through Aviator. That is unavoidable in a prototype.
+
+It is the *only* structural divergence. In particular, the demo does **not**
+take the shortcut of letting the operator pick a tenant: identities are
+provisioned per realm (`buyer@dillards.demo`, `buyer@belk.demo`,
+`catalog@jrenee.demo`), and the tenant is derived from whichever one signs in.
+To act as another tenant you must authenticate as someone who belongs to it.
+
+Other demo-only compromises, none of which change the security model:
+
+- Keys, client registrations, and audit lines live in process memory and reset
+  on cold start.
+- The audit **read** endpoint is unauthenticated (the portal has no login).
+- Demo passwords are documented in the quickstart. Obviously.
+
+---
+
+## 6. What this prototype deliberately does not demonstrate
+
+Stated plainly, because a demo that fakes these teaches the room the wrong
+thing and gets caught in the first technical review:
+
+- **ENT-09, container/process isolation per tenant.** Cannot be shown inside a
+  Next.js route. It is a deployment property owned by Aviator.
+- **ENT-08, durable rate limiting.** Process-memory counters are per instance in
+  a serverless deployment, so implementing them here would demonstrate a limit
+  that does not exist.
+- **ENT-07 outbound half.** No downstream service calls exist yet to forward a
+  token to.
+- **Real federation.** No customer IdP is connected; see §5.1.
+
+The common thread with §4A's own closing line: a working demo and a safe one
+are not the same claim. Everything above is a known, scoped gap — not a
+surprise.

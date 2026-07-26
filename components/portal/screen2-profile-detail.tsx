@@ -34,6 +34,7 @@ import {
   setImageRequirement,
   updateAttributeRequirement,
 } from "@/lib/mcp/tools"
+import { PORTAL_CTX } from "@/lib/mcp/context"
 
 function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -1097,7 +1098,7 @@ export function Screen2ProfileDetail({
 
   function handleAddAttr(input: { name: string; guidance: string }) {
     if (!addAttrTarget || !selectedBrickCode) return
-    addAttributeRequirement(selectedBrickCode, input.name, addAttrTarget, input.guidance || undefined)
+    addAttributeRequirement(PORTAL_CTX, selectedBrickCode, input.name, addAttrTarget, input.guidance || undefined)
     refresh()
     setAddAttrTarget(null)
     showToast("Attribute added.")
@@ -1105,21 +1106,21 @@ export function Screen2ProfileDetail({
 
   function handleSaveAttr(gs1Name: string, updates: { name: string; guidance: string }) {
     if (!selectedBrickCode) return
-    updateAttributeRequirement(selectedBrickCode, gs1Name, updates)
+    updateAttributeRequirement(PORTAL_CTX, selectedBrickCode, gs1Name, updates)
     refresh()
     showToast("Attribute updated.")
   }
 
   function handleDeleteAttr(row: AttributeRequirement) {
     if (!selectedBrickCode) return
-    removeAttributeRequirement(selectedBrickCode, row.gs1Name)
+    removeAttributeRequirement(PORTAL_CTX, selectedBrickCode, row.gs1Name)
     refresh()
     showToast(`"${row.name}" removed from requirements.`)
   }
 
   function handleAddImage(row: ImageRequirement) {
     if (!selectedBrickCode) return
-    setImageRequirement(selectedBrickCode, row)
+    setImageRequirement(PORTAL_CTX, selectedBrickCode, row)
     refresh()
     setAddImageOpen(false)
     showToast("Image requirement added.")
@@ -1127,7 +1128,7 @@ export function Screen2ProfileDetail({
 
   function handleSaveImageRow(updated: ImageRequirement) {
     if (!selectedBrickCode) return
-    setImageRequirement(selectedBrickCode, updated)
+    setImageRequirement(PORTAL_CTX, selectedBrickCode, updated)
     refresh()
     showToast("Image requirement updated.")
   }

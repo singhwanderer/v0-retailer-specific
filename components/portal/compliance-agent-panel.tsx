@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { createAttributeProfile, addAttributeRequirement, setImageRequirement } from "@/lib/mcp/tools"
+import { PORTAL_CTX } from "@/lib/mcp/context"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 import type { ProposedAction } from "@/lib/copilot/tools"
 import type { CopilotSource } from "@/lib/copilot/agent"
@@ -98,7 +99,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
     try {
       if (proposal.tool === "create_attribute_profile") {
         const { name, brickCodes, category } = proposal.args as { name: string; brickCodes: string[]; category?: string }
-        const result = createAttributeProfile(name, brickCodes, category)
+        const result = createAttributeProfile(PORTAL_CTX, name, brickCodes, category)
         if ("error" in result) {
           setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: result.error } : p)))
           return
@@ -120,7 +121,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
           target: "core" | "extended"
           guidance?: string
         }
-        const result = addAttributeRequirement(brickCode, attributeName, target, guidance)
+        const result = addAttributeRequirement(PORTAL_CTX, brickCode, attributeName, target, guidance)
         if ("error" in result) {
           setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: result.error } : p)))
           return
@@ -139,7 +140,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
           shapeCrop: string
           guidanceNote?: string
         }
-        const result = setImageRequirement(brickCode, requirement)
+        const result = setImageRequirement(PORTAL_CTX, brickCode, requirement)
         if ("error" in result) {
           const message = String(result.error)
           setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: message } : p)))

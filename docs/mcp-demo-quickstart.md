@@ -10,20 +10,49 @@ The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployme
 ## Connect from claude.ai
 
 1. claude.ai → **Settings → Connectors → Add custom connector**
-2. Paste the endpoint URL, no authentication
-3. Start a chat, enable the "tgc-demo" connector via the tools menu
+2. Paste the endpoint URL. Your client discovers the sign-in automatically — there is no API key or token to create.
+3. **Sign in with one of the demo identities below** and choose how much access to grant (read-only is the default).
+4. Start a chat and enable the "tgc" connector via the tools menu
 
 ## Connect from ChatGPT
 
 1. **Settings → Apps & Connectors → Advanced → Developer mode** (requires Plus/Pro/Team)
-2. **Create** a connector with the endpoint URL, no authentication
-3. Enable it in a new chat via the tools menu
+2. **Create** a connector with the endpoint URL — sign-in is discovered automatically
+3. Sign in, grant scopes, then enable it in a new chat via the tools menu
 
 > **If the connector can't reach the URL (401/403):** the Vercel project's
 > Deployment Protection or Bot Protection is blocking anonymous requests.
 > In Vercel: Project → Settings → Deployment Protection → set Vercel
 > Authentication to off (or "Only Production" and use the production URL),
 > and check Firewall/Bot Protection isn't challenging non-browser clients.
+
+## Demo sign-in identities
+
+The connector requires OAuth sign-in — see
+[`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md). **Your organisation
+is derived from who you sign in as; there is no account picker anywhere in the
+flow, by design.**
+
+| Sign in as | Password | Organisation | Class |
+|---|---|---|---|
+| `buyer@dillards.demo` | `demo` | Dillard's | retailer |
+| `buyer@belk.demo` | `demo` | Belk | retailer (peer) |
+| `catalog@jrenee.demo` | `demo` | J.Renée | supplier |
+
+Demo credentials for watermarked mock data — the demo authorization server
+stands in for a customer's real IdP (Entra ID / Okta / Ping).
+
+### The three things worth demoing
+
+1. **Tenant isolation.** Sign in as Dillard's and create a requirement or grant
+   an exception. Sign in as Belk and look for it — it isn't there. Sign in as
+   J.Renée (a supplier) and the retailer tools aren't even listed.
+2. **Progressive scopes.** Grant read-only at sign-in: the four write tools
+   don't appear in the assistant's tool list at all, and are refused if called
+   directly.
+3. **The access log.** Portal → Compliance Agent → AI Assistant Access →
+   **Access log**. Every call and every refusal, live. The **Security** tab runs
+   the proactive-agent and wrong-audience-token demos.
 
 ## Ask anything — these are just examples
 
@@ -40,7 +69,16 @@ All data is mock and watermarked; writes persist only in the demo server's memor
 
 ```bash
 pnpm build && pnpm start
-curl -s -X POST http://localhost:3000/api/mcp \
-  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_my_suppliers","arguments":{}}}'
+
+# Unauthenticated: 401 plus the discovery pointer that starts the OAuth flow.
+curl -i -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{}'
+
+# The metadata documents an MCP client fetches next.
+curl -s http://localhost:3000/.well-known/oauth-protected-resource
+curl -s http://localhost:3000/.well-known/oauth-authorization-server
 ```
+
+Tool calls now need a token, so the quickest local check is the browser: open
+the portal, and use **AI Assistant Access → Security** to run the proactive
+agent and mint a wrong-audience token, then watch both land in **Access log**.

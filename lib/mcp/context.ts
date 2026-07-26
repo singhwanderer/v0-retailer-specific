@@ -1,0 +1,77 @@
+// Caller identity for every tool invocation.
+//
+// §4A's load-bearing requirement is that a valid token is NOT proof the caller
+// may see this tenant's data — the check has to happen again at each
+// individual tool call. That is only possible if every tool receives a caller
+// identity, so CallerContext is threaded as the first parameter of every
+// function in lib/mcp/tools.ts rather than resolved at the edge and forgotten.
+//
+// Note the deliberate separation of claims: "which tenant" and "which agent"
+// are distinct, independently checkable fields, not one bucket credential
+// everyone shares (§4A row 3). And `subjectType` distinguishes a human-
+// delegated session from an autonomous workload (§4A row 4).
+
+import { PORTAL_TENANT_ID, type TenantClass } from "@/lib/mcp/tenants"
+
+/**
+ * Progressive scopes (§4A row 6). A connection starts at read-only; write
+ * scopes are granted only when a specific action needs them.
+ */
+export const SCOPES = {
+  read: "tgc.read",
+  requirementsWrite: "tgc.requirements.write",
+  exceptionsWrite: "tgc.exceptions.write",
+} as const
+
+export type Scope = (typeof SCOPES)[keyof typeof SCOPES]
+
+export const ALL_SCOPES: Scope[] = [SCOPES.read, SCOPES.requirementsWrite, SCOPES.exceptionsWrite]
+
+/** The default a fresh connection gets if it asks for nothing specific. */
+export const DEFAULT_SCOPES: Scope[] = [SCOPES.read]
+
+export function isScope(value: string): value is Scope {
+  return (ALL_SCOPES as string[]).includes(value)
+}
+
+export function parseScopes(scopeParam: string | null | undefined): Scope[] {
+  if (!scopeParam) return []
+  return scopeParam.split(/[\s+]+/).filter(isScope)
+}
+
+export interface CallerContext {
+  /** Derived from the authenticated identity's realm. Never from user input. */
+  tenantId: string
+  /** Retailer and supplier tenants are isolated from each other. */
+  tenantClass: TenantClass
+  /**
+   * "user" = a human delegated the action in a live session.
+   * "workload" = an autonomous agent acting under its own scoped service
+   * identity, with no human in the session (§4A row 4).
+   */
+  subjectType: "user" | "workload"
+  /** The acting human, or null for a workload. */
+  subjectId: string | null
+  /** Which agent/client is calling — a separate claim from tenant. */
+  agentId: string
+  scopes: Set<Scope>
+}
+
+export function hasScope(ctx: CallerContext, scope: Scope): boolean {
+  return ctx.scopes.has(scope)
+}
+
+/**
+ * The identity the in-portal prototype's own direct calls run under. The
+ * portal's retailer screens call lib/mcp/tools.ts in-process (not over MCP),
+ * and they still pass an explicit context — so no code path reaches tenant
+ * data without one.
+ */
+export const PORTAL_CTX: CallerContext = {
+  tenantId: PORTAL_TENANT_ID,
+  tenantClass: "retailer",
+  subjectType: "user",
+  subjectId: "portal-session",
+  agentId: "tgc-portal-ui",
+  scopes: new Set(ALL_SCOPES),
+}

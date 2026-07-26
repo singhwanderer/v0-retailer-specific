@@ -55,6 +55,14 @@ export interface ReportOptions {
   /** ISO date (yyyy-mm-dd) or "" — items last updated before this are excluded. */
   excludeUpdatedBefore?: string
   ignoreDiscontinued: boolean
+  /**
+   * Which tenant's requirement profiles and vendor exceptions this report
+   * resolves against. Omitted by the in-portal callers (they run as the portal
+   * tenant); always supplied on the MCP path, where it comes from the
+   * authenticated identity. Without this, a report run by one tenant would
+   * silently apply another tenant's waivers.
+   */
+  tenantId?: string
 }
 
 export interface RankedAttribute {
@@ -370,7 +378,7 @@ export function runRetailerReport(
     // Attribute pool for this vendor's category under the chosen filter.
     let pool: { name: string; code?: string }[]
     if (filter.kind === "account") {
-      pool = assembleBrickAttributes(s.brickCode).extendedAttributes.map((a) => ({
+      pool = assembleBrickAttributes(s.brickCode, options.tenantId).extendedAttributes.map((a) => ({
         name: a.name,
         code: a.source === "standard" ? a.gs1Name.match(/\(([^)]+)\)$/)?.[1] : undefined,
       }))
@@ -389,7 +397,10 @@ export function runRetailerReport(
     // Every exception type, scoped to this category, drops its attributes from
     // the blame pool — an attribute under an exception shouldn't be named as
     // this vendor's problem regardless of the exception's kind.
-    const waived = waivedAttributeNames(s.supplier, { brickCode: s.brickCode })
+    const waived = waivedAttributeNames(s.supplier, {
+      brickCode: s.brickCode,
+      tenantId: options.tenantId,
+    })
 
     // Only an Active "Attribute Waiver" reduces the gap count itself (a waived
     // requirement is no longer outstanding). An Extended Deadline or Reduced
@@ -399,6 +410,7 @@ export function runRetailerReport(
     const waiverOnly = waivedAttributeNames(s.supplier, {
       exceptionType: "Attribute Waiver",
       brickCode: s.brickCode,
+      tenantId: options.tenantId,
     })
     const waivedGapCount = pool.filter((a) => isAttributeWaived(a.name, waiverOnly)).length
 
