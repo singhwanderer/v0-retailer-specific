@@ -5,6 +5,7 @@ import { SupplierNotifications } from "@/components/portal/supplier-notification
 import type { VendorException } from "@/lib/mcp/store"
 
 type Perspective = "retailer" | "supplier"
+type Role = "admin" | "member"
 
 interface TopNavProps {
   activeScreen: string
@@ -22,6 +23,17 @@ interface TopNavProps {
   supplierExceptions?: VendorException[]
   /** Jump to the selection code an exception applies to */
   onOpenException?: (exception: VendorException) => void
+  /**
+   * Demo role within the current organisation. Governs whether administrative
+   * screens (the AI access log) are reachable.
+   *
+   * This is a DEMO PERSONA SWITCH, not a login: the prototype portal has no
+   * authentication of its own, so the role is chosen here rather than derived
+   * from a session. In production it comes from the `role` claim on the
+   * signed-in user's token — see docs/mcp-enterprise-auth-trd.md (ENT-10).
+   */
+  role?: Role
+  onRoleChange?: (r: Role) => void
 }
 
 const navLinks = [
@@ -41,6 +53,8 @@ export function TopNav({
   onAiToggleChange,
   supplierExceptions = [],
   onOpenException,
+  role = "admin",
+  onRoleChange,
 }: TopNavProps) {
   return (
     <header
@@ -182,6 +196,39 @@ export function TopNav({
           )}
         </div>
 
+        {/* Role toggle — deliberately styled as a smaller, secondary control
+            than the perspective switch: it changes what this person may see,
+            not which organisation they belong to. */}
+        {onRoleChange && (
+          <div className="hidden md:flex items-center gap-1.5" title="Demo persona switch — in production this comes from your signed-in account">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-white/60 hidden lg:inline">
+              Role
+            </span>
+            <div
+              className="flex items-center p-[3px] rounded-lg"
+              style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+            >
+              {(["admin", "member"] as Role[]).map((r) => {
+                const isActive = role === r
+                return (
+                  <button
+                    key={r}
+                    onClick={() => onRoleChange(r)}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
+                    style={
+                      isActive
+                        ? { backgroundColor: "#FFFFFF", color: "#0168B3" }
+                        : { color: "rgba(255,255,255,0.85)" }
+                    }
+                  >
+                    {r === "admin" ? "Admin" : "Standard"}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Identity pill */}
         <div className="flex items-center gap-2 text-white/90">
           <div
@@ -190,9 +237,14 @@ export function TopNav({
           >
             <User className="w-4 h-4 text-white" />
           </div>
-          <span className="text-sm font-medium">
-            {perspective === "retailer" ? "Dillard\u2019s" : "J.Ren\u00e9e"}
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-medium">
+              {perspective === "retailer" ? "Dillard\u2019s" : "J.Ren\u00e9e"}
+            </span>
+            <span className="text-[10px] text-white/60">
+              {role === "admin" ? "Administrator" : "Standard user"}
+            </span>
+          </div>
         </div>
       </div>
     </header>

@@ -42,9 +42,9 @@ function applyOverride(
  * write-creating getProfileExtras, so simply inspecting a brick never
  * creates store state.
  */
-export function assembleBrickAttributes(brickCode: string): BrickAttributeSet {
+export function assembleBrickAttributes(brickCode: string, tenantId?: string): BrickAttributeSet {
   const brick = getBrickByCode(brickCode)
-  const extras = readProfileExtras(brickCode)
+  const extras = readProfileExtras(brickCode, tenantId)
   const excluded = new Set(extras.excludedGs1Names)
   const baseline = BASELINE_CORE_ATTRIBUTES.filter((a) => !excluded.has(a.gs1Name)).map((a) =>
     applyOverride(a, extras.overrides)

@@ -74,7 +74,8 @@ picks up the new rule automatically, with no retraining.**
 We stood up a small **MCP server** that exposes our (currently mock) retailer
 requirement and supplier-compliance data as a set of tools, so anyone can
 point their own Claude or ChatGPT at it and *just talk* to our data — no
-custom chatbot, no API key of their own to manage, nothing to install.
+custom chatbot, no API key of their own to manage, nothing to install — they
+sign in with their own work account and choose how much access to grant.
 
 ### Plain-text flow — from connecting to getting an answer
 
@@ -85,7 +86,12 @@ custom chatbot, no API key of their own to manage, nothing to install.
         ▼
    They paste ONE URL into their AI's "Connectors"
    settings:  https://v0-retailer-specific.vercel.app/api/mcp
-   (no API key, no login — just a URL)
+   (no API key to create — the AI discovers the sign-in itself)
+        │
+        ▼
+   They sign in with their OWN work account and pick how much
+   access to grant (read-only by default). Which organisation's
+   data they get is decided by WHO THEY ARE — never a choice.
         │
         ▼
    Their AI connects and asks the server:
@@ -129,9 +135,65 @@ their rules correctly and enforce them.
 | **Read (9)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, list global System filters, run a compliance report across the vendor base, list vendor exceptions on file, and a `get_capabilities` "what can you do" helper |
 | **Write (4)** | create a requirement profile, add an attribute requirement to it, set an image requirement (format/background/dimensions/etc.), grant or update a vendor exception (waiver / extended deadline / reduced scope) |
 
-This is retailer-facing only (e.g. a Dillard's-style user asking about their
-own suppliers) — not a supplier-facing tool set, and not able to see other
-retailers' data.
+### And the same server answers the supplier side
+
+| Category | Tools |
+| --- | --- |
+| **Supplier reads (4)** | own compliance status (against the GS1 baseline *and* each retail partner separately), own retail partners with their open gaps and extra requirements, own outstanding attributes and images for a chosen partner, and the exceptions retailers have granted them |
+
+**The point is that it's the same server, behind the same URL.** A supplier and
+a retailer paste the identical connector address. Which set of tools they get is
+decided by *who signed in* — not by a different deployment, a different URL, or
+a setting anyone can flip. A supplier's assistant is never even shown the
+retailer tools, and would be refused if it somehow called one.
+
+That mirrors how the network actually works: TGC is bilateral, so a one-sided
+connector was always half a product.
+
+### Plain-text flow — the supplier side
+
+```
+   A J.Renée user pastes the SAME connector URL
+        │
+        ▼
+   They sign in with THEIR OWN work account
+   (a J.Renée account, not a Dillard's one)
+        │
+        ▼
+   The server derives: supplier tenant → supplier tools
+   The retailer tools are not listed at all
+        │
+        ▼
+   "Which retail partner am I furthest behind for?"
+   "What's still outstanding for Dillard's?"
+   "What has been waived for me?"
+        │
+        ▼
+   Answers about THEIR catalogue, per retail partner —
+   because compliance is never one global score: each
+   retailer layers its own requirements on the standard
+```
+
+One nuance worth calling out, because it is the interesting bit of a bilateral
+network: a supplier **can** see the waivers a retailer granted *them* — that is
+a shared fact, and they are a party to it — and **cannot** see anything else
+that retailer holds. Not their other suppliers, not their requirements, not
+their reports. "Rows about me" is a different thing from "their data", and the
+server enforces the difference on every call.
+
+### Who can see the audit trail
+
+Every AI action against an account is logged — who, which assistant, which
+tool, what was allowed or refused. Two limits on reading it, both of which
+customers ask about immediately:
+
+- **Only your own organisation's activity.** A Dillard's administrator sees
+  Dillard's lines and nothing from Belk or J.Renée.
+- **Administrators only.** A category buyer connects their own assistant, but
+  does not get to read every AI action taken across the whole company.
+
+This is retailer- and supplier-facing, and in both cases scoped to the signing-in
+organisation's own data — no account can see another's.
 
 ### Vendor exceptions are chat-operable, and actually move the numbers
 
@@ -172,10 +234,13 @@ deadline extension doesn't erase the requirement, only delays it.
 
 ### Honest current limits (this is a demo, not production)
 
-- **No authentication yet.** Anyone with the URL can connect. Acceptable only
-  because all data behind it is mock/watermarked. A real rollout needs proper
-  auth (OAuth 2.1) so a connecting user only ever sees their own tenant's
-  data — this is a known, planned requirement, not an oversight.
+- **Auth is now real, but the identity provider is not.** The connector
+  requires OAuth 2.1 sign-in and enforces tenant isolation on every single tool
+  call, progressive read/write scopes, and full audit logging. What's still a
+  stand-in is *where the people come from*: a local demo sign-in rather than a
+  customer's own Entra ID / Okta, federated through TG Aviator. See
+  [the technical requirements doc](./mcp-enterprise-auth-trd.md) for exactly
+  which boxes are checked and which are deliberately not.
 - **Writes don't persist.** Changes made via chat live in server memory and
   reset when the server restarts. A real version needs a real database.
   Related: chat-created requirements don't yet show up in the existing portal
@@ -211,7 +276,7 @@ it's catching up to a documented standard.
 
 | Requirement | Why it matters | Where it's documented |
 | --- | --- | --- |
-| **Real auth (OAuth 2.1), no shared credentials** | Today's "no auth, anyone with the URL" model is fine for mock data and nowhere near acceptable once real customer data is behind it | MCP's own authorization spec now mandates OAuth 2.1 for any server handling real resources |
+| **Real auth (OAuth 2.1), no shared credentials** | An unauthenticated endpoint is fine for mock data and nowhere near acceptable once real customer data is behind it. Note what this really means: the *customer's* IdP authenticates their own employee — we never hold a user directory, and their offboarding revokes access without a ticket to us | MCP's own authorization spec now mandates OAuth 2.1 for any server handling real resources |
 | **Tokens scoped to *this* server only (Resource Indicators, RFC 8707)** | Stops a token stolen from one system being replayed against another | Prevents the "confused deputy" attack pattern called out across enterprise MCP security guides |
 | **Delegated identity, not a shared service account** | Every action needs to carry *both* "which customer/tenant" and "which agent" as separate, checkable claims — not one bucket credential everyone shares | OAuth token-exchange delegation (RFC 8693) — the emerging standard for agent-acts-on-behalf-of-user flows |
 | **Separate service/workload identity for agent-initiated actions** | A delegated user token only exists while a human is in the session. An agent acting on its own — e.g. a scheduled compliance check with no user connected at that moment — needs its own scoped, short-lived credential (client-credentials style), not a borrowed user token | Standard distinction between "on-behalf-of" delegation and workload identity for autonomous agent actions |
@@ -227,6 +292,19 @@ it's catching up to a documented standard.
 The common thread across all of it: **a working demo and a safe one aren't the
 same claim.** Nothing here is a surprise or a blocker we're discovering late —
 it's the standard checklist, and we already know which boxes are unchecked.
+
+**Where the prototype now stands against this table.** Rows 1-6, 10 and 11 are
+implemented and demonstrable end-to-end: OAuth sign-in with the tenant derived
+from the authenticated identity (never chosen), audience-bound tokens,
+per-call tenant checks across both tenant classes, progressive scopes, workload
+identity for agent-initiated runs, a live audit log, and a curated tool
+registry. Row 7 is half done, rows 8 and 9 belong to the Gateway, and the
+identity provider itself is still a local stand-in. Each row's requirement,
+acceptance criteria, owner and demo status is in
+**[the technical requirements doc](./mcp-enterprise-auth-trd.md)** — including a
+section on what this prototype deliberately does *not* demonstrate, because a
+demo that fakes container isolation or rate limiting gets caught in the first
+technical review.
 
 Two of these rows exist specifically because of what's in 4B below, not in
 spite of it: **service/workload identity** is what the proactive,
@@ -249,10 +327,12 @@ AI" bet opens up:
   the shared **TG Aviator MCP Gateway** with a **Catalogue Domain Agent** in
   front of it, and any customer gets ad-hoc, conversational access with
   multi-tenant security enforced by the platform, not by us.
-- **Supplier-side tools, not just retailer-side.** Today's server only
-  answers "how are my suppliers doing" for a retailer. A supplier-facing tool
-  set (own compliance status, own outstanding requirements) is the natural
-  next surface.
+- ~~**Supplier-side tools, not just retailer-side.**~~ **Delivered.** This was
+  gated on two-tenant-class isolation, and that box is now checked — so the
+  supplier tool set shipped with it: own compliance per retail partner, own
+  outstanding attributes and images, and the exceptions granted to them. It is
+  the clearest example of the discipline this section describes: the capability
+  waited for its control, and arrived the moment the control did.
 - **Persistence and a real portal sync.** Writes made through chat should
   land in the same database the portal UI reads from, so a requirement
   created by an AI conversation shows up on-screen immediately — no separate
@@ -301,8 +381,11 @@ and more callers.
   new rule immediately.
 - **No new chatbot to build or maintain.** The user's own AI subscription does
   the conversation; we only publish and enforce the actions.
-- **It's a demo today by design** — no auth, no persistence, mock data — but
-  every one of those gaps is a known, scoped step, not a surprise blocker.
+- **The security model is no longer a promise — it runs.** Sign in as two
+  different customers and the same question returns different data; sign in
+  read-only and the AI is not even shown the tools that write. What's still
+  demo-grade is persistence, the identity provider, and platform-level controls
+  that belong to Aviator — each a known, scoped step, not a surprise blocker.
 - **"Enterprise-ready" is a checklist, not a vague future** — real OAuth,
   tokens scoped per server, tenant checked on every call across both retailer
   and supplier tenants, workload identity for agent-initiated actions, rate
@@ -311,6 +394,15 @@ and more callers.
 - **Every expansion idea maps to a specific checklist item.** Proactive agents
   need workload identity; supplier-side tools need two-tenant-class isolation.
   We're not adding scope faster than we're adding the controls it requires.
+- **One connector, two audiences.** A supplier and a retailer paste the same
+  URL and get different tools, different data, and different suggested
+  questions — because the network is bilateral and the identity decides which
+  side you're on. Nobody configures that; it falls out of who signed in.
+- **The tenant is derived, never chosen.** Nobody — not the user, not the AI
+  client, not an autonomous agent — can assert which customer's data they're
+  acting on. It falls out of who authenticated. That single rule is what makes
+  a multi-tenant connector safe, and it's why there's no account picker
+  anywhere in the flow.
 - **We're not building this security layer alone.** TGC is the named first
   implementation for TG Aviator's multi-tenant platform — our job is a
   Catalogue-specific Domain Agent behind their shared Gateway, not a bespoke

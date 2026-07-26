@@ -5,16 +5,32 @@
 // "Conversational access (MCP)" sections — consumed both by the external MCP
 // endpoint (app/api/[transport]/route.ts) and directly by the portal UI
 // (Screen 1/2), which call these same functions as plain client-side calls.
+//
+// Every function that touches tenant-owned state takes a CallerContext as its
+// FIRST parameter and resolves its data through ctx.tenantId. That is what
+// makes §4A's per-call tenant check possible: authorization is re-evaluated at
+// each invocation (in runGuarded, lib/mcp/guard.ts) rather than being decided
+// once when the connection was established. The portal's own in-process calls
+// pass PORTAL_CTX, so there is no code path into tenant data without an
+// identity attached.
+//
+// Demo caveat, recorded in docs/mcp-enterprise-auth-trd.md: the supplier
+// fixture (RETAILER_SUPPLIERS) is shared across retailer tenants, so two
+// retailer tenants see the same vendor list. Isolation is real for everything
+// that is *stored* — profiles, profile extras, and vendor exceptions, which is
+// where every write lands — and that divergence is what the cross-tenant test
+// asserts.
 
 import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PERSONA, SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
-  getProfileBricks,
   RETAILER_SUPPLIERS,
   type AttributeProfile,
   type ProfileBrick,
   type ProfileStatus,
 } from "@/lib/retailer-requirements"
+import type { CallerContext } from "@/lib/mcp/context"
+import { getSupplierCapabilities } from "@/lib/mcp/tools-supplier"
 import {
   getProfileExtras,
   getStore,
@@ -50,8 +66,8 @@ export function searchGs1Bricks(query: string) {
   }))
 }
 
-export function listAttributeProfiles(status?: ProfileStatus) {
-  const { profiles } = getStore()
+export function listAttributeProfiles(ctx: CallerContext, status?: ProfileStatus) {
+  const { profiles } = getStore(ctx.tenantId)
   const matches = status ? profiles.filter((p) => p.status === status) : profiles
   if (status && matches.length === 0) {
     const available = [...new Set(profiles.map((p) => p.status))]
@@ -64,14 +80,14 @@ export function listAttributeProfiles(status?: ProfileStatus) {
   return matches
 }
 
-export function getProfileDetail(brickCode: string) {
-  const profile = findProfileForBrick(getStore().profiles, brickCode)
+export function getProfileDetail(ctx: CallerContext, brickCode: string) {
+  const profile = findProfileForBrick(getStore(ctx.tenantId).profiles, brickCode)
   const brick = getBrickByCode(brickCode)
   if (!profile && !brick) {
     return { error: `No attribute profile or GS1 category found for category code ${brickCode}. Use search_gs1_bricks or list_attribute_profiles to find valid codes.` }
   }
   // Read-only: inspecting a profile must never create store state.
-  const { coreAttributes, extendedAttributes, imageRequirements } = assembleBrickAttributes(brickCode)
+  const { coreAttributes, extendedAttributes, imageRequirements } = assembleBrickAttributes(brickCode, ctx.tenantId)
   return {
     profile: profile ?? { note: "No retailer profile created yet for this GS1 category", brickCode, brickName: brick?.brickName },
     coreAttributes,
@@ -126,7 +142,7 @@ export function listSystemFilters() {
  * Stateless read: computed on demand from current data; the portal UI keeps
  * its own report queue, so nothing is persisted here.
  */
-export function runComplianceReport(args: {
+export function runComplianceReport(ctx: CallerContext, args: {
   systemFilterId?: string
   profileName?: string
   supplier?: string
@@ -150,7 +166,7 @@ export function runComplianceReport(args: {
     filter = { kind: "system", id: sys.id as SystemFilterId }
     filterLabel = sys.name
   } else {
-    const { profiles } = getStore()
+    const { profiles } = getStore(ctx.tenantId)
     if (profileName) {
       const match = profiles.find((p) => p.name.toLowerCase() === profileName.toLowerCase().trim())
       if (!match) {
@@ -178,11 +194,11 @@ export function runComplianceReport(args: {
 
   const result = runRetailerReport(
     RETAILER_SUPPLIERS,
-    getStore().profiles,
+    getStore(ctx.tenantId).profiles,
     filter,
     resolvedProfile,
     vendorScope,
-    { maxAttributes: maxAttributes ?? 10, ignoreDiscontinued: true }
+    { maxAttributes: maxAttributes ?? 10, ignoreDiscontinued: true, tenantId: ctx.tenantId }
   )
 
   return {
@@ -195,8 +211,8 @@ export function runComplianceReport(args: {
 }
 
 /** List vendor exceptions on file, optionally filtered by vendor name or status. */
-export function listVendorExceptions(vendor?: string, status?: "Active" | "Expired") {
-  const { vendorExceptions } = getStore()
+export function listVendorExceptions(ctx: CallerContext, vendor?: string, status?: "Active" | "Expired") {
+  const { vendorExceptions } = getStore(ctx.tenantId)
   let matches = vendorExceptions
   if (vendor) {
     const q = vendor.toLowerCase().trim()
@@ -234,7 +250,7 @@ export function listVendorExceptions(vendor?: string, status?: "Active" | "Expir
  * but don't reduce the count — see waivedAttributes()/runRetailerReport()
  * in lib/compliance-report.ts).
  */
-export function setVendorException(args: {
+export function setVendorException(ctx: CallerContext, args: {
   id?: string
   vendor?: string
   brickCode: string
@@ -247,7 +263,7 @@ export function setVendorException(args: {
   if (args.attributes.length === 0) {
     return { error: "At least one attribute must be listed for the exception (e.g. 'Sustainable Materials Y/N')." }
   }
-  const store = getStore()
+  const store = getStore(ctx.tenantId)
 
   // The supplier side of this prototype is logged in as one persona, so an
   // exception granted without naming a vendor is meant for them — that's the
@@ -294,8 +310,13 @@ export function setVendorException(args: {
 // Plain-English catalog of what this connector can do, plus a live snapshot of
 // the demo data so the model can answer "what can I ask?" without guessing.
 // Built from the store, so it never drifts from the actual seeded data.
-export function getCapabilities() {
-  const store = getStore()
+export function getCapabilities(ctx: CallerContext) {
+  // A supplier and a retailer are asking genuinely different questions, and a
+  // capability list that describes the wrong half is worse than none — it
+  // invites the model to propose tools this caller will be refused for.
+  if (ctx.tenantClass === "supplier") return getSupplierCapabilities(ctx)
+
+  const store = getStore(ctx.tenantId)
   const categoriesWithData = [
     ...new Set(
       SUPPLIER_PRODUCTS_SEED.filter((p) => p.brickCode).map(
@@ -381,7 +402,12 @@ export function getCapabilities() {
  * independent of which/how-many bricks are mapped; it defaults to
  * `categoryName` so existing single-argument callers keep working.
  */
-export function createAttributeProfile(categoryName: string, brickCodes: string[], category?: string) {
+export function createAttributeProfile(
+  ctx: CallerContext,
+  categoryName: string,
+  brickCodes: string[],
+  category?: string
+) {
   if (brickCodes.length === 0) {
     return { error: "At least one GS1 category code is required. Use search_gs1_bricks to find one." }
   }
@@ -391,7 +417,7 @@ export function createAttributeProfile(categoryName: string, brickCodes: string[
     return { error: `Unknown GS1 category code ${brickCodes[missingIdx]}. Use search_gs1_bricks to find the right category first.` }
   }
   const resolvedBricks = bricks as NonNullable<(typeof bricks)[number]>[]
-  const store = getStore()
+  const store = getStore(ctx.tenantId)
   const conflictCode = brickCodes.find((code) => findProfileForBrick(store.profiles, code))
   if (conflictCode) {
     const owner = findProfileForBrick(store.profiles, conflictCode)!
@@ -421,8 +447,8 @@ export function createAttributeProfile(categoryName: string, brickCodes: string[
 
 // A write may only extend a profile that actually exists — otherwise the store
 // silently grows extras for a category the retailer never set up.
-function requireProfile(brickCode: string) {
-  const profile = findProfileForBrick(getStore().profiles, brickCode)
+function requireProfile(ctx: CallerContext, brickCode: string) {
+  const profile = findProfileForBrick(getStore(ctx.tenantId).profiles, brickCode)
   if (!profile) {
     return {
       error: `No attribute profile exists for GS1 category ${brickCode}. Create one first with create_attribute_profile, then add requirements to it.`,
@@ -432,14 +458,15 @@ function requireProfile(brickCode: string) {
 }
 
 export function addAttributeRequirement(
+  ctx: CallerContext,
   brickCode: string,
   attributeName: string,
   target: "core" | "extended",
   guidance?: string
 ) {
-  const missing = requireProfile(brickCode)
+  const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
-  const extras = getProfileExtras(brickCode)
+  const extras = getProfileExtras(brickCode, ctx.tenantId)
   const requirement: AttributeRequirement = {
     name: attributeName,
     gs1Name: attributeName,
@@ -451,10 +478,10 @@ export function addAttributeRequirement(
   return { created: requirement, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
 }
 
-export function setImageRequirement(brickCode: string, requirement: ImageRequirement) {
-  const missing = requireProfile(brickCode)
+export function setImageRequirement(ctx: CallerContext, brickCode: string, requirement: ImageRequirement) {
+  const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
-  const extras = getProfileExtras(brickCode)
+  const extras = getProfileExtras(brickCode, ctx.tenantId)
   const idx = extras.imageRequirements.findIndex(
     (r) => r.requirementName.toLowerCase() === requirement.requirementName.toLowerCase()
   )
@@ -475,13 +502,14 @@ export function setImageRequirement(brickCode: string, requirement: ImageRequire
  * themselves stored — they're derived live).
  */
 export function updateAttributeRequirement(
+  ctx: CallerContext,
   brickCode: string,
   gs1Name: string,
   updates: { name?: string; guidance?: string }
 ) {
-  const missing = requireProfile(brickCode)
+  const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
-  const extras = getProfileExtras(brickCode)
+  const extras = getProfileExtras(brickCode, ctx.tenantId)
   const idx = extras.customAttributes.findIndex((a) => a.gs1Name === gs1Name)
   if (idx >= 0) {
     extras.customAttributes[idx] = { ...extras.customAttributes[idx], ...updates }
@@ -497,10 +525,10 @@ export function updateAttributeRequirement(
  * be deleted since it isn't itself stored, so it's recorded as an exclusion
  * that assembleBrickAttributes filters out instead.
  */
-export function removeAttributeRequirement(brickCode: string, gs1Name: string) {
-  const missing = requireProfile(brickCode)
+export function removeAttributeRequirement(ctx: CallerContext, brickCode: string, gs1Name: string) {
+  const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
-  const extras = getProfileExtras(brickCode)
+  const extras = getProfileExtras(brickCode, ctx.tenantId)
   const idx = extras.customAttributes.findIndex((a) => a.gs1Name === gs1Name)
   if (idx >= 0) {
     const [removed] = extras.customAttributes.splice(idx, 1)

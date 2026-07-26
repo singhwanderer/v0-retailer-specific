@@ -11,19 +11,22 @@ Companion to the README's "Conversational access (MCP)" section (the concept) an
 | Feature branch (live now) | `https://v0-retailer-specific-git-1d56dd-geminicanadapro-8402s-projects.vercel.app/api/mcp` |
 | Production (after merging to `main`) | `https://v0-retailer-specific.vercel.app/api/mcp` |
 
-The endpoint speaks MCP over Streamable HTTP. No authentication is configured — acceptable only because everything behind it is watermarked mock data. A real rollout gets OAuth 2.1 (see FAQ below).
+The endpoint speaks MCP over Streamable HTTP and **requires OAuth 2.1 sign-in**. An unauthenticated request gets a `401` carrying a discovery pointer, which is how your AI client finds the sign-in on its own — you only ever paste the URL.
+
+Sign in with `buyer@dillards.demo`, `buyer@belk.demo`, or `catalog@jrenee.demo` (password `demo`). Your organisation is derived from which identity you sign in as — there is no account picker. Full design in [`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md).
 
 ## 2. How to connect
 
 **claude.ai (recommended for the demo)**
 1. Settings → **Connectors** → **Add custom connector**
-2. Name it "TGC", paste the endpoint URL, no authentication → Add
-3. In a new chat, open the tools/search menu and enable the TGC connector
+2. Name it "TGC", paste the endpoint URL → Add
+3. Sign in when prompted and choose the access to grant (read-only is the default)
+4. In a new chat, open the tools/search menu and enable the TGC connector
 4. Ask: *"Which of my suppliers are furthest behind on compliance?"*
 
 **ChatGPT**
 1. Settings → **Apps & Connectors** → enable **Developer mode** (Plus/Pro/Team)
-2. **Create** connector → paste the endpoint URL, no authentication
+2. **Create** connector → paste the endpoint URL, then sign in and grant scopes
 3. Enable it in a new conversation via the tools menu
 
 **Claude Desktop**

@@ -109,8 +109,14 @@ example prompts above:
 
 > This connector is a **directional investment preview** and may not ship in V1.
 > All data is mock; write tools persist to an in-memory store that resets
-> periodically. The endpoint has no authentication and is intended only for the
-> watermarked demo data.
+> periodically.
+>
+> The endpoint requires **OAuth 2.1 sign-in**, and enforces per-call tenant
+> isolation, progressive scopes, and audit logging — see
+> [`docs/mcp-enterprise-auth-trd.md`](docs/mcp-enterprise-auth-trd.md) for the
+> requirements, what is genuinely demonstrated, and what is deliberately not.
+> The authorization server here is a **demo** stand-in for a customer's own IdP
+> federated through the TG Aviator Gateway.
 
 ## Supplier view design intent
 

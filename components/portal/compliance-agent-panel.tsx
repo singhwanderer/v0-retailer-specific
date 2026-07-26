@@ -4,8 +4,8 @@ import { useState } from "react"
 import { Bot, Send, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { createAttributeProfile, addAttributeRequirement, setImageRequirement } from "@/lib/mcp/tools"
+import { PORTAL_CTX } from "@/lib/mcp/context"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 import type { ProposedAction } from "@/lib/copilot/tools"
 import type { CopilotSource } from "@/lib/copilot/agent"
@@ -98,7 +98,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
     try {
       if (proposal.tool === "create_attribute_profile") {
         const { name, brickCodes, category } = proposal.args as { name: string; brickCodes: string[]; category?: string }
-        const result = createAttributeProfile(name, brickCodes, category)
+        const result = createAttributeProfile(PORTAL_CTX, name, brickCodes, category)
         if ("error" in result) {
           setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: result.error } : p)))
           return
@@ -120,7 +120,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
           target: "core" | "extended"
           guidance?: string
         }
-        const result = addAttributeRequirement(brickCode, attributeName, target, guidance)
+        const result = addAttributeRequirement(PORTAL_CTX, brickCode, attributeName, target, guidance)
         if ("error" in result) {
           setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: result.error } : p)))
           return
@@ -139,7 +139,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
           shapeCrop: string
           guidanceNote?: string
         }
-        const result = setImageRequirement(brickCode, requirement)
+        const result = setImageRequirement(PORTAL_CTX, brickCode, requirement)
         if ("error" in result) {
           const message = String(result.error)
           setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: message } : p)))
@@ -213,7 +213,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
               <div className="flex items-start gap-2">
                 <div className="rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm max-w-[85%]" style={{ backgroundColor: "#F3F4F6", color: "#111827" }}>
                   Ask me about your requirements, suppliers, or compliance — or ask me to set up a new one. I can create new
-                  profiles and requirements, but I can't edit anything that already exists.
+                  profiles and requirements, but I can&rsquo;t edit anything that already exists.
                 </div>
               </div>
 

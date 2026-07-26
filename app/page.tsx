@@ -17,7 +17,7 @@ import { ScreenSupplierProductAttributes } from "@/components/portal/screen-supp
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
 import { ScreenComplianceReports } from "@/components/portal/screen-compliance-reports"
 import { ScreenComplianceDashboard } from "@/components/portal/screen-compliance-dashboard"
-import { AiAccessModal } from "@/components/portal/screen-retailer-ai-access"
+import { AiAccessModal } from "@/components/portal/screen-ai-access"
 import { ComplianceAgentPanel } from "@/components/portal/compliance-agent-panel"
 import type { ReportRequestPayload } from "@/components/portal/report-request-modal"
 import {
@@ -97,6 +97,11 @@ const AI_ENABLED_KEY = "tgc-proto-ai-enabled"
 
 export default function RetailerPortal() {
   const [perspective, setPerspective] = useState<Perspective>("retailer")
+  // Demo role within the current organisation. A persona switch, not a login —
+  // the prototype portal has no authentication of its own. In production this
+  // comes from the `role` claim on the signed-in user's token. It governs one
+  // thing: whether the administrative AI access log is reachable.
+  const [role, setRole] = useState<"admin" | "member">("admin")
 
   // ── Orientation: welcome overlay + one-time persona-toggle hint ─────────────
   // Both persist their dismissal in localStorage so the prototype orients a
@@ -317,6 +322,7 @@ export default function RetailerPortal() {
     ) {
       setRetailerScreen(id as RetailerScreen)
     }
+    if (id === "ai-access") setAiAccessOpen(true)
   }
 
   // ── Supplier navigation (sidebar clicks) ────────────────────────────────────
@@ -336,6 +342,7 @@ export default function RetailerPortal() {
       setActiveCode(null)
       setGapContext(null)
     }
+    if (id === "ai-access") setAiAccessOpen(true)
   }
 
   // ── Compliance list → GS1 row zero ──────────────────────────────────────────
@@ -618,6 +625,8 @@ export default function RetailerPortal() {
         onAiToggleChange={handleAiToggleChange}
         supplierExceptions={supplierExceptions}
         onOpenException={handleOpenException}
+        role={role}
+        onRoleChange={setRole}
       />
 
       {perspective === "retailer" && aiEnabled && (
@@ -628,7 +637,13 @@ export default function RetailerPortal() {
         />
       )}
 
-      {aiAccessOpen && <AiAccessModal onClose={() => setAiAccessOpen(false)} />}
+      {aiAccessOpen && (
+        <AiAccessModal
+          onClose={() => setAiAccessOpen(false)}
+          perspective={perspective}
+          role={role}
+        />
+      )}
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
@@ -636,6 +651,7 @@ export default function RetailerPortal() {
           activeScreen={activeScreen}
           onNavigate={handleNavigate}
           perspective={perspective}
+          role={role}
         />
 
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: "#F4F6F8" }}>

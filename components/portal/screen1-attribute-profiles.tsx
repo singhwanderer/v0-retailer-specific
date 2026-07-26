@@ -14,6 +14,7 @@ import { getProfileBricks, type AttributeProfile } from "@/lib/retailer-requirem
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
 import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
 import { createAttributeProfile } from "@/lib/mcp/tools"
+import { PORTAL_CTX } from "@/lib/mcp/context"
 
 interface Screen1Props {
   /** Shared profile list — the one source of truth (also read/written by Screen 2) */
@@ -600,7 +601,7 @@ export function Screen1AttributeProfiles({
       // Route through the shared store write path — the same function the
       // MCP connector calls — so authoring here and via the connector are one
       // code path.
-      const created = createAttributeProfile(result.name, brickCodes)
+      const created = createAttributeProfile(PORTAL_CTX, result.name, brickCodes)
       if ("error" in created) {
         showToast(created.error ?? "Could not create the requirement.")
         return

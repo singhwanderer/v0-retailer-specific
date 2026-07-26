@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, Tag } from "lucide-react"
+import { Bot, ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
@@ -10,6 +10,12 @@ interface SidebarProps {
   activeScreen: string
   onNavigate: (screen: string) => void
   perspective: Perspective
+  /**
+   * Demo role within the current organisation. The AI Assistant Access entry is
+   * administrative — it leads to a log of every AI action taken across the
+   * organisation — so it is shown to admins only.
+   */
+  role?: "admin" | "member"
 }
 
 // ── Retailer nav ──────────────────────────────────────────────────────────────
@@ -22,6 +28,9 @@ const retailerNavItems = [
   { id: "attribute-profiles", label: "Attributes & Images", icon: Tag, wired: true },
   { id: "compliance-reports", label: "Compliance Reports", icon: FileChartColumn, wired: true },
 ]
+
+/** Administrative entry, appended for admins on both sides. */
+const AI_ACCESS_ITEM = { id: "ai-access", label: "AI Assistant Access", icon: Bot, wired: true }
 
 // ── Supplier nav — mirrors the real Trading Grid Catalogue left nav ────────────
 // Section headers + leaf items reproduce the live product so the prototype reads
@@ -92,10 +101,11 @@ const supplierSections: NavSection[] = [
 ]
 
 // ── Retailer sidebar (simple flat list) ───────────────────────────────────────
-function RetailerNav({ activeScreen, onNavigate }: Omit<SidebarProps, "perspective">) {
+function RetailerNav({ activeScreen, onNavigate, role = "admin" }: Omit<SidebarProps, "perspective">) {
+  const items = role === "admin" ? [...retailerNavItems, AI_ACCESS_ITEM] : retailerNavItems
   return (
     <nav className="flex flex-col gap-0.5 p-3 pt-4">
-      {retailerNavItems.map(({ id, label, icon: Icon, wired }) => {
+      {items.map(({ id, label, icon: Icon, wired }) => {
         const isActive = activeScreen === id
         return (
           <button
@@ -118,9 +128,17 @@ function RetailerNav({ activeScreen, onNavigate }: Omit<SidebarProps, "perspecti
 }
 
 // ── Supplier sidebar (sectioned accordion, TGC-style) ─────────────────────────
-function SupplierNav({ activeScreen, onNavigate }: Omit<SidebarProps, "perspective">) {
+function SupplierNav({ activeScreen, onNavigate, role = "admin" }: Omit<SidebarProps, "perspective">) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(supplierSections.map((s) => [s.key, s.defaultExpanded]))
+  )
+
+  // Administration gains the AI access entry for admins — the same
+  // administrative home the retailer side uses, so the two read alike.
+  const sections = supplierSections.map((section) =>
+    section.key === "administration" && role === "admin"
+      ? { ...section, items: [...section.items, { id: "ai-access", label: "AI Assistant Access", wired: true, isNew: true }] }
+      : section
   )
 
   function toggle(key: string) {
@@ -129,7 +147,7 @@ function SupplierNav({ activeScreen, onNavigate }: Omit<SidebarProps, "perspecti
 
   return (
     <nav className="flex flex-col py-1 text-sm">
-      {supplierSections.map((section) => {
+      {sections.map((section) => {
         const isOpen = expanded[section.key]
         return (
           <div key={section.key}>
@@ -214,16 +232,16 @@ function SupplierNav({ activeScreen, onNavigate }: Omit<SidebarProps, "perspecti
   )
 }
 
-export function Sidebar({ activeScreen, onNavigate, perspective }: SidebarProps) {
+export function Sidebar({ activeScreen, onNavigate, perspective, role = "admin" }: SidebarProps) {
   return (
     <aside
       className="w-60 shrink-0 flex flex-col border-r overflow-y-auto"
       style={{ backgroundColor: "#FFFFFF", borderColor: "#E0E4E8" }}
     >
       {perspective === "supplier" ? (
-        <SupplierNav activeScreen={activeScreen} onNavigate={onNavigate} />
+        <SupplierNav activeScreen={activeScreen} onNavigate={onNavigate} role={role} />
       ) : (
-        <RetailerNav activeScreen={activeScreen} onNavigate={onNavigate} />
+        <RetailerNav activeScreen={activeScreen} onNavigate={onNavigate} role={role} />
       )}
     </aside>
   )

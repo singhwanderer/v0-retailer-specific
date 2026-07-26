@@ -83,7 +83,7 @@ ChatGPT requires **Developer mode** to add a custom MCP connector (Plus/Pro/Team
 
 1. Open **Claude Desktop** → **Settings**.
 2. Open **Connectors** → **Add custom connector**.
-3. Paste the connector URL, no authentication, and confirm.
+3. Paste the connector URL, then sign in with your demo identity and choose the access to grant.
 4. Enable **TGC** in a new conversation's tools menu.
 
 ---

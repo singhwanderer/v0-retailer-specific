@@ -10,14 +10,15 @@ The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployme
 ## Connect from claude.ai
 
 1. claude.ai → **Settings → Connectors → Add custom connector**
-2. Paste the endpoint URL, no authentication
-3. Start a chat, enable the "tgc-demo" connector via the tools menu
+2. Paste the endpoint URL. Your client discovers the sign-in automatically — there is no API key or token to create.
+3. **Sign in with one of the demo identities below** and choose how much access to grant (read-only is the default).
+4. Start a chat and enable the "tgc" connector via the tools menu
 
 ## Connect from ChatGPT
 
 1. **Settings → Apps & Connectors → Advanced → Developer mode** (requires Plus/Pro/Team)
-2. **Create** a connector with the endpoint URL, no authentication
-3. Enable it in a new chat via the tools menu
+2. **Create** a connector with the endpoint URL — sign-in is discovered automatically
+3. Sign in, grant scopes, then enable it in a new chat via the tools menu
 
 > **If the connector can't reach the URL (401/403):** the Vercel project's
 > Deployment Protection or Bot Protection is blocking anonymous requests.
@@ -25,14 +26,87 @@ The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployme
 > Authentication to off (or "Only Production" and use the production URL),
 > and check Firewall/Bot Protection isn't challenging non-browser clients.
 
+## Demo sign-in identities
+
+The connector requires OAuth sign-in — see
+[`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md). **Your organisation
+is derived from who you sign in as; there is no account picker anywhere in the
+flow, by design.**
+
+| Sign in as | Password | Organisation | Class | Role |
+|---|---|---|---|---|
+| `admin@dillards.demo` | `demo` | Dillard's | retailer | admin |
+| `buyer@dillards.demo` | `demo` | Dillard's | retailer | member |
+| `buyer@belk.demo` | `demo` | Belk | retailer (peer) | member |
+| `admin@jrenee.demo` | `demo` | J.Renée | supplier | admin |
+| `catalog@jrenee.demo` | `demo` | J.Renée | supplier | member |
+
+Both your organisation **and** your role come from which identity you sign in
+as. Neither is selectable.
+
+Demo credentials for watermarked mock data — the demo authorization server
+stands in for a customer's real IdP (Entra ID / Okta / Ping).
+
+### The four things worth demoing
+
+1. **One URL, two audiences.** Sign in as `buyer@dillards.demo` and ask "which
+   of my suppliers is furthest behind?". Sign out, sign in as
+   `catalog@jrenee.demo` and ask "which retail partner am I furthest behind
+   for?". Same connector, different tools, different data — decided entirely by
+   who signed in. The supplier is never even shown the retailer tools.
+2. **Tenant isolation.** As Dillard's, grant J.Renée an exception. As Belk, look
+   for it — it isn't there. As J.Renée, `list_my_exceptions` shows it labelled
+   *granted by Dillard's* — and nothing else Dillard's holds.
+3. **Progressive scopes.** Grant read-only at sign-in: the four write tools
+   don't appear in the assistant's tool list at all, and are refused if called
+   directly.
+4. **The access log.** See the walkthrough below.
+
+### Access log walkthrough (the security story in 6 steps)
+
+The log lives at **Administration → AI Assistant Access → Access log** (also
+reachable from the Compliance Agent panel on the retailer side).
+
+1. Portal as **Dillard's / Standard user** — there is no AI Assistant Access
+   item in the sidebar. Open it from the Compliance Agent link: **Connect**
+   works, **Access log** is locked to administrators.
+2. Switch the role toggle to **Admin** — the sidebar item appears and the log
+   opens, empty.
+3. Connect Claude, sign in as `buyer@dillards.demo`, ask a question. Lines
+   appear: the person, the assistant, the tool, the scope it required.
+4. **Security** tab → *Run proactive check* → a line appears as a **service
+   identity**, with no person attached — an agent acting on a schedule with
+   nobody in the session.
+5. **Security** tab → *Mint a wrong-audience token* and replay it → it is
+   refused, and appears under **Refused before sign-in** — unattributed,
+   because a rejected token's own claims are not evidence of who sent it.
+6. Flip the portal to the **supplier** persona (Admin) → the same screen shows
+   **only J.Renée's** activity. Dillard's lines are gone.
+
+Steps 1-2 show the role gate; step 6 shows the tenant gate.
+
+> The role and persona toggles are **demo persona switches**, not a login — the
+> prototype portal has no authentication of its own. The connector's equivalents
+> are genuinely enforced; see
+> [`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md) ENT-10.
+
 ## Ask anything — these are just examples
 
 The prompts below are illustrations, **not** a fixed command list. The connected LLM interprets free language and picks the right tool, so ask in your own words about any requirement or supplier-compliance question. Not sure where to start? Ask **"What can you help me with?"** and the assistant calls the `get_capabilities` tool to list its actions and the data that actually exists in the demo. In claude.ai the connector also contributes clickable **starter prompts** (review compliance, set up a category, audit a supplier, explain a profile) in the prompt picker.
+
+**As a retailer (Dillard's):**
 
 1. **Query compliance:** "Which of my suppliers are furthest behind on compliance, and on what?"
 2. **Understand requirements:** "What does my Footwear profile require, including image requirements?"
 3. **Create a requirement:** "Create an attribute profile for Dresses, then require a lifestyle image, JPEG, 2000×2000 minimum, white background." Then: "List my profiles" — the new one appears.
 4. **Audit a supplier:** "How is J.Renée doing on Footwear?"
+
+**As a supplier (J.Renée):**
+
+1. **Own position:** "How compliant am I overall, and which retail partner am I furthest behind for?"
+2. **Outstanding work:** "What am I still missing for Dillard's?"
+3. **Why the difference:** "Which retailers require the most attributes beyond the GS1 standard?"
+4. **Relief granted:** "What has been waived for me, and by whom?"
 
 All data is mock and watermarked; writes persist only in the demo server's memory and reset periodically.
 
@@ -40,7 +114,16 @@ All data is mock and watermarked; writes persist only in the demo server's memor
 
 ```bash
 pnpm build && pnpm start
-curl -s -X POST http://localhost:3000/api/mcp \
-  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_my_suppliers","arguments":{}}}'
+
+# Unauthenticated: 401 plus the discovery pointer that starts the OAuth flow.
+curl -i -X POST http://localhost:3000/api/mcp \
+  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{}'
+
+# The metadata documents an MCP client fetches next.
+curl -s http://localhost:3000/.well-known/oauth-protected-resource
+curl -s http://localhost:3000/.well-known/oauth-authorization-server
 ```
+
+Tool calls now need a token, so the quickest local check is the browser: open
+the portal, and use **AI Assistant Access → Security** to run the proactive
+agent and mint a wrong-audience token, then watch both land in **Access log**.
