@@ -26,7 +26,7 @@ import { createMcpHandler } from "mcp-handler"
 import { authenticateMcpRequest } from "@/lib/mcp/auth"
 import type { CallerContext } from "@/lib/mcp/context"
 import { runGuarded } from "@/lib/mcp/guard"
-import { toolsForScopes } from "@/lib/mcp/manifest"
+import { annotationsFor, guardSpecFor, invokeTool, toolsForScopes } from "@/lib/mcp/manifest"
 import { getTenant } from "@/lib/mcp/tenants"
 
 function asText(data: unknown) {
@@ -93,19 +93,20 @@ function buildHandler(ctx: CallerContext) {
   return createMcpHandler(
     (server) => {
       for (const tool of visible) {
-        server.tool(tool.name, tool.description, tool.schema, async (args: unknown) => {
-          const outcome = runGuarded(
-            ctx,
-            {
-              name: tool.name,
-              requiredScope: tool.requiredScope,
-              allowedTenantClasses: tool.allowedTenantClasses,
-              allowWorkload: tool.allowWorkload,
-            },
-            () => tool.handler(ctx, args)
-          )
-          return asText(outcome.ok ? outcome.result : outcome.error)
-        })
+        server.tool(
+          tool.name,
+          tool.description,
+          tool.schema,
+          annotationsFor(tool),
+          async (args: unknown) => {
+            // invokeTool interposes the confirmation step: a mutating tool's
+            // first call previews and mints a token instead of acting. The
+            // guard still wraps both phases, so the proposal and the approval
+            // each produce their own audit line.
+            const outcome = runGuarded(ctx, guardSpecFor(tool), () => invokeTool(ctx, tool, args))
+            return asText(outcome.ok ? outcome.result : outcome.error)
+          }
+        )
       }
 
       // ── Starter prompts ────────────────────────────────────────────────────

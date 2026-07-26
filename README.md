@@ -95,6 +95,16 @@ creation). Setup and usage:
 - `docs/mcp-getting-started.md` — connect a client and try it
 - `docs/mcp-demo-quickstart.md`, `docs/mcp-faq.md` — walkthrough and FAQ
 
+The retailer tool surface covers the full lifecycle — read, create, edit, and
+remove — with a human in the loop for every non-read action. **No mutating tool
+acts on its first call**: it returns a preview of exactly what would change, what
+that does to compliance numbers, and a short-lived single-use token, and a
+separate `confirm_pending_change` tool is the only path that mutates. Removal
+needs a fourth scope, `tgc.destructive`, *in addition to* the relevant write
+scope. See [`docs/mcp-enterprise-auth-trd.md`](docs/mcp-enterprise-auth-trd.md)
+ENT-06a for why the confirmation lives in the protocol rather than in a UI card
+the external clients don't have.
+
 The connector is built to survive cold, off-script exploration, not just the
 example prompts above:
 - **Discoverability** — a `get_capabilities` tool returns a plain-English catalog

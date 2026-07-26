@@ -38,6 +38,7 @@ import {
   type ImageRequirement,
   type VendorException,
 } from "@/lib/mcp/store"
+import { listAudit } from "@/lib/mcp/audit"
 import {
   assembleBrickAttributes,
   describeProfileAttributes,
@@ -539,6 +540,366 @@ export function removeAttributeRequirement(ctx: CallerContext, brickCode: string
   }
   delete extras.overrides[gs1Name]
   return { removed: { gs1Name }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+}
+
+export function removeImageRequirement(ctx: CallerContext, brickCode: string, requirementName: string) {
+  const missing = requireProfile(ctx, brickCode)
+  if (missing) return missing
+  const extras = getProfileExtras(brickCode, ctx.tenantId)
+  const idx = extras.imageRequirements.findIndex(
+    (r) => r.requirementName.toLowerCase() === requirementName.toLowerCase().trim()
+  )
+  if (idx < 0) {
+    const names = extras.imageRequirements.map((r) => r.requirementName)
+    return {
+      error: `No image requirement named "${requirementName}" on GS1 category ${brickCode}. ${
+        names.length ? `Image requirements here: ${names.join(", ")}.` : "This profile has no image requirements."
+      }`,
+    }
+  }
+  const [removed] = extras.imageRequirements.splice(idx, 1)
+  return { removed, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+}
+
+/** Activate, deactivate, or return a profile to Draft. */
+export function setProfileStatus(ctx: CallerContext, profileName: string, status: ProfileStatus) {
+  const store = getStore(ctx.tenantId)
+  const profile = store.profiles.find((p) => p.name.toLowerCase() === profileName.toLowerCase().trim())
+  if (!profile) {
+    return { error: `No attribute profile named "${profileName}". Your profiles: ${store.profiles.map((p) => p.name).join(", ")}.` }
+  }
+  const previous = profile.status
+  profile.status = status
+  profile.lastUpdated = today()
+  return {
+    updated: { name: profile.name, status, previousStatus: previous },
+    demo_note: DEMO_NOTE,
+  }
+}
+
+/**
+ * Delete a requirement profile and the per-brick extras beneath it.
+ *
+ * The widest-blast-radius write in the inventory: every vendor item in the
+ * mapped categories stops being assessed against these rules the moment it
+ * lands, which is exactly why it sits behind the destructive scope and the
+ * confirmation step rather than alongside "add an attribute".
+ */
+export function deleteAttributeProfile(ctx: CallerContext, profileName: string) {
+  const store = getStore(ctx.tenantId)
+  const idx = store.profiles.findIndex((p) => p.name.toLowerCase() === profileName.toLowerCase().trim())
+  if (idx < 0) {
+    return { error: `No attribute profile named "${profileName}". Your profiles: ${store.profiles.map((p) => p.name).join(", ")}.` }
+  }
+  const [removed] = store.profiles.splice(idx, 1)
+  for (const brick of profileBrickCodes(removed)) delete store.profileExtras[brick]
+  return { removed: { name: removed.name, category: removed.category, status: removed.status }, demo_note: DEMO_NOTE }
+}
+
+/**
+ * Revoke a vendor exception outright, or expire it.
+ *
+ * "Expire" keeps the row visible with status Expired — the audit-friendly
+ * default, since a waiver that once applied is part of how a vendor's past
+ * numbers were reached. Deleting removes the record entirely.
+ */
+export function revokeVendorException(ctx: CallerContext, id: string, mode: "expire" | "delete" = "expire") {
+  const store = getStore(ctx.tenantId)
+  const idx = store.vendorExceptions.findIndex((e) => e.id === id)
+  if (idx < 0) {
+    return { error: `No vendor exception with id "${id}". Use list_vendor_exceptions to find the right id.` }
+  }
+  const row = store.vendorExceptions[idx]
+  if (mode === "delete") {
+    store.vendorExceptions.splice(idx, 1)
+    return { deleted: row, demo_note: DEMO_NOTE }
+  }
+  const updated: VendorException = { ...row, status: "Expired" }
+  store.vendorExceptions[idx] = updated
+  return { expired: updated, demo_note: DEMO_NOTE }
+}
+
+function profileBrickCodes(profile: AttributeProfile): string[] {
+  return profile.bricks?.length ? profile.bricks.map((b) => b.code) : [profile.brickCode]
+}
+
+// ── Simulation ───────────────────────────────────────────────────────────────
+
+/**
+ * Answer "what would this requirement change do to my vendor base?" without
+ * changing anything.
+ *
+ * This is the question a merchandiser actually has *before* authoring, and no
+ * screen in the product answers it: today you add the attribute, run a report,
+ * and find out afterwards.
+ *
+ * ── Why this models the change rather than re-running the engine ─────────────
+ * The obvious implementation — apply the change to a copy of the store and diff
+ * two real reports — cannot work here, and it is worth saying why rather than
+ * shipping something that silently always returns zero. The retailer engine
+ * takes each vendor's gap total from the supplier fixture and then *distributes*
+ * it across whatever attributes are currently required. Widening or narrowing
+ * that pool changes which attribute gets named as the culprit; it cannot change
+ * the total, because the total was never derived from the pool.
+ *
+ * So the two directions are modelled explicitly, from the baseline report:
+ *   - Adding a requirement nobody has been asked for yet means every assessed
+ *     item is missing it on day one. New gaps = items assessed.
+ *   - Removing one clears exactly the gaps currently blamed on it, which the
+ *     baseline report already counts per attribute.
+ *
+ * Both assumptions are returned alongside the numbers, because a forecast whose
+ * model is hidden is worse than no forecast.
+ */
+export function simulateRequirementChange(ctx: CallerContext, args: {
+  profileName: string
+  attributeName: string
+  action?: "add" | "remove"
+}) {
+  const action = args.action ?? "add"
+  const store = getStore(ctx.tenantId)
+  const profile = store.profiles.find((p) => p.name.toLowerCase() === args.profileName.toLowerCase().trim())
+  if (!profile) {
+    return { error: `No attribute profile named "${args.profileName}". Your profiles: ${store.profiles.map((p) => p.name).join(", ")}.` }
+  }
+
+  const filter: ReportFilterRef = { kind: "account", retailer: "Dillard's" }
+  const before = runRetailerReport(RETAILER_SUPPLIERS, store.profiles, filter, profile.name, "all", {
+    maxAttributes: 999,
+    ignoreDiscontinued: true,
+    tenantId: ctx.tenantId,
+  })
+
+  const vendorRows = before.rows.filter(
+    (r): r is Extract<typeof r, { kind: "vendor" }> => r.kind === "vendor"
+  )
+
+  if (vendorRows.length === 0) {
+    return {
+      error: `No vendors are assessed against "${profile.name}" today${profile.status !== "Active" ? " — it is a Draft, so nothing is being measured against it yet" : ""}. There is nothing to simulate.`,
+    }
+  }
+
+  if (action === "add") {
+    const alreadyRequired = before.missingAttributes.some(
+      (a) => a.name.toLowerCase() === args.attributeName.toLowerCase().trim()
+    )
+    const newGaps = vendorRows.reduce((sum, r) => sum + r.productsTotal, 0)
+    const impact = vendorRows
+      .map((r) => ({
+        supplier: r.supplier,
+        category: r.category,
+        itemsAffected: r.productsTotal,
+        gapsBefore: r.openGaps,
+        gapsAfter: r.openGaps + r.productsTotal,
+        wasFullyCompliant: r.openGaps === 0,
+      }))
+      .sort((a, b) => b.itemsAffected - a.itemsAffected)
+
+    return {
+      simulated: { profile: profile.name, action, attribute: args.attributeName },
+      alreadyRequired,
+      itemsAssessed: before.itemsAssessed,
+      gapsBefore: before.totalGaps,
+      gapsAfter: before.totalGaps + newGaps,
+      gapsDelta: newGaps,
+      vendorsAffected: impact.length,
+      vendorsNewlyNonCompliant: impact.filter((v) => v.wasFullyCompliant).length,
+      vendorImpact: impact.slice(0, 15),
+      note: impact.length > 15 ? `Showing the 15 most affected vendors of ${impact.length}.` : undefined,
+      assumption:
+        "Assumes no supplier is already carrying this attribute, so every assessed item is missing it on day one. That is the worst case and the usual one for a genuinely new requirement — if some suppliers already hold the data, the real increase is smaller.",
+      demo_note: "Nothing was changed. This is a forecast against current mock data.",
+    }
+  }
+
+  const blamed = before.missingAttributes.find(
+    (a) => a.name.toLowerCase() === args.attributeName.toLowerCase().trim()
+  )
+  if (!blamed) {
+    return {
+      simulated: { profile: profile.name, action, attribute: args.attributeName },
+      gapsRemoved: 0,
+      note: `"${args.attributeName}" is not currently the cause of any open gaps under "${profile.name}", so removing it would not change the numbers. Attributes currently driving gaps here: ${before.missingAttributes.slice(0, 8).map((a) => a.name).join(", ")}.`,
+      demo_note: "Nothing was changed. This is a forecast against current mock data.",
+    }
+  }
+
+  return {
+    simulated: { profile: profile.name, action, attribute: args.attributeName },
+    itemsAssessed: before.itemsAssessed,
+    gapsBefore: before.totalGaps,
+    gapsAfter: Math.max(0, before.totalGaps - blamed.count),
+    gapsDelta: -blamed.count,
+    warning:
+      "Removing a requirement improves the reported number without any supplier supplying anything. It lowers the bar rather than closing a gap — worth being explicit about with whoever asked for it.",
+    demo_note: "Nothing was changed. This is a forecast against current mock data.",
+  }
+}
+
+// ── Vendor outreach ──────────────────────────────────────────────────────────
+
+/**
+ * Draft the remediation message for one vendor from their actual open gaps.
+ *
+ * Read-only on purpose: it drafts, a human sends. Attributes already covered by
+ * an Active exception are excluded, because chasing a vendor for something you
+ * waived for them is the fastest way to make the whole report untrustworthy.
+ */
+export function draftVendorOutreach(ctx: CallerContext, args: {
+  supplier: string
+  tone?: "direct" | "collaborative"
+  deadline?: string
+}) {
+  const q = args.supplier.toLowerCase().trim()
+  const matches = RETAILER_SUPPLIERS.filter((s) => s.supplier.toLowerCase().includes(q))
+  if (matches.length === 0) {
+    const known = knownSuppliers()
+    return {
+      matches: [],
+      knownSuppliers: known,
+      note: `No supplier matched "${args.supplier}". Suppliers trading under your retailer account: ${known.join(", ")}.`,
+    }
+  }
+  // A partial name can match several vendors, and the fixture deliberately
+  // contains near-duplicates ("Calvin Klein" / "Calvin Klein Performance").
+  // Drafting a chase letter to the wrong legal entity is worth one clarifying
+  // question, so ask rather than guess.
+  const distinct = [...new Set(matches.map((m) => m.supplier))]
+  if (distinct.length > 1) {
+    return {
+      ambiguous: distinct,
+      note: `"${args.supplier}" matches ${distinct.length} suppliers: ${distinct.join(", ")}. Name one exactly before drafting outreach.`,
+    }
+  }
+
+  const supplier = distinct[0]
+  const report = runRetailerReport(
+    RETAILER_SUPPLIERS,
+    getStore(ctx.tenantId).profiles,
+    { kind: "account", retailer: "Dillard's" },
+    "all-active",
+    supplier,
+    { maxAttributes: 10, ignoreDiscontinued: true, tenantId: ctx.tenantId }
+  )
+
+  const waived = [
+    ...new Set(
+      getStore(ctx.tenantId)
+        .vendorExceptions.filter((e) => e.status === "Active" && e.vendor === supplier)
+        .flatMap((e) => e.attributes)
+    ),
+  ]
+
+  const categories = matches.map((m) => m.category)
+
+  // Do not draft a chase letter with nothing to chase. This fires both when a
+  // vendor is genuinely clean and when nothing they supply is covered by an
+  // active profile — different causes, so say which.
+  if (report.itemsAssessed === 0) {
+    return {
+      supplier,
+      note: `No items of ${supplier}'s are currently assessed against any active profile (${categories.join(", ")}), so there is nothing to raise with them. Check that a profile covering their categories is Active.`,
+    }
+  }
+  if (report.totalGaps === 0) {
+    return {
+      supplier,
+      note: `${supplier} has no open gaps across ${report.itemsAssessed} assessed items — they are fully compliant with what you require today. There is nothing to chase.`,
+    }
+  }
+
+  const deadline = args.deadline ?? "the end of the current quarter"
+  const collaborative = (args.tone ?? "collaborative") === "collaborative"
+
+  const lines = report.missingAttributes.map((a, i) => `${i + 1}. ${a.name} — missing on ${a.count} item${a.count === 1 ? "" : "s"}`)
+
+  const body = [
+    `Hello ${supplier} team,`,
+    "",
+    collaborative
+      ? `We're reviewing product data completeness across the categories you supply us (${categories.join(", ")}), and wanted to share where we currently see gaps so we can close them together.`
+      : `A review of your product data across ${categories.join(", ")} shows ${report.totalGaps} outstanding attribute gaps across ${report.itemsAssessed} items.`,
+    "",
+    `Current completeness: ${report.overallPct}% across ${report.itemsAssessed} assessed items, with ${report.totalGaps} open gaps.`,
+    "",
+    "The attributes most often missing:",
+    ...lines,
+    "",
+    waived.length
+      ? `For clarity, the following are covered by an active exception and are not part of this request: ${waived.join(", ")}.`
+      : "",
+    collaborative
+      ? `If any of these are difficult to source on your side, tell us which and we'll look at whether an exception or a phased deadline makes sense. Otherwise we'd like these populated by ${deadline}.`
+      : `Please populate these by ${deadline}.`,
+    "",
+    "Thank you,",
+    "Catalogue Operations",
+  ]
+    .filter((l) => l !== "")
+    .join("\n")
+
+  return {
+    supplier,
+    subject: `Product data completeness — ${categories.join(", ")} (${report.totalGaps} open gaps)`,
+    body,
+    basedOn: {
+      itemsAssessed: report.itemsAssessed,
+      openGaps: report.totalGaps,
+      compliancePct: report.overallPct,
+      topMissingAttributes: report.missingAttributes.map((a) => a.name),
+      excludedByActiveException: waived,
+    },
+    demo_note:
+      "Draft only — nothing was sent, and no record of outreach is stored. Attributes under an Active exception for this vendor are excluded from the ask.",
+  }
+}
+
+// ── Audit ────────────────────────────────────────────────────────────────────
+
+/**
+ * Let an administrator ask what their organisation's AI assistants have been
+ * doing. Tenant-scoped and admin-only, matching the Access log screen exactly:
+ * a capability that reads the audit trail must be governed by the same rules as
+ * the screen that reads it, or the connector becomes the way around the gate.
+ */
+export function queryAccessLog(ctx: CallerContext, args: {
+  outcome?: "allowed" | "denied" | "error"
+  tool?: string
+  limit?: number
+}) {
+  if (ctx.role !== "admin") {
+    return {
+      error:
+        "The access log records every AI action taken across this organisation, so it is available to administrators only. Your account is a standard user.",
+    }
+  }
+
+  const limit = Math.min(Math.max(args.limit ?? 25, 1), 100)
+  let rows = listAudit(200).filter((e) => e.tenantId === ctx.tenantId)
+  if (args.outcome) rows = rows.filter((e) => e.outcome === args.outcome)
+  if (args.tool) {
+    const q = args.tool.toLowerCase().trim()
+    rows = rows.filter((e) => e.tool.toLowerCase().includes(q))
+  }
+
+  const truncated = rows.length > limit
+  return {
+    entries: rows.slice(0, limit).map((e) => ({
+      timestamp: e.timestamp,
+      actingAs: e.subjectType === "workload" ? `service identity (${e.agentId})` : e.subjectId,
+      agent: e.agentId,
+      tool: e.tool,
+      requiredScope: e.requiredScope,
+      outcome: e.outcome,
+      reason: e.reason,
+    })),
+    returned: Math.min(rows.length, limit),
+    matched: rows.length,
+    truncated,
+    note:
+      "Only this organisation's activity is visible here, and only to administrators. Calls refused before an identity could be established are deliberately not attributed to any organisation and are not returned — they appear in the portal's Access log under 'Refused before sign-in'.",
+  }
 }
 
 function today(): string {

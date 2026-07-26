@@ -65,7 +65,8 @@ stands in for a customer's real IdP (Entra ID / Okta / Ping).
 ### Access log walkthrough (the security story in 6 steps)
 
 The log lives at **Administration → AI Assistant Access → Access log** (also
-reachable from the Compliance Agent panel on the retailer side).
+reachable from the Compliance Agent panel on the retailer side). Every step below
+is a click — nothing here needs a terminal.
 
 1. Portal as **Dillard's / Standard user** — there is no AI Assistant Access
    item in the sidebar. Open it from the Compliance Agent link: **Connect**
@@ -77,11 +78,15 @@ reachable from the Compliance Agent panel on the retailer side).
 4. **Security** tab → *Run proactive check* → a line appears as a **service
    identity**, with no person attached — an agent acting on a schedule with
    nobody in the session.
-5. **Security** tab → *Mint a wrong-audience token* and replay it → it is
-   refused, and appears under **Refused before sign-in** — unattributed,
-   because a rejected token's own claims are not evidence of who sent it.
+5. **Security** tab → *Try without signing in*, then *Mint a wrong-audience
+   token* followed by *Replay it against the connector*. Both are refused, and
+   both appear under **Refused before sign-in** — unattributed, because a
+   rejected token's own claims are not evidence of who sent it.
 6. Flip the portal to the **supplier** persona (Admin) → the same screen shows
    **only J.Renée's** activity. Dillard's lines are gone.
+
+For the full 45-minute walkthrough built around these beats, see
+[`demo-script-compliance-mcp.md`](./demo-script-compliance-mcp.md).
 
 Steps 1-2 show the role gate; step 6 shows the tenant gate.
 
@@ -124,6 +129,9 @@ curl -s http://localhost:3000/.well-known/oauth-protected-resource
 curl -s http://localhost:3000/.well-known/oauth-authorization-server
 ```
 
-Tool calls now need a token, so the quickest local check is the browser: open
-the portal, and use **AI Assistant Access → Security** to run the proactive
-agent and mint a wrong-audience token, then watch both land in **Access log**.
+Tool calls need a token, so the quickest local check is the browser: open the
+portal and use **AI Assistant Access → Security**, which runs all three
+demonstrations — the proactive agent, an unauthenticated call, and minting *and
+replaying* a wrong-audience token — and watch them land in **Access log**. The
+curl above is only there for anyone who wants to see the raw 401 and the
+discovery documents; the Security tab covers the same ground by clicking.

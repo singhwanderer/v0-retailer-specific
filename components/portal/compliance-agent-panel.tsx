@@ -1,10 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { Bot, Send, Sparkles, X } from "lucide-react"
+import { Bot, Send, ShieldAlert, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { createAttributeProfile, addAttributeRequirement, setImageRequirement } from "@/lib/mcp/tools"
+import {
+  createAttributeProfile,
+  addAttributeRequirement,
+  setImageRequirement,
+  updateAttributeRequirement,
+  removeAttributeRequirement,
+  removeImageRequirement,
+} from "@/lib/mcp/tools"
 import { PORTAL_CTX } from "@/lib/mcp/context"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 import type { ProposedAction } from "@/lib/copilot/tools"
@@ -148,6 +155,52 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
         setProposals((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: "applied", resultNote: "Added. Open the profile in Attributes & Images to see it." } : p))
         )
+      } else if (proposal.tool === "update_attribute_requirement") {
+        const { brickCode, gs1Name, name, guidance } = proposal.args as {
+          brickCode: string
+          gs1Name: string
+          name?: string
+          guidance?: string
+        }
+        const result = updateAttributeRequirement(PORTAL_CTX, brickCode, gs1Name, { name, guidance })
+        if ("error" in result) {
+          const message = String(result.error)
+          setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: message } : p)))
+          return
+        }
+        setProposals((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: "applied", resultNote: "Updated. Open the profile in Attributes & Images to see it." } : p))
+        )
+      } else if (proposal.tool === "remove_attribute_requirement") {
+        const { brickCode, gs1Name } = proposal.args as { brickCode: string; gs1Name: string }
+        const result = removeAttributeRequirement(PORTAL_CTX, brickCode, gs1Name)
+        if ("error" in result) {
+          const message = String(result.error)
+          setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: message } : p)))
+          return
+        }
+        setProposals((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? { ...p, status: "applied", resultNote: "Removed. Suppliers are no longer asked for it in this category." }
+              : p
+          )
+        )
+      } else if (proposal.tool === "remove_image_requirement") {
+        const { brickCode, requirementName } = proposal.args as { brickCode: string; requirementName: string }
+        const result = removeImageRequirement(PORTAL_CTX, brickCode, requirementName)
+        if ("error" in result) {
+          const message = String(result.error)
+          setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: message } : p)))
+          return
+        }
+        setProposals((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? { ...p, status: "applied", resultNote: "Removed. Images already supplied are untouched." }
+              : p
+          )
+        )
       }
     } catch {
       setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: "Could not apply this change." } : p)))
@@ -234,15 +287,35 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
               ))}
 
               {proposals.map((entry) => (
-                <div key={entry.id} className="self-start max-w-[92%] rounded-lg border px-3.5 py-3 text-sm" style={{ borderColor: "#E5E7EB", backgroundColor: "#FFFBEB" }}>
+                <div
+                  key={entry.id}
+                  className="self-start max-w-[92%] rounded-lg border px-3.5 py-3 text-sm"
+                  style={
+                    entry.proposal.destructive
+                      ? { borderColor: "#FECACA", backgroundColor: "#FEF2F2" }
+                      : { borderColor: "#E5E7EB", backgroundColor: "#FFFBEB" }
+                  }
+                >
                   <div className="flex items-start gap-2">
-                    <Sparkles className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#B45309" }} />
+                    {entry.proposal.destructive ? (
+                      <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#B91C1C" }} />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#B45309" }} />
+                    )}
                     <p className="text-[#111827]">{entry.proposal.summary}</p>
                   </div>
+                  {entry.proposal.consequence && (
+                    <p
+                      className="mt-1.5 ml-6 text-xs font-light leading-relaxed"
+                      style={{ color: entry.proposal.destructive ? "#991B1B" : "#92400E" }}
+                    >
+                      {entry.proposal.consequence}
+                    </p>
+                  )}
                   {entry.status === "pending" && (
                     <div className="mt-2.5 flex gap-2">
                       <Button size="sm" onClick={() => applyProposal(entry.id)} className="h-7 px-3 text-xs">
-                        Apply
+                        {entry.proposal.destructive ? "Remove it" : "Apply"}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => cancelProposal(entry.id)} className="h-7 px-3 text-xs">
                         Cancel

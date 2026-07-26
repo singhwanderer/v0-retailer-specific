@@ -21,11 +21,25 @@ export const SCOPES = {
   read: "tgc.read",
   requirementsWrite: "tgc.requirements.write",
   exceptionsWrite: "tgc.exceptions.write",
+  /**
+   * Removal and deactivation, required IN ADDITION to the relevant write scope.
+   *
+   * Adding an attribute to a profile and deleting a profile that thousands of
+   * vendor items are assessed against are not the same authority, and consenting
+   * to the first should not silently grant the second. Kept unchecked by default
+   * on the consent screen for that reason.
+   */
+  destructive: "tgc.destructive",
 } as const
 
 export type Scope = (typeof SCOPES)[keyof typeof SCOPES]
 
-export const ALL_SCOPES: Scope[] = [SCOPES.read, SCOPES.requirementsWrite, SCOPES.exceptionsWrite]
+export const ALL_SCOPES: Scope[] = [
+  SCOPES.read,
+  SCOPES.requirementsWrite,
+  SCOPES.exceptionsWrite,
+  SCOPES.destructive,
+]
 
 /** The default a fresh connection gets if it asks for nothing specific. */
 export const DEFAULT_SCOPES: Scope[] = [SCOPES.read]

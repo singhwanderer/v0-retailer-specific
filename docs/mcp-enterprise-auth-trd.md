@@ -196,18 +196,58 @@ and cannot see vendor B's.
 
 ### ENT-06 — Least privilege / progressive scopes
 
-**Requirement.** Three scopes: `tgc.read`, `tgc.requirements.write`,
-`tgc.exceptions.write`. Consent defaults to read-only. Enforced at discovery
-(a read-only connection is not shown write tools) **and** at invocation.
+**Requirement.** Four scopes: `tgc.read`, `tgc.requirements.write`,
+`tgc.exceptions.write`, `tgc.destructive`. Consent defaults to read-only.
+Enforced at discovery (a read-only connection is not shown write tools) **and**
+at invocation.
 
 **Acceptance criteria**
 1. A read-only connection's `tools/list` contains zero write tools.
 2. Calling a write tool directly with a read-only token is refused.
 3. Granting requirements-write does not grant exceptions-write — the tool that
    changes compliance numbers is separately consented.
+4. Granting either write scope does not grant `tgc.destructive`. A tool that
+   removes something requires it **in addition to** the relevant write scope,
+   and a connection without it does not see the removal tools at all.
 
 **Note.** Discovery filtering is UX. The invocation check is the security
 boundary. Both are required; neither substitutes for the other.
+
+**Why removal is its own scope.** Adding an attribute to a profile and deleting
+the profile that thousands of vendor items are assessed against are not the same
+authority, and a single "write" bucket asks the user to consent to both at once.
+The consent screen carries a fourth checkbox, unchecked by default: *Remove
+requirements and revoke exceptions.*
+
+### ENT-06a — Two-phase confirmation for every mutation
+
+**Requirement.** No mutating tool acts on its first call. It validates, computes
+the effect, and returns a preview plus a short-lived single-use
+`confirmation_token`. A separate tool, `confirm_pending_change`, is the only code
+path that mutates.
+
+**Why it exists.** The in-portal agent gets a human in the loop for free — it
+renders a proposal card with Apply and Cancel. An external Claude or ChatGPT
+session has no such card. If the only safeguard there is "the assistant will
+probably describe what it is about to do first", the safeguard is a hope. So the
+confirmation lives in the protocol instead of the UI.
+
+**Acceptance criteria**
+1. Calling any mutating tool returns `status: confirmation_required` and leaves
+   state unchanged.
+2. Confirming executes exactly once; replaying the token is refused.
+3. A token minted in one tenant is not redeemable by another, and the refusal is
+   worded identically to an unknown token — confirming that another tenant's
+   token exists is itself a cross-tenant disclosure.
+4. An unconfirmed token expires (10 minutes) without mutating anything.
+5. The proposal and the approval each emit their own audit line.
+6. A workload identity may propose but never confirm.
+
+**The token carries no authority.** On confirm, tenant, tenant class and every
+required scope are re-checked against the *confirming* caller's context, exactly
+as on a direct call. The token records which change was described, never that the
+caller may make it — anything else would make it a bearer credential we minted to
+bypass our own guard.
 
 ### ENT-07 — No token passthrough
 

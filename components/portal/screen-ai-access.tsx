@@ -28,7 +28,8 @@ const MCP_ENDPOINT = "https://v0-retailer-specific.vercel.app/api/mcp"
 export type AccessPerspective = "retailer" | "supplier"
 export type AccessRole = "admin" | "member"
 
-type ToolRow = { name: string; kind: "Read" | "Write"; scope: string; description: string }
+type ToolKind = "Read" | "Write" | "Remove"
+type ToolRow = { name: string; kind: ToolKind; scope: string; description: string }
 
 // Mirrors lib/mcp/manifest.ts — each tool's required scope and the tenant class
 // that may call it are part of what the connector publishes about itself, not
@@ -44,8 +45,21 @@ const RETAILER_TOOLS: ToolRow[] = [
   { name: "list_vendor_exceptions", kind: "Read", scope: "tgc.read", description: "List vendor exceptions on file (waivers, extended deadlines, reduced scope)." },
   { name: "create_attribute_profile", kind: "Write", scope: "tgc.requirements.write", description: "Create a new attribute profile for a product category." },
   { name: "add_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add a custom attribute requirement to a profile." },
+  { name: "simulate_requirement_change", kind: "Read", scope: "tgc.read", description: "Model a requirement change against the vendor base without applying it." },
+  { name: "draft_vendor_outreach", kind: "Read", scope: "tgc.read", description: "Draft a remediation message to one supplier from their actual open gaps." },
+  { name: "query_access_log", kind: "Read", scope: "tgc.read", description: "Search this organisation's own AI access log. Administrators only." },
+  { name: "list_pending_changes", kind: "Read", scope: "tgc.read", description: "Proposals awaiting confirmation, with what each would do." },
+  { name: "create_attribute_profile", kind: "Write", scope: "tgc.requirements.write", description: "Create a new attribute profile for a product category." },
+  { name: "add_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add a custom attribute requirement to a profile." },
+  { name: "update_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Change an attribute's label or supplier guidance." },
   { name: "set_image_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add or update an image requirement on a profile." },
+  { name: "activate_profile", kind: "Write", scope: "tgc.requirements.write", description: "Start or stop enforcing a profile across the vendor base." },
   { name: "set_vendor_exception", kind: "Write", scope: "tgc.exceptions.write", description: "Grant or update a vendor exception for one category." },
+  { name: "confirm_pending_change", kind: "Write", scope: "tgc.read", description: "Apply a proposed change after the user has approved it." },
+  { name: "remove_attribute_requirement", kind: "Remove", scope: "tgc.requirements.write + tgc.destructive", description: "Stop requiring an attribute. Open gaps against it disappear." },
+  { name: "remove_image_requirement", kind: "Remove", scope: "tgc.requirements.write + tgc.destructive", description: "Stop requiring an image on a profile." },
+  { name: "delete_attribute_profile", kind: "Remove", scope: "tgc.requirements.write + tgc.destructive", description: "Delete a whole profile and every rule beneath it." },
+  { name: "revoke_vendor_exception", kind: "Remove", scope: "tgc.exceptions.write + tgc.destructive", description: "Expire or delete a waiver. The vendor's gap count rises again." },
 ]
 
 const SUPPLIER_TOOLS: ToolRow[] = [
@@ -58,6 +72,18 @@ const SUPPLIER_TOOLS: ToolRow[] = [
 const SHARED_TOOLS: ToolRow[] = [
   { name: "get_capabilities", kind: "Read", scope: "tgc.read", description: "Discover what this connector can do for you, and a live snapshot of your data." },
 ]
+
+/**
+ * What a connection that consented to read-only actually sees.
+ *
+ * The Connect tab lists everything this tenant class *could* be granted, which
+ * is the wrong picture if the point is that consent narrows the surface. This
+ * is the same list filtered the way lib/mcp/manifest.ts filters it — a tool is
+ * visible only when every scope it declares has been granted.
+ */
+function toolsAtReadOnly(tools: ToolRow[]): ToolRow[] {
+  return tools.filter((t) => t.scope === "tgc.read" && t.kind === "Read")
+}
 
 interface AuditEntry {
   id: string
@@ -81,15 +107,17 @@ const TENANT: Record<AccessPerspective, { id: string; name: string; admin: strin
   supplier: { id: "jrenee", name: "J.Renée", admin: "admin@jrenee.demo", member: "catalog@jrenee.demo" },
 }
 
-function ToolKindPill({ kind }: { kind: "Read" | "Write" }) {
+function ToolKindPill({ kind }: { kind: ToolKind }) {
+  const style =
+    kind === "Remove"
+      ? { backgroundColor: "#FEE2E2", color: "#991B1B" }
+      : kind === "Write"
+        ? { backgroundColor: "#FEF3C7", color: "#92400E" }
+        : { backgroundColor: "#EFF6FF", color: "#0168B3" }
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0"
-      style={
-        kind === "Write"
-          ? { backgroundColor: "#FEF3C7", color: "#92400E" }
-          : { backgroundColor: "#EFF6FF", color: "#0168B3" }
-      }
+      style={style}
     >
       {kind}
     </span>
@@ -216,6 +244,10 @@ function ConnectTab({ perspective }: { perspective: AccessPerspective }) {
   const isSupplier = perspective === "supplier"
   const mine = isSupplier ? SUPPLIER_TOOLS : RETAILER_TOOLS
   const theirs = isSupplier ? RETAILER_TOOLS : SUPPLIER_TOOLS
+  const [readOnlyView, setReadOnlyView] = useState(false)
+
+  const allTools = [...SHARED_TOOLS, ...mine]
+  const visibleTools = readOnlyView ? toolsAtReadOnly(allTools) : allTools
 
   return (
     <>
@@ -270,7 +302,47 @@ function ConnectTab({ perspective }: { perspective: AccessPerspective }) {
             {perspective} tenant
           </span>
         </div>
-        <ToolTable tools={[...SHARED_TOOLS, ...mine]} />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setReadOnlyView(false)}
+            className="px-3 py-1.5 rounded-md text-xs font-medium"
+            style={
+              readOnlyView
+                ? { border: "1px solid #E0E4E8", color: "#374151" }
+                : { backgroundColor: "#0168B3", color: "#FFFFFF" }
+            }
+          >
+            Everything you can consent to
+          </button>
+          <button
+            onClick={() => setReadOnlyView(true)}
+            className="px-3 py-1.5 rounded-md text-xs font-medium"
+            style={
+              readOnlyView
+                ? { backgroundColor: "#0168B3", color: "#FFFFFF" }
+                : { border: "1px solid #E0E4E8", color: "#374151" }
+            }
+          >
+            What a read-only connection sees
+          </button>
+        </div>
+        <ToolTable tools={visibleTools} />
+        <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
+          {readOnlyView ? (
+            <>
+              Read-only is the default at the consent screen. The {allTools.length - visibleTools.length} tools that
+              write, remove, or confirm are not merely disabled — they are absent from the tool list the assistant is
+              given, and refused if called directly. Filtering the list is the experience; the check at invocation is
+              the boundary.
+            </>
+          ) : (
+            <>
+              This is the full surface a {perspective} may grant, not what any one connection holds. Removals need the
+              destructive scope <em>on top of</em> the relevant write scope, and every write returns a preview and a
+              confirmation token rather than acting — nothing changes until a person approves it.
+            </>
+          )}
+        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -468,19 +540,166 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
 
 // ── Tab: Security ────────────────────────────────────────────────────────────
 
+/**
+ * The visible outcome of one security demonstration.
+ *
+ * These used to be a raw JSON dump. A refusal is the *point* of two of the
+ * three demos, so it needs to read as a refusal at a glance rather than as a
+ * wall of keys — with the underlying payload still one click away for anyone
+ * who wants to check the claim rather than take it.
+ */
+interface DemoResult {
+  title: string
+  outcome: "refused" | "completed"
+  verdict: string
+  detail: string
+}
+
+function DemoResultCard({ result }: { result: DemoResult }) {
+  const [showDetail, setShowDetail] = useState(false)
+  const refused = result.outcome === "refused"
+
+  return (
+    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}>
+      <div className="flex items-start gap-3 p-4">
+        <span
+          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 mt-0.5"
+          style={
+            refused
+              ? { backgroundColor: "#FEE2E2", color: "#991B1B" }
+              : { backgroundColor: "#DCFCE7", color: "#166534" }
+          }
+        >
+          {refused ? "Refused" : "Completed"}
+        </span>
+        <div className="flex flex-col gap-1 min-w-0">
+          <p className="text-sm font-medium text-[#111827]">{result.title}</p>
+          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
+            {result.verdict}
+          </p>
+          <button
+            onClick={() => setShowDetail((v) => !v)}
+            className="text-[11px] font-medium self-start mt-1"
+            style={{ color: "#0168B3" }}
+          >
+            {showDetail ? "Hide details" : "Show details"}
+          </button>
+        </div>
+      </div>
+      {showDetail && (
+        <pre
+          className="text-[11px] font-mono p-3 overflow-x-auto max-h-64 overflow-y-auto"
+          style={{ backgroundColor: "#F9FAFB", borderTop: "1px solid #E0E4E8", color: "#374151" }}
+        >
+          {result.detail}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 function SecurityTab({ perspective, role }: { perspective: AccessPerspective; role: AccessRole }) {
   const tenant = TENANT[perspective]
-  const [output, setOutput] = useState<string | null>(null)
+  const [result, setResult] = useState<DemoResult | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // Held so the token can be replayed without minting a second one — the demo
+  // is "this exact token is refused", not "some token is refused".
+  const [mintedToken, setMintedToken] = useState<string | null>(null)
 
-  async function run(label: string, path: string) {
-    setBusy(label)
-    setOutput(null)
+  async function runProactive() {
+    setBusy("proactive")
+    setResult(null)
     try {
-      const res = await fetch(path, { method: "POST" })
-      setOutput(JSON.stringify(await res.json(), null, 2))
+      const res = await fetch("/api/demo/proactive-check", { method: "POST" })
+      const data = await res.json()
+      const alerts = Array.isArray(data?.vendorAlerts) ? data.vendorAlerts.length : 0
+      setResult({
+        title: "Proactive check ran under a service identity",
+        outcome: "completed",
+        verdict: `No human was in the session. The agent authenticated as itself, held read-only scope, and flagged ${alerts} vendor${alerts === 1 ? "" : "s"} above the alert threshold. It appears in the Access log as a service identity with no person attached.`,
+        detail: JSON.stringify(data, null, 2),
+      })
     } catch (err) {
-      setOutput(String(err))
+      setResult({
+        title: "Proactive check could not run",
+        outcome: "refused",
+        verdict: "The demo endpoint could not be reached.",
+        detail: String(err),
+      })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function mintToken() {
+    setBusy("deputy")
+    setResult(null)
+    try {
+      const res = await fetch("/api/demo/confused-deputy", { method: "POST" })
+      const data = await res.json()
+      setMintedToken(data?.access_token ?? null)
+      setResult({
+        title: "A valid token was minted for a different service",
+        outcome: "completed",
+        verdict: `Correct issuer, correct signing key, real organisation, full scopes — but its audience is ${data?.issued_for ?? "another service"} rather than this connector. Nothing has been refused yet. Replay it to see what happens.`,
+        detail: JSON.stringify(data, null, 2),
+      })
+    } catch (err) {
+      setResult({
+        title: "Could not mint the token",
+        outcome: "refused",
+        verdict: "The demo endpoint could not be reached.",
+        detail: String(err),
+      })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * Replay whatever credential we have against the real endpoint.
+   *
+   * This is the beat that used to require a terminal. It calls /api/mcp exactly
+   * as an external client would — so the refusal, and the unattributed audit
+   * line it produces, are the genuine article rather than a simulation.
+   */
+  async function replay(kind: "deputy" | "anonymous") {
+    setBusy(kind === "deputy" ? "deputy-replay" : "anonymous")
+    setResult(null)
+    try {
+      const res = await fetch("/api/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          ...(kind === "deputy" && mintedToken ? { Authorization: `Bearer ${mintedToken}` } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      })
+      const body = await res.text()
+      const challenge = res.headers.get("WWW-Authenticate")
+      const refused = !res.ok
+
+      setResult({
+        title:
+          kind === "deputy"
+            ? `Replayed the wrong-audience token — ${res.status} ${refused ? "refused" : "accepted"}`
+            : `Called the connector with no token at all — ${res.status} ${refused ? "refused" : "accepted"}`,
+        outcome: refused ? "refused" : "completed",
+        verdict: refused
+          ? kind === "deputy"
+            ? "Refused on the audience check alone, before any tool was reachable. Because it never got past authentication, the refusal cannot be attributed to any organisation — open the Access log and it appears under “Refused before sign-in”."
+            : "Refused, and the response carries the discovery pointer an AI client uses to find the sign-in unaided — which is why pasting the URL into Claude or ChatGPT is all the setup there is. The refusal appears in the Access log under “Refused before sign-in”."
+          : "The endpoint accepted this call, which it should not have. Worth investigating.",
+        detail: [challenge ? `WWW-Authenticate: ${challenge}` : null, body].filter(Boolean).join("\n\n"),
+      })
+    } catch (err) {
+      setResult({
+        title: "The replay could not be sent",
+        outcome: "refused",
+        verdict: "The connector endpoint could not be reached from the browser.",
+        detail: String(err),
+      })
     } finally {
       setBusy(null)
     }
@@ -519,7 +738,7 @@ function SecurityTab({ perspective, role }: { perspective: AccessPerspective; ro
             nobody to approve it. Watch it appear in the Access log as a service identity.
           </p>
           <button
-            onClick={() => run("proactive", "/api/demo/proactive-check")}
+            onClick={runProactive}
             disabled={busy !== null}
             className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium text-white self-start disabled:opacity-60"
             style={{ backgroundColor: "#0168B3" }}
@@ -535,30 +754,60 @@ function SecurityTab({ perspective, role }: { perspective: AccessPerspective; ro
         <SectionCard>
           <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
             Mints a token that is completely valid — correct issuer, correct signing key, real organisation, full
-            scopes — but issued for a <span className="font-medium">different service</span>. Replayed here it is
-            refused on the audience check alone. Because it never got past authentication, the refusal is logged as
-            unattributed rather than filed under any organisation.
+            scopes — but issued for a <span className="font-medium">different service</span>. Replay it against this
+            connector and it is refused on the audience check alone. Because it never got past authentication, the
+            refusal is logged as unattributed rather than filed under any organisation.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={mintToken}
+              disabled={busy !== null}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium self-start disabled:opacity-60"
+              style={{ border: "1px solid #E0E4E8", color: "#374151" }}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              {busy === "deputy" ? "Minting…" : "Mint a wrong-audience token"}
+            </button>
+            <button
+              onClick={() => replay("deputy")}
+              disabled={busy !== null || !mintedToken}
+              title={mintedToken ? undefined : "Mint a token first"}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium text-white self-start disabled:opacity-40"
+              style={{ backgroundColor: "#B91C1C" }}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              {busy === "deputy-replay" ? "Replaying…" : "Replay it against the connector"}
+            </button>
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold text-[#111827]">No token at all</h3>
+        <SectionCard>
+          <p className="text-xs font-light leading-relaxed" style={{ color: "#374151" }}>
+            Calls the connector with no credential whatsoever. There is no anonymous mode and no API key to leak — the
+            endpoint refuses and hands back the discovery pointer an AI client follows to find the sign-in on its own.
+            That is the whole of the setup a user does: paste one URL.
           </p>
           <button
-            onClick={() => run("deputy", "/api/demo/confused-deputy")}
+            onClick={() => replay("anonymous")}
             disabled={busy !== null}
             className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium self-start disabled:opacity-60"
             style={{ border: "1px solid #E0E4E8", color: "#374151" }}
           >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            {busy === "deputy" ? "Minting…" : "Mint a wrong-audience token"}
+            <Lock className="w-3.5 h-3.5" />
+            {busy === "anonymous" ? "Calling…" : "Try without signing in"}
           </button>
         </SectionCard>
       </div>
 
-      {output && (
-        <pre
-          className="text-[11px] font-mono p-3 rounded-lg overflow-x-auto max-h-72 overflow-y-auto"
-          style={{ backgroundColor: "#F9FAFB", border: "1px solid #E0E4E8", color: "#374151" }}
-        >
-          {output}
-        </pre>
-      )}
+      {result && <DemoResultCard result={result} />}
+
+      <p className="text-[11px] font-light leading-relaxed" style={{ color: "#6B7280" }}>
+        Every one of these lands in the Access log — the two refusals under “Refused before sign-in”, the proactive
+        check as a service identity. Open the Access log tab to see them.
+      </p>
     </section>
   )
 }

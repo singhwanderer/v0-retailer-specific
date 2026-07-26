@@ -18,6 +18,13 @@ import type { TenantClass } from "@/lib/mcp/tenants"
 export interface ToolGuardSpec {
   name: string
   requiredScope: Scope
+  /**
+   * Scopes required IN ADDITION to requiredScope. Today this is how a
+   * destructive tool demands `tgc.destructive` on top of the write scope for
+   * the thing it removes: consenting to "author requirements" must not silently
+   * also consent to "delete requirements".
+   */
+  additionalScopes?: Scope[]
   /** Which tenant classes may call this tool at all. */
   allowedTenantClasses: TenantClass[]
   /** Workload (no-human) identities are refused unless this is true. */
@@ -49,8 +56,10 @@ export function runGuarded<T>(
     return { ok: false, error: { error: reason, code: "forbidden_tenant_class" } }
   }
 
-  if (!ctx.scopes.has(spec.requiredScope)) {
-    const reason = `Missing required scope "${spec.requiredScope}". This connection was granted: ${[...ctx.scopes].join(", ") || "(none)"}.`
+  const needed = [spec.requiredScope, ...(spec.additionalScopes ?? [])]
+  const absent = needed.filter((s) => !ctx.scopes.has(s))
+  if (absent.length > 0) {
+    const reason = `Missing required scope${absent.length > 1 ? "s" : ""} ${absent.map((s) => `"${s}"`).join(", ")}. This tool requires ${needed.join(" + ")}. This connection was granted: ${[...ctx.scopes].join(", ") || "(none)"}.`
     auditFor(ctx, spec.name, spec.requiredScope, "denied", Date.now() - started, reason)
     return { ok: false, error: { error: reason, code: "insufficient_scope" } }
   }

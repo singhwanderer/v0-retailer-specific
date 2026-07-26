@@ -132,8 +132,35 @@ their rules correctly and enforce them.
 
 | Category | Tools |
 | --- | --- |
-| **Read (9)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, list global System filters, run a compliance report across the vendor base, list vendor exceptions on file, and a `get_capabilities` "what can you do" helper |
-| **Write (4)** | create a requirement profile, add an attribute requirement to it, set an image requirement (format/background/dimensions/etc.), grant or update a vendor exception (waiver / extended deadline / reduced scope) |
+| **Read (13)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, list global System filters, run a compliance report across the vendor base, list vendor exceptions on file, **simulate a requirement change without applying it**, **draft vendor outreach from a supplier's real gaps**, **search this organisation's own AI access log** (administrators only), list proposals awaiting confirmation, and a `get_capabilities` "what can you do" helper |
+| **Write (6)** | create a requirement profile, add an attribute requirement, change an attribute's label or guidance, set an image requirement, activate or deactivate a profile, grant or update a vendor exception |
+| **Remove (4)** | drop an attribute requirement, drop an image requirement, delete a whole profile, revoke a vendor exception. Each needs `tgc.destructive` **on top of** the relevant write scope |
+
+### Nothing writes on the first call
+
+Every tool in the last two rows is two-phase. Called once, it does not act — it
+returns a preview of exactly what would change, what that does to compliance
+numbers, and a short-lived confirmation token. A separate `confirm_pending_change`
+tool is the only path that mutates.
+
+That is there because the in-portal agent gets a human in the loop for free (a
+proposal card with Apply and Cancel) and an external Claude or ChatGPT session
+does not. Putting the confirmation in the protocol rather than the UI buys three
+things: the assistant has to state the consequence before a person can approve it,
+the approval is a separate audited act, and a conversation somebody abandons
+changes nothing, because an unconfirmed proposal simply expires.
+
+Two smaller decisions worth noting, because both are product calls rather than
+plumbing:
+
+- **Removal tells you what it costs.** Ask to drop a requirement and the response
+  says the reported number improves *without any supplier supplying anything* —
+  that it lowers the bar rather than closing a gap. A tool that makes the chart
+  look better without saying so will be used to make the chart look better.
+- **Simulation states its own assumption.** "What happens if I require Sustainable
+  Materials on Apparel?" returns the gap and vendor impact *and* the model behind
+  it — that it assumes no supplier already holds the data. A forecast whose model
+  is hidden is worse than no forecast.
 
 ### And the same server answers the supplier side
 
@@ -281,7 +308,8 @@ it's catching up to a documented standard.
 | **Delegated identity, not a shared service account** | Every action needs to carry *both* "which customer/tenant" and "which agent" as separate, checkable claims — not one bucket credential everyone shares | OAuth token-exchange delegation (RFC 8693) — the emerging standard for agent-acts-on-behalf-of-user flows |
 | **Separate service/workload identity for agent-initiated actions** | A delegated user token only exists while a human is in the session. An agent acting on its own — e.g. a scheduled compliance check with no user connected at that moment — needs its own scoped, short-lived credential (client-credentials style), not a borrowed user token | Standard distinction between "on-behalf-of" delegation and workload identity for autonomous agent actions |
 | **Tenant checked on every tool call, not just at login — across *both* tenant classes** | A valid token isn't proof the caller should see *this* tenant's data — that check has to happen again at each individual tool invocation. For us specifically, that means keeping retailer tenants and supplier tenants isolated from each other, not just isolating peers within the same class | Called out repeatedly as the #1 multi-tenant MCP failure mode: isolation enforced at login but not re-checked per call |
-| **Least privilege / progressive scopes** | Start every connection at read-only/discovery; only grant write scopes when a specific action actually needs them | Standard "progressive scope" pattern for MCP servers handling sensitive data |
+| **Least privilege / progressive scopes** | Start every connection at read-only/discovery; only grant write scopes when a specific action actually needs them — and separate *removing* things from *writing* things, since consenting to "author requirements" should not silently also consent to "delete requirements" | Standard "progressive scope" pattern for MCP servers handling sensitive data |
+| **A human approves every mutation** | An assistant that can delete a requirement inside a chat window with no confirmation step is not a feature. Every mutating tool returns a preview and a token; a separate call executes. The token carries no authority of its own — scope and tenant are re-checked on confirm | The human-in-the-loop expectation for agentic write access; MCP's own tool annotations exist to signal exactly this |
 | **No token passthrough** | Our server must never blindly forward a token it didn't issue itself, or accept one meant for a different service | Explicitly called out as forbidden in current MCP security guidance |
 | **Rate limits and bounded retrieval per call** | Caps on how much a single tool call can fetch or how often it can be called — without this, tool surface growth means unpredictable cost and blast radius, not just a security gap | One of the 5 essential practices in current enterprise MCP security guidance |
 | **Container / process isolation per tenant or session** | Keeps one tenant's (or one compromised agent's) blast radius from reaching another tenant's runtime, not just their data | Listed alongside per-request identity and least privilege as core enterprise MCP practice |
