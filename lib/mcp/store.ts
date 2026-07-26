@@ -6,7 +6,7 @@
 // while the serverless instance stays warm and resets on cold start — every
 // write tool says so in its response.
 
-import { PORTAL_TENANT_ID } from "@/lib/mcp/tenants"
+import { PORTAL_TENANT_ID, TENANTS } from "@/lib/mcp/tenants"
 import {
   ATTRIBUTE_PROFILES,
   VENDOR_EXCEPTIONS,
@@ -147,6 +147,48 @@ export function getStore(tenantId: string = PORTAL_TENANT_ID): DemoStore {
  */
 export function hydrateVendorExceptions(exceptions: VendorException[]): void {
   getStore().vendorExceptions = exceptions
+}
+
+/**
+ * Exception rows naming this vendor, gathered across every retailer tenant that
+ * granted one, each labelled with the granting retailer.
+ *
+ * ── Why this is not a hole in tenant isolation ──────────────────────────────
+ * At first glance a supplier reading rows out of retailer tenants' stores is
+ * exactly what ENT-05 forbids. It isn't, and the distinction is worth being
+ * precise about: an exception is a **bilateral fact**. The supplier is a named
+ * party to that row — a waiver granted to J.Renée is as much J.Renée's record
+ * as it is Dillard's. What the supplier may read is not "Dillard's data" but
+ * "rows about me".
+ *
+ * That only holds if the read stays narrow, so three rules are structural here
+ * rather than left to callers:
+ *   1. Filtering happens BEFORE returning. This never returns a store, never
+ *      returns a retailer's other rows, and never returns a row naming a
+ *      different vendor.
+ *   2. `vendorName` comes from the authenticated supplier tenant, never from a
+ *      tool argument — a supplier cannot ask about someone else's exceptions.
+ *   3. Read-only. There is no supplier-side path that creates or amends an
+ *      exception; only the granting retailer can do that.
+ */
+export function exceptionsGrantedToVendor(
+  vendorName: string
+): (VendorException & { grantedBy: string })[] {
+  const target = vendorName.toLowerCase().trim()
+  const rows: (VendorException & { grantedBy: string })[] = []
+
+  // Iterate the tenant registry rather than whatever stores happen to be
+  // materialised — a retailer whose store hasn't been touched yet still has
+  // seeded exceptions, and they are just as real.
+  for (const tenant of TENANTS) {
+    // Only a retailer grants exceptions.
+    if (tenant.tenantClass !== "retailer") continue
+    for (const row of getStore(tenant.id).vendorExceptions) {
+      if (row.vendor.toLowerCase().trim() !== target) continue
+      rows.push({ ...row, grantedBy: tenant.name })
+    }
+  }
+  return rows
 }
 
 /** Active exceptions for one vendor — the shape the compliance-report engine needs. */

@@ -123,7 +123,7 @@ function consentForm(p: AuthorizeParams, clientName: string, error?: string): st
 
   <button type="submit">Sign in and allow</button>
   <p class="note">Your organisation is determined by who you sign in as — it is not something you or the AI client can choose.</p>
-  <div class="creds">buyer@dillards.demo &nbsp;/&nbsp; demo<br>buyer@belk.demo &nbsp;/&nbsp; demo<br>catalog@jrenee.demo &nbsp;/&nbsp; demo</div>
+  <div class="creds">admin@dillards.demo &nbsp;/&nbsp; demo &nbsp;<span style="color:#9CA3AF">(admin)</span><br>buyer@dillards.demo &nbsp;/&nbsp; demo<br>buyer@belk.demo &nbsp;/&nbsp; demo<br>admin@jrenee.demo &nbsp;/&nbsp; demo &nbsp;<span style="color:#9CA3AF">(admin)</span><br>catalog@jrenee.demo &nbsp;/&nbsp; demo</div>
 </form>`)
 }
 
@@ -198,6 +198,9 @@ export async function POST(req: Request) {
     scopes: p.scopes,
     tenantId: tenant.id,
     subjectId: user.email,
+    // Role travels with the identity for the same reason the tenant does: it
+    // is a property of who signed in, not something the client may state.
+    role: user.role,
   })
 
   const redirect = new URL(p.redirectUri)

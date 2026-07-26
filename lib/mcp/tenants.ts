@@ -43,7 +43,22 @@ export interface DemoUser {
   password: string
   displayName: string
   jobTitle: string
+  role: TenantRole
 }
+
+/**
+ * Role *within* a tenant.
+ *
+ * Tenant isolation answers "whose data". It does not answer "which employee" —
+ * and an access log is an administrative artifact: a category buyer should not
+ * be able to read every AI action taken across their whole company.
+ *
+ * Deliberately narrow in scope: role governs who may read the audit log.
+ * What an AI assistant may *do* stays governed by OAuth scopes, which is what
+ * the consent screen grants. Two clean concepts rather than one muddled one —
+ * scopes are what the agent may do, role is what the person may see.
+ */
+export type TenantRole = "admin" | "member"
 
 // Three tenants, chosen so both halves of §4A row 5 are demonstrable:
 //   - dillards vs. belk   → peer isolation WITHIN the retailer class
@@ -54,24 +69,44 @@ export const TENANTS: Tenant[] = [
   { id: "jrenee", name: "J.Renée", tenantClass: "supplier", realm: "jrenee.demo" },
 ]
 
+// An admin and a member on each of the two demoed sides, so the role gate can
+// be shown rather than merely asserted. Belk carries one member only — it
+// exists purely as a peer-isolation foil.
 export const DEMO_USERS: DemoUser[] = [
+  {
+    email: "admin@dillards.demo",
+    password: "demo",
+    displayName: "Priya Raman",
+    jobTitle: "Catalogue Administrator, Dillard's",
+    role: "admin",
+  },
   {
     email: "buyer@dillards.demo",
     password: "demo",
     displayName: "Dana Reyes",
     jobTitle: "Category Buyer, Dillard's",
+    role: "member",
   },
   {
     email: "buyer@belk.demo",
     password: "demo",
     displayName: "Alex Nwosu",
     jobTitle: "Category Buyer, Belk",
+    role: "member",
+  },
+  {
+    email: "admin@jrenee.demo",
+    password: "demo",
+    displayName: "Tomas Lindqvist",
+    jobTitle: "Data Administrator, J.Renée",
+    role: "admin",
   },
   {
     email: "catalog@jrenee.demo",
     password: "demo",
     displayName: "Sam Okafor",
     jobTitle: "Catalogue Manager, J.Renée",
+    role: "member",
   },
 ]
 

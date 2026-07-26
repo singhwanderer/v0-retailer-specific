@@ -135,9 +135,65 @@ their rules correctly and enforce them.
 | **Read (9)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, list global System filters, run a compliance report across the vendor base, list vendor exceptions on file, and a `get_capabilities` "what can you do" helper |
 | **Write (4)** | create a requirement profile, add an attribute requirement to it, set an image requirement (format/background/dimensions/etc.), grant or update a vendor exception (waiver / extended deadline / reduced scope) |
 
-This is retailer-facing only (e.g. a Dillard's-style user asking about their
-own suppliers) — not a supplier-facing tool set, and not able to see other
-retailers' data.
+### And the same server answers the supplier side
+
+| Category | Tools |
+| --- | --- |
+| **Supplier reads (4)** | own compliance status (against the GS1 baseline *and* each retail partner separately), own retail partners with their open gaps and extra requirements, own outstanding attributes and images for a chosen partner, and the exceptions retailers have granted them |
+
+**The point is that it's the same server, behind the same URL.** A supplier and
+a retailer paste the identical connector address. Which set of tools they get is
+decided by *who signed in* — not by a different deployment, a different URL, or
+a setting anyone can flip. A supplier's assistant is never even shown the
+retailer tools, and would be refused if it somehow called one.
+
+That mirrors how the network actually works: TGC is bilateral, so a one-sided
+connector was always half a product.
+
+### Plain-text flow — the supplier side
+
+```
+   A J.Renée user pastes the SAME connector URL
+        │
+        ▼
+   They sign in with THEIR OWN work account
+   (a J.Renée account, not a Dillard's one)
+        │
+        ▼
+   The server derives: supplier tenant → supplier tools
+   The retailer tools are not listed at all
+        │
+        ▼
+   "Which retail partner am I furthest behind for?"
+   "What's still outstanding for Dillard's?"
+   "What has been waived for me?"
+        │
+        ▼
+   Answers about THEIR catalogue, per retail partner —
+   because compliance is never one global score: each
+   retailer layers its own requirements on the standard
+```
+
+One nuance worth calling out, because it is the interesting bit of a bilateral
+network: a supplier **can** see the waivers a retailer granted *them* — that is
+a shared fact, and they are a party to it — and **cannot** see anything else
+that retailer holds. Not their other suppliers, not their requirements, not
+their reports. "Rows about me" is a different thing from "their data", and the
+server enforces the difference on every call.
+
+### Who can see the audit trail
+
+Every AI action against an account is logged — who, which assistant, which
+tool, what was allowed or refused. Two limits on reading it, both of which
+customers ask about immediately:
+
+- **Only your own organisation's activity.** A Dillard's administrator sees
+  Dillard's lines and nothing from Belk or J.Renée.
+- **Administrators only.** A category buyer connects their own assistant, but
+  does not get to read every AI action taken across the whole company.
+
+This is retailer- and supplier-facing, and in both cases scoped to the signing-in
+organisation's own data — no account can see another's.
 
 ### Vendor exceptions are chat-operable, and actually move the numbers
 
@@ -271,10 +327,12 @@ AI" bet opens up:
   the shared **TG Aviator MCP Gateway** with a **Catalogue Domain Agent** in
   front of it, and any customer gets ad-hoc, conversational access with
   multi-tenant security enforced by the platform, not by us.
-- **Supplier-side tools, not just retailer-side.** Today's server only
-  answers "how are my suppliers doing" for a retailer. A supplier-facing tool
-  set (own compliance status, own outstanding requirements) is the natural
-  next surface.
+- ~~**Supplier-side tools, not just retailer-side.**~~ **Delivered.** This was
+  gated on two-tenant-class isolation, and that box is now checked — so the
+  supplier tool set shipped with it: own compliance per retail partner, own
+  outstanding attributes and images, and the exceptions granted to them. It is
+  the clearest example of the discipline this section describes: the capability
+  waited for its control, and arrived the moment the control did.
 - **Persistence and a real portal sync.** Writes made through chat should
   land in the same database the portal UI reads from, so a requirement
   created by an AI conversation shows up on-screen immediately — no separate
@@ -336,6 +394,10 @@ and more callers.
 - **Every expansion idea maps to a specific checklist item.** Proactive agents
   need workload identity; supplier-side tools need two-tenant-class isolation.
   We're not adding scope faster than we're adding the controls it requires.
+- **One connector, two audiences.** A supplier and a retailer paste the same
+  URL and get different tools, different data, and different suggested
+  questions — because the network is bilateral and the identity decides which
+  side you're on. Nobody configures that; it falls out of who signed in.
 - **The tenant is derived, never chosen.** Nobody — not the user, not the AI
   client, not an autonomous agent — can assert which customer's data they're
   acting on. It falls out of who authenticated. That single rule is what makes

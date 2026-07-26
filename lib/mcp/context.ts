@@ -11,7 +11,7 @@
 // everyone shares (§4A row 3). And `subjectType` distinguishes a human-
 // delegated session from an autonomous workload (§4A row 4).
 
-import { PORTAL_TENANT_ID, type TenantClass } from "@/lib/mcp/tenants"
+import { PORTAL_TENANT_ID, type TenantClass, type TenantRole } from "@/lib/mcp/tenants"
 
 /**
  * Progressive scopes (§4A row 6). A connection starts at read-only; write
@@ -52,6 +52,12 @@ export interface CallerContext {
   subjectType: "user" | "workload"
   /** The acting human, or null for a workload. */
   subjectId: string | null
+  /**
+   * The acting human's role within the tenant. Governs who may read the audit
+   * log — NOT what tools may be called, which stays scope-governed. A workload
+   * has no role: it is not a person and has no administrative standing.
+   */
+  role: TenantRole | null
   /** Which agent/client is calling — a separate claim from tenant. */
   agentId: string
   scopes: Set<Scope>
@@ -72,6 +78,7 @@ export const PORTAL_CTX: CallerContext = {
   tenantClass: "retailer",
   subjectType: "user",
   subjectId: "portal-session",
+  role: "admin",
   agentId: "tgc-portal-ui",
   scopes: new Set(ALL_SCOPES),
 }

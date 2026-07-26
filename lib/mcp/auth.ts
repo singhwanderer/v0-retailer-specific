@@ -123,6 +123,9 @@ export async function authenticateMcpRequest(req: Request): Promise<AuthResult> 
       tenantClass: tenant.tenantClass,
       subjectType: verified.value.subjectType,
       subjectId: verified.value.subjectType === "workload" ? null : verified.value.subjectId,
+      // A workload has no role: it is not a person and holds no administrative
+      // standing, however broad its scopes.
+      role: verified.value.subjectType === "workload" ? null : verified.value.role,
       agentId: verified.value.agentId,
       scopes: new Set(verified.value.scopes),
     },

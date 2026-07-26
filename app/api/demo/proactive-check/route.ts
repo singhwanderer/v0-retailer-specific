@@ -65,6 +65,9 @@ export async function POST(req: Request) {
     tenantClass: tenant.tenantClass,
     subjectType: "workload",
     subjectId: null,
+    // No role: a service identity is not a person and holds no administrative
+    // standing, however broad its scopes.
+    role: null,
     agentId: verified.value.agentId,
     scopes: new Set(verified.value.scopes),
   }

@@ -64,6 +64,7 @@ export async function POST(req: Request) {
       tenantId: tenant.id,
       agentId: entry.clientId,
       subjectType: "user",
+      role: entry.role,
       scopes: entry.scopes,
     })
 

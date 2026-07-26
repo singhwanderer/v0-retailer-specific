@@ -24,13 +24,13 @@
 import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PERSONA, SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
-  getProfileBricks,
   RETAILER_SUPPLIERS,
   type AttributeProfile,
   type ProfileBrick,
   type ProfileStatus,
 } from "@/lib/retailer-requirements"
 import type { CallerContext } from "@/lib/mcp/context"
+import { getSupplierCapabilities } from "@/lib/mcp/tools-supplier"
 import {
   getProfileExtras,
   getStore,
@@ -311,6 +311,11 @@ export function setVendorException(ctx: CallerContext, args: {
 // the demo data so the model can answer "what can I ask?" without guessing.
 // Built from the store, so it never drifts from the actual seeded data.
 export function getCapabilities(ctx: CallerContext) {
+  // A supplier and a retailer are asking genuinely different questions, and a
+  // capability list that describes the wrong half is worse than none — it
+  // invites the model to propose tools this caller will be refused for.
+  if (ctx.tenantClass === "supplier") return getSupplierCapabilities(ctx)
+
   const store = getStore(ctx.tenantId)
   const categoriesWithData = [
     ...new Set(

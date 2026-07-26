@@ -22,6 +22,12 @@ import { z } from "zod"
 import { SCOPES, type CallerContext, type Scope } from "@/lib/mcp/context"
 import type { TenantClass } from "@/lib/mcp/tenants"
 import {
+  getMyComplianceStatus,
+  getMyOpenGaps,
+  listMyExceptions,
+  listMyRetailPartners,
+} from "@/lib/mcp/tools-supplier"
+import {
   addAttributeRequirement,
   createAttributeProfile,
   getCapabilities,
@@ -65,17 +71,22 @@ export interface ToolDefinition {
 }
 
 const RETAILER_ONLY: TenantClass[] = ["retailer"]
+const SUPPLIER_ONLY: TenantClass[] = ["supplier"]
+/** Discovery must work for everyone — see get_capabilities below. */
+const BOTH_CLASSES: TenantClass[] = ["retailer", "supplier"]
 
 export const TOOL_MANIFEST: ToolDefinition[] = [
   // ── Discoverability ────────────────────────────────────────────────────────
   {
     name: "get_capabilities",
     description:
-      "Return a plain-English catalog of what this TGC connector can do (read and write actions with example phrasings) plus a live snapshot of the demo data: the attribute profiles, retail partners, vendors, and categories that actually have data. Call this when the user asks 'what can I do?', 'what can you help with?', or seems unsure what to ask — and to ground answers in what data really exists before saying something is unavailable.",
+      "Return a plain-English catalog of what this TGC connector can do (read and write actions with example phrasings) plus a live snapshot of the data that actually exists. Call this when the user asks 'what can I do?', 'what can you help with?', or seems unsure what to ask — and to ground answers in what data really exists before saying something is unavailable. The answer differs for a retailer and a supplier, because they get different tools.",
     schema: {},
     kind: "read",
     requiredScope: SCOPES.read,
-    allowedTenantClasses: RETAILER_ONLY,
+    // Available to BOTH classes: "what can you help me with?" has to work for
+    // everyone, or a supplier's first question dead-ends on an empty tool list.
+    allowedTenantClasses: BOTH_CLASSES,
     allowWorkload: true,
     handler: (ctx) => getCapabilities(ctx),
   },
@@ -329,6 +340,72 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
     handler: (ctx, args) => setVendorException(ctx, args),
+  },
+
+  // ── Supplier-side reads ────────────────────────────────────────────────────
+  // The mirror of the retailer inventory above. These became safe to expose
+  // only once tenant-class isolation was enforced per call (§4B gated them on
+  // exactly that); a retailer tenant can never see or call them.
+  {
+    name: "get_my_compliance_status",
+    description:
+      "Get this supplier's own compliance position: catalogue size, GS1 baseline completion, and completion for each retail partner separately with their open gap counts. Use this first when a supplier asks 'how am I doing?' — compliance is always per retail partner, never one global score.",
+    schema: {},
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: SUPPLIER_ONLY,
+    allowWorkload: true,
+    handler: (ctx) => getMyComplianceStatus(ctx),
+  },
+  {
+    name: "list_my_retail_partners",
+    description:
+      "List the retail partners this supplier trades with — selection codes, open gaps, products complete, completion percentage, and how many retailer-specific attributes each requires on top of the GS1 standard set. Use this to answer 'who do I sell to?' or 'why am I compliant for one retailer but not another?'.",
+    schema: {},
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: SUPPLIER_ONLY,
+    allowWorkload: true,
+    handler: (ctx) => listMyRetailPartners(ctx),
+  },
+  {
+    name: "get_my_open_gaps",
+    description:
+      "Get what is still outstanding for this supplier against one target: the GS1 baseline, or one named retail partner. Returns the most commonly missing attributes across the catalogue, per-product detail, and — separately — the attributes that retailer has WAIVED, which are not gaps. Optionally scope to one GS1 category.",
+    schema: {
+      target: z
+        .string()
+        .optional()
+        .describe(
+          "'gs1' for the industry baseline (the default), or a retail partner name such as 'Dillard's'"
+        ),
+      brickCode: z.string().optional().describe("Scope to one GS1 category code, e.g. 10001077"),
+      maxProducts: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe("Maximum products to list individually (default 20). Aggregate counts cover everything."),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: SUPPLIER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => getMyOpenGaps(ctx, args),
+  },
+  {
+    name: "list_my_exceptions",
+    description:
+      "List the exceptions retailers have granted to this supplier — waivers, extended deadlines, and reduced-scope exclusions — each labelled with the retailer that granted it and what it actually changes. A supplier can see the exceptions that name them, but nothing else the granting retailer holds, and cannot create or amend one.",
+    schema: {
+      status: z.enum(["Active", "Expired"]).optional().describe("Filter by exception status"),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: SUPPLIER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => listMyExceptions(ctx, args),
   },
 ]
 

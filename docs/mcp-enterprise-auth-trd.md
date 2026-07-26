@@ -47,6 +47,20 @@ provisioned against exactly one tenant, so it cannot choose either.
 A tenant selector is a privilege-escalation surface. **This prototype therefore
 does not have one, not even as a demo shortcut** — see §5.1.
 
+The same rule governs **role**. A user's role within their tenant (`admin` or
+`member`) is set from their identity at sign-in and travels as a token claim.
+It is never read from a request. Role and scope are deliberately different
+concepts and are not allowed to blur:
+
+| | Governs | Granted by |
+| --- | --- | --- |
+| **Scope** | What the AI assistant may *do* | The user, at the consent screen |
+| **Role** | What the person may *see* in the portal | Their organisation, at provisioning |
+
+Concretely: role gates the audit log. `set_vendor_exception` stays
+scope-governed, not admin-gated — otherwise there are two competing authority
+models and neither is trustworthy.
+
 ---
 
 ## 2. Requirements
@@ -152,6 +166,34 @@ isolated from each other.
 function in `lib/mcp/tools.ts` takes a `CallerContext` first parameter rather
 than resolving identity once at the edge.
 
+#### ENT-05a — Bilateral facts: the one legitimate cross-tenant read
+
+A supplier must be able to see **exceptions granted to them**. Those rows live
+in the granting retailer's tenant, so at first glance this is precisely the
+cross-tenant read this requirement forbids.
+
+It is not, and the distinction has to be stated rather than assumed:
+
+> An exception is a **bilateral fact**. The supplier is a named party to it. A
+> waiver granted to J.Renée is as much J.Renée's record as it is Dillard's.
+> What the supplier reads is not "Dillard's data" — it is "rows about me".
+
+That holds only while the read stays narrow, so three constraints are
+structural in `exceptionsGrantedToVendor()` (`lib/mcp/store.ts`) rather than
+left to callers:
+
+1. **Filter before returning.** It never returns a store, never a retailer's
+   other rows, never a row naming a different vendor.
+2. **The vendor name comes from the authenticated tenant**, never a tool
+   argument — a supplier cannot ask about anyone else's exceptions.
+3. **Read-only.** No supplier-side path creates or amends an exception; only
+   the granting retailer can.
+
+Acceptance criterion, and the load-bearing test of the supplier surface: grant
+an exception to vendor A and another to vendor B as the same retailer; vendor
+A's connection returns exactly one row, labelled with the granting retailer,
+and cannot see vendor B's.
+
 ### ENT-06 — Least privilege / progressive scopes
 
 **Requirement.** Three scopes: `tgc.read`, `tgc.requirements.write`,
@@ -225,10 +267,46 @@ Authentication refusals that never reach a tool are logged too.
 2. Refusals are logged with the reason, not silently dropped.
 3. There is a single emit point, so a new tool cannot skip auditing.
 
-**Production delta.** Ship to the platform log sink; scope reads to the tenant's
-own administrators. The demo's ring buffer is per instance and resets on cold
-start, and the read endpoint is unauthenticated because the portal has no login
-of its own.
+#### Who may read it
+
+An audit log is an administrative artifact, and it is subject to the same
+isolation it exists to evidence. Two gates:
+
+- **Tenant.** `/api/mcp-audit` requires `?tenant=<id>` and returns only that
+  tenant's lines. **Omitting the parameter returns nothing, not everything** —
+  an unscoped audit read must never be the easy path. A Dillard's administrator
+  cannot see J.Renée's or Belk's activity.
+- **Role.** Only an `admin` sees the log at all. A `member` gets an explicit
+  "administrators only" state rather than a hidden feature.
+
+#### Refusals cannot be attributed
+
+A call rejected *before* authentication succeeded has no trustworthy tenant:
+the token may name one, but the entire reason it was refused is that we do not
+believe it. Filing such lines under the named tenant would let anyone write
+into any tenant's log simply by presenting a forged token.
+
+They cannot be dropped either — a burst of rejected tokens is exactly what an
+administrator needs to see. So they are returned in a separate **unattributed**
+band and rendered separately, labelled as refused before identity was
+established.
+
+**Production delta, and three named demo gaps:**
+
+1. Ship to the platform log sink; the demo's ring buffer is per instance and
+   resets on cold start.
+2. The tenant arrives as a **query parameter** — which is the "caller asserts
+   its own tenant" pattern banned everywhere else. It is tolerable only because
+   the prototype portal has no login to derive a tenant from and everything
+   behind it is mock data. In production the endpoint takes a bearer token:
+   tenant from the token, `role === "admin"` required.
+3. The portal's **role toggle is a demo persona switch, not a login**, for the
+   same reason. The real enforcement point is the token's `role` claim, which
+   is implemented and carried for every MCP caller.
+
+These are recorded here rather than fixed-looking in the UI, because a demo
+that quietly simulates an authorization boundary is worse than one that says
+where the boundary really is.
 
 ### ENT-11 — Curated tool registry
 
@@ -259,6 +337,7 @@ Five pieces, each solving one thing:
 | `lib/mcp/context.ts` | `CallerContext` — tenant, tenant class, subject type, subject, agent, scopes. Threaded as the first parameter of every tool. |
 | `lib/mcp/auth.ts` | Resource-server verification: signature, issuer, expiry, **audience**. Builds the `CallerContext`. |
 | `lib/mcp/manifest.ts` | The curated registry: schema **and declared authority** per tool. |
+| `lib/mcp/tools-supplier.ts` | The supplier-side tool inventory — the mirror of `tools.ts`, reachable only by supplier tenants. |
 | `lib/mcp/guard.ts` | `runGuarded()` — the single choke point. Re-checks tenant class and scope per call, emits the audit line. |
 
 Request path:
@@ -297,6 +376,9 @@ Two honest caveats:
 - The supplier list (`RETAILER_SUPPLIERS`) is a shared fixture and is *not*
   tenant-partitioned. Isolation is real for everything **stored** — profiles,
   profile extras, vendor exceptions — which is where every write lands.
+- Likewise the supplier catalogue (`SUPPLIER_PRODUCTS_SEED`) is a single
+  fixture, because J.Renée is the only supplier tenant. A real multi-supplier
+  deployment keys it per tenant exactly as the retailer store already is.
 
 ---
 
@@ -336,28 +418,44 @@ Run it: see [`mcp-demo-quickstart.md`](./mcp-demo-quickstart.md).
 | Connect claude.ai with no token | ENT-01 | `curl` the endpoint → 401 + discovery pointer |
 | Sign in as two different people | ENT-01, ENT-05 | Same URL, same tool, different data |
 | Peer isolation | ENT-05 | Write as Dillard's; absent for Belk |
-| Cross-class isolation | ENT-05 | J.Renée (supplier) sees **zero** retailer tools |
+| **Two audiences, one URL** | ENT-05 | Sign in as J.Renée → four *supplier* tools and none of the retailer set; sign in as Dillard's → the reverse |
+| Bilateral read | ENT-05a | Grant J.Renée an exception as Dillard's; J.Renée sees that row labelled `grantedBy`, and nothing else Dillard's holds |
 | Read-only consent | ENT-06 | Write tools absent from the tool list; refused if called |
 | Wrong-audience token | ENT-02 | Portal → AI Assistant Access → Security |
 | Proactive agent | ENT-04 | Same screen; runs with no human, read-only |
-| Access log | ENT-10 | Portal → AI Assistant Access → Access log |
+| Access log, tenant-scoped | ENT-10 | Dillard's admin sees only Dillard's lines; flip to J.Renée and Dillard's activity is gone |
+| Role gate | ENT-10 | As a Standard user the log is locked; switch to Admin and it opens |
 
 ### 5.1 The one structural divergence
 
 The demo authorization server is **local**, standing in for a real Entra/Okta
 tenant federated through Aviator. That is unavoidable in a prototype.
 
-It is the *only* structural divergence. In particular, the demo does **not**
-take the shortcut of letting the operator pick a tenant: identities are
-provisioned per realm (`buyer@dillards.demo`, `buyer@belk.demo`,
-`catalog@jrenee.demo`), and the tenant is derived from whichever one signs in.
-To act as another tenant you must authenticate as someone who belongs to it.
+It is the *only* structural divergence in the **connector**. In particular, the
+demo does **not** take the shortcut of letting the operator pick a tenant. The
+provisioned identities are:
 
-Other demo-only compromises, none of which change the security model:
+| Identity | Organisation | Class | Role |
+| --- | --- | --- | --- |
+| `admin@dillards.demo` | Dillard's | retailer | admin |
+| `buyer@dillards.demo` | Dillard's | retailer | member |
+| `buyer@belk.demo` | Belk | retailer | member |
+| `admin@jrenee.demo` | J.Renée | supplier | admin |
+| `catalog@jrenee.demo` | J.Renée | supplier | member |
+
+Password `demo` throughout. Both tenant and role are derived from whichever
+identity signs in — to act as another organisation, or as an administrator, you
+must authenticate as someone who is one.
+
+Other demo-only compromises, none of which change the connector's security
+model:
 
 - Keys, client registrations, and audit lines live in process memory and reset
   on cold start.
-- The audit **read** endpoint is unauthenticated (the portal has no login).
+- The audit **read** endpoint takes its tenant from a query parameter, and the
+  portal's role comes from a toggle — both because the prototype portal has no
+  login of its own. See ENT-10; this is the one place the *portal* simulates a
+  boundary the *connector* genuinely enforces.
 - Demo passwords are documented in the quickstart. Obviously.
 
 ---
@@ -375,6 +473,12 @@ thing and gets caught in the first technical review:
 - **ENT-07 outbound half.** No downstream service calls exist yet to forward a
   token to.
 - **Real federation.** No customer IdP is connected; see §5.1.
+- **Portal-side authorization.** The portal has no login, so its tenant and role
+  are persona switches rather than session-derived. The connector's equivalents
+  are real; the portal's are not, and ENT-10 says so rather than letting the
+  screen imply otherwise.
+- **Multi-supplier data.** J.Renée is the only supplier tenant, so the supplier
+  catalogue is a single fixture rather than per-tenant storage.
 
 The common thread with §4A's own closing line: a working demo and a safe one
 are not the same claim. Everything above is a known, scoped gap — not a

@@ -22,6 +22,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import { SignJWT, exportJWK, generateKeyPair, jwtVerify, type JWK } from "jose"
 import { DEFAULT_SCOPES, isScope, type Scope } from "@/lib/mcp/context"
+import type { TenantRole } from "@/lib/mcp/tenants"
 
 export const JWT_ALG = "RS256"
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60
@@ -100,6 +101,8 @@ export interface AuthCode {
   /** Derived at sign-in from the authenticated identity. Never caller-supplied. */
   tenantId: string
   subjectId: string
+  /** Also derived from the identity — the caller never states its own role. */
+  role: TenantRole
   expiresAt: number
 }
 
@@ -200,6 +203,8 @@ export interface TgcTokenClaims {
   /** Which agent/client is calling — a separate claim from tenant, by design. */
   agent_id: string
   subject_type: "user" | "workload"
+  /** Absent for workloads — a service identity is not a person. */
+  role?: TenantRole
   scope: string
 }
 
@@ -210,6 +215,7 @@ export async function issueAccessToken(input: {
   tenantId: string
   agentId: string
   subjectType: "user" | "workload"
+  role?: TenantRole
   scopes: Scope[]
 }): Promise<{ token: string; expiresIn: number }> {
   const { privateKey, kid } = await getKeys()
@@ -217,6 +223,7 @@ export async function issueAccessToken(input: {
     tenant: input.tenantId,
     agent_id: input.agentId,
     subject_type: input.subjectType,
+    ...(input.role ? { role: input.role } : {}),
     scope: input.scopes.join(" "),
   })
     .setProtectedHeader({ alg: JWT_ALG, kid })
@@ -235,6 +242,7 @@ export interface VerifiedToken {
   agentId: string
   subjectType: "user" | "workload"
   subjectId: string
+  role: TenantRole | null
   scopes: Scope[]
 }
 
@@ -283,6 +291,7 @@ export async function verifyAccessToken(
         agentId: claims.agent_id ?? "unknown-agent",
         subjectType: claims.subject_type === "workload" ? "workload" : "user",
         subjectId: String(payload.sub ?? "unknown"),
+        role: claims.role === "admin" ? "admin" : claims.role === "member" ? "member" : null,
         scopes: scopes.length > 0 ? scopes : DEFAULT_SCOPES,
       },
     }
