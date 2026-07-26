@@ -116,6 +116,21 @@ The prompts below are illustrations, **not** a fixed command list. The connected
 
 All data is mock and watermarked; writes persist only in the demo server's memory and reset periodically.
 
+## What is traced and graded, and what isn't
+
+The prototype has two agent surfaces, and only one of them is under evaluation:
+
+- **The in-product Compliance Agent panel** (retailer side, toggle in the top
+  bar) is instrumented. Every turn is traced to LangSmith, and a golden set with
+  scorers bound runs against the same agent function the panel uses.
+- **This connector** is not. A question asked from claude.ai or ChatGPT produces
+  no trace and is not covered by the golden set.
+
+Worth knowing before you go looking for a connector call in LangSmith and
+conclude tracing is broken. Extending the loop to the connector's tool layer is
+planned, not done — see
+[`eval-framework-pm-presentation.md`](./eval-framework-pm-presentation.md) §7.
+
 ## One more capability, not yet clickable
 
 The connector can also run checks on its own — for example, scanning for
