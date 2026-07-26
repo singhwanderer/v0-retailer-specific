@@ -86,11 +86,10 @@ lives in [`mcp-pm-presentation.md`](./mcp-pm-presentation.md).
 For the full 45-minute walkthrough built around these beats, see
 [`demo-script-compliance-mcp.md`](./demo-script-compliance-mcp.md).
 
-Steps 1-2 show the role gate; step 5 shows the tenant gate. Refusals — a connection
-with no token, or one carrying a token minted for another service — appear in a
-separate **Refused before sign-in** band, unattributed, because a rejected token's
-own claims are not evidence of who sent it. To produce one, point a client at the
-endpoint without completing sign-in, or use the curl below.
+Steps 1-2 show the role gate; step 5 shows the tenant gate. A refusal — for
+example, a client that tries to connect without completing sign-in — appears in
+a separate **Refused before sign-in** band rather than under any organisation,
+because a rejected attempt isn't trustworthy evidence of who made it.
 
 > The role and persona toggles are **demo persona switches**, not a login — the
 > prototype portal has no authentication of its own. The connector's equivalents
@@ -117,33 +116,15 @@ The prompts below are illustrations, **not** a fixed command list. The connected
 
 All data is mock and watermarked; writes persist only in the demo server's memory and reset periodically.
 
-## Local test (no deploy needed)
+## One more capability, not yet clickable
 
-```bash
-pnpm build && pnpm start
+The connector can also run checks on its own — for example, scanning for
+suppliers falling behind on a schedule, with nobody signed in at the time. When
+it does this, it acts under its own restricted identity rather than borrowing a
+person's login: it can only look things up, it's tied to one company's data,
+and it can never make a change, because no person is present to approve one.
 
-# Unauthenticated: 401 plus the discovery pointer that starts the OAuth flow.
-curl -i -X POST http://localhost:3000/api/mcp \
-  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{}'
-
-# The metadata documents an MCP client fetches next.
-curl -s http://localhost:3000/.well-known/oauth-protected-resource
-curl -s http://localhost:3000/.well-known/oauth-authorization-server
-```
-
-Two endpoints stage the scenarios that are awkward to reproduce by hand. They are
-not surfaced in the UI — nothing in the portal calls them — so they are reachable
-only like this:
-
-```bash
-# An autonomous agent running with no human in the session: authenticates as
-# itself, tied to one tenant, read scope only. Produces a service-identity line.
-curl -s -X POST http://localhost:3000/api/demo/proactive-check
-
-# A genuinely valid token minted for a DIFFERENT resource. Replay the
-# access_token it returns against /api/mcp and it is refused on the audience
-# check alone, landing in the unattributed band.
-curl -s -X POST http://localhost:3000/api/demo/confused-deputy
-```
-
-Then open **AI Assistant Access → Access log** to see what each one wrote.
+This is a real, standing part of how the connector works — it isn't only for
+demos. There's currently no button in the app to trigger it live and watch it
+happen; it runs automatically when scheduled. If it comes up in conversation,
+it's fine to describe it exactly as above.

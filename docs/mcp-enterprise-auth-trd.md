@@ -455,7 +455,7 @@ Run it: see [`mcp-demo-quickstart.md`](./mcp-demo-quickstart.md).
 
 | Demo | Shows | How |
 | --- | --- | --- |
-| Connect claude.ai with no token | ENT-01 | `curl` the endpoint → 401 + discovery pointer |
+| Connect claude.ai with no token | ENT-01 | Point a client at the endpoint with nothing signed in: refused, with a pointer to where to sign in |
 | Sign in as two different people | ENT-01, ENT-05 | Same URL, same tool, different data |
 | Peer isolation | ENT-05 | Write as Dillard's; absent for Belk |
 | **Two audiences, one URL** | ENT-05 | Sign in as J.Renée → four *supplier* tools and none of the retailer set; sign in as Dillard's → the reverse |
@@ -463,10 +463,20 @@ Run it: see [`mcp-demo-quickstart.md`](./mcp-demo-quickstart.md).
 | Read-only consent | ENT-06 | Write tools absent from the tool list; refused if called. The Connect tab's "what a read-only connection sees" toggle shows the same filtering |
 | Destructive scope separated | ENT-06 | Consent to requirements-write only: the removal tools are still absent |
 | Two-phase confirmation | ENT-06a | Call any mutating tool: it returns a preview and a token and changes nothing. Confirm as another tenant → refused. Confirm as the right one → applied, exactly once |
-| Wrong-audience token | ENT-02 | `POST /api/demo/confused-deputy`, then replay the token it returns against `/api/mcp` |
-| Proactive agent | ENT-04 | `POST /api/demo/proactive-check` — runs with no human, read-only |
+| Wrong-audience token | ENT-02 | A validly-signed token issued for a different resource is rejected on the audience check alone, before reaching any tool. No UI trigger exists for this today — see §5.2 |
+| Proactive agent | ENT-04 | Runs with no human present, under a read-only identity scoped to one tenant. No UI trigger exists for this today — see §5.2 |
 | Access log, tenant-scoped | ENT-10 | Dillard's admin sees only Dillard's lines; flip to J.Renée and Dillard's activity is gone |
 | Role gate | ENT-10 | As a Standard user the log is locked; switch to Admin and it opens |
+
+### 5.2 Two demonstrations with no UI trigger today
+
+An earlier build had a "Security" tab in the AI Assistant Access screen with
+buttons for the two rows above. It was removed: an administrator opening that
+screen is there to connect an assistant and review its activity, and a staged
+attack demo dressed up as an admin feature wasn't that. Both behaviors are still
+real and enforced — they simply aren't reachable by clicking anything right now.
+An engineer who wants to trigger either one directly can find the two routes
+under `app/api/demo/` in the codebase.
 
 ### 5.1 The one structural divergence
 
