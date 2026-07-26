@@ -132,7 +132,7 @@ This is the split we designed for, so that iteration doesn't bottleneck on engin
 | Capability | Owned by | Where |
 | --- | --- | --- |
 | Instrumenting the agent to produce traces | Engineering | `lib/copilot/agent.ts` (one-time setup, done) |
-| Viewing production conversations / debugging a bad answer | **PM/anyone with LangSmith access** | LangSmith → **Tracing project** |
+| Viewing production conversations / debugging a bad answer | **PM/anyone with LangSmith access** — see §6a/OBS-01: this is today's demo-mock reality, not the production access model. Real customer traces need the same tenant + role gate the audit log already has | LangSmith → **Tracing project** |
 | Adding/editing golden test questions | **PM** | LangSmith → **Datasets** (import from CSV, or add rows by hand) |
 | Defining what counts as a "correct" answer (scorers) | **PM** (pre-built templates: Correctness, Hallucination, Conciseness — or a custom rubric) or Engineering (a domain-specific check like GS1 validity) | LangSmith → **Evaluators** |
 | Kicking off a fresh eval run | **PM** | The button on the supplier attributes screen (no terminal) |
@@ -158,10 +158,69 @@ Every traced conversation includes: the user's question, the system prompt,
 the model's answer, which internal tools the agent called and their
 inputs/outputs, token counts, and response time.
 
-It does **not** include anything like a user ID, supplier ID, GTIN, product
-image, or a reviewer's decision — those concepts don't exist in this feature.
-The golden test dataset is uploaded into LangSmith directly (via the UI, or a
-small one-off script); it never passes through our application code.
+**Correction to an earlier version of this doc:** that trace *does* include
+supplier and vendor names, attribute profile names, and compliance numbers —
+they're inside the free-text question/answer and inside tool-call arguments
+and results (e.g. `get_supplier_compliance` returns exactly the numbers a
+customer would consider their own compliance data). In this demo that's all
+mock, so it's a non-issue today. Once real customer data is behind this
+feature, that statement is no longer true, and nothing in the code redacts any
+of it before it reaches LangSmith — see the next section.
+
+It does **not** include a user ID, GTIN, product image, or a reviewer's
+decision — those concepts genuinely don't exist in this feature. The golden
+test dataset is uploaded into LangSmith directly (via the UI, or a small
+one-off script); it never passes through our application code.
+
+## 6a. Data protection for LangSmith tracing
+
+**The honest framing first, because it's the actual finding here, not just
+"redaction is missing":** the auth track (`mcp-enterprise-auth-trd.md`,
+ENT-01–11) named every one of these problems for the MCP *connector* and built
+the controls before shipping the scope that needed them — that's the whole
+point of that document's closing line, "we are not adding scope faster than we
+are adding the controls it requires." The observability track didn't follow
+that discipline. Full-content tracing shipped with no tenant gating, no role
+gating, and no redaction. That's the gap, tracked as **OBS-01** and **OBS-02**
+in the TRD's new §7 — read that section for acceptance criteria and ownership;
+this section is the trade-off table behind the recommendation.
+
+**What's actually available**, verified against LangSmith's SDK (matches
+`langsmith: ^0.8.6`, already pinned in this repo):
+
+| Lever | Protects | Tracing value retained | Cost | Verdict |
+|---|---|---|---|---|
+| **Do nothing** (today) | Nothing | Everything | Zero | Fine for mock data only. Not acceptable once real customer data flows. |
+| **Blanket hide** (`hideInputs`/`hideOutputs: true`, env or `Client` config) | All content | Tool names, call order, latency, tokens, pass/fail | ~Zero — one config line | Right default for **live production** traces. Wrong for the **golden-set eval** — you can't score an answer you can't see, and the eval only ever runs synthetic questions anyway, so there's nothing to protect there. |
+| **Custom redaction function** (`hideInputs`/`hideOutputs` accept a function, not just a boolean) | Whatever the function strips | Structure + whatever's allow-listed as safe | Real — define what's sensitive across ~29 tools | The right long-term shape, but sequence it once the tool surface stops moving — same logic already used to sequence eval itself. Must be an allow-list (default-deny), not a deny-list: a deny-list ships a new field unredacted the day a tool adds one. |
+| **Regex/NER anonymizer** (LangSmith's `create_anonymizer`, or Presidio/Comprehend) | PII-shaped text (emails, human names) | Almost everything | Moderate | Weak fit for *this* domain — compliance jargon, brick codes, vendor legal-entity names don't look like generic PII to an NER model. Better for stray human PII than for the compliance data itself. |
+| **Per-tenant scoping** (`tracing_context`) | Lets one customer opt out of content tracing without changing the global default | Full for everyone else | Low, once a redaction function exists | The mechanism that makes this a per-customer contractual answer, not one global policy. |
+| **Workspace separation + RBAC** (Enterprise plan) | *Who* can open a trace, not its content | Everything, for the people who should see it | Enterprise plan | **Highest leverage — do this first.** Mirrors the audit log's own ENT-10 property ("tenant-scoped, admin-gated"), which LangSmith tracing has neither of today: one shared project, no gate on who inside the org can open any trace. |
+| **Retention window** | Exposure that accumulates over time | Unaffected | Config only | Do regardless of every other choice — independent, not a substitute. |
+| **Self-hosted / BYOC** (Enterprise add-on) | Everything — data never reaches a third-party cloud | Everything | Highest — real infra to run | The fallback answer for a customer whose DPA forbids any third-party subprocessor touching their data at all. Not a default; the answer that has to exist. |
+
+**Recommended default, stated as the answer to give:**
+
+1. The golden-set eval keeps full visibility always — it's synthetic test
+   data, not customer data, so there is nothing to protect there.
+2. Live production tracing: workspace separation + RBAC first (parallels
+   ENT-10 directly), content redaction (an allow-list function) before any
+   real customer data is in scope — named now, built when that's imminent,
+   same pattern as ENT-07's outbound-passthrough rule.
+3. `tracing_context` gives a customer whose contract requires it a harder
+   opt-out without changing the default for everyone else.
+4. A retention window is set explicitly, independent of the above.
+5. Self-hosted/BYOC is the named fallback for a DPA that won't allow any
+   third-party subprocessor at all.
+
+**One vendor-side fact worth re-checking on every LangSmith SDK upgrade rather
+than assuming once:** JS SDK versions before 0.5.19 had `hideOutputs` not
+covering *streaming token events* — content leaked through the trace's events
+array even with output hiding turned on (CVE-2026-41182 / GHSA-rr7j-v2q5-chgv).
+This repo's pinned version postdates the fix, but it's the kind of thing a
+redaction control can silently stop doing its job on a routine dependency bump,
+so it belongs in whatever checklist gates a `langsmith` version bump, not just
+in this paragraph.
 
 ---
 
@@ -180,6 +239,10 @@ small one-off script); it never passes through our application code.
   question asked from claude.ai produces no trace and is not graded. Extending
   the loop to the connector path is the next piece of work.
 - ⏳ Prompt-library migration — the system prompt still lives in code.
+- ⏳ **Trace data protection (OBS-01, OBS-02 in the TRD).** No tenant/role gate
+  on who can open a trace, and no content redaction. Harmless today because
+  every trace is mock data; not harmless the day real customer conversations
+  are traced. See §6a.
 
 The loop is demonstrable end-to-end today: see Beat 4b of
 [`demo-script-compliance-mcp.md`](./demo-script-compliance-mcp.md), which drives
@@ -226,3 +289,9 @@ engineering time — and each one would be flagged and scoped before being built
 - **This reused what we already had.** No new vendor relationship, no new
   billing plan, no new AWS/infra footprint — LangSmith was already part of
   our stack for other projects.
+- **The data-protection question has an answer, and it's not built yet.** Named
+  now as OBS-01/OBS-02 in the TRD rather than discovered under pressure later:
+  workspace/RBAC gating on who can open a trace comes first, content redaction
+  before real customer data is in scope, both before either is strictly needed
+  today. Mock data means there's nothing to expose yet — that's a grace period,
+  not a reason to skip naming the requirement.

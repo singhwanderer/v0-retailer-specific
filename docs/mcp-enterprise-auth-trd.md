@@ -534,4 +534,79 @@ thing and gets caught in the first technical review:
 
 The common thread with §4A's own closing line: a working demo and a safe one
 are not the same claim. Everything above is a known, scoped gap — not a
-surprise.
+surprise. Two more, deliberately kept in their own section rather than folded
+into the list above: see §7.
+
+---
+
+## 7. AI observability data protection (LangSmith)
+
+**Why this is a separate section, not ENT-12.** ENT-01–11 govern who may call
+the MCP *connector* and what they may do — "§4A's eleven rows," referenced by
+that count elsewhere in this doc set. This is a different question: once an
+agent turn is traced to a third-party observability vendor (LangSmith), who can
+*read* that trace, and what does it contain? Same discipline, different
+surface, so it gets its own IDs.
+
+**The finding, stated plainly.** ENT-01–11 exist because the connector's scope
+(read/write/delete tools) was not shipped ahead of the controls it needed —
+that sequencing is §4's whole point. Live tracing shipped the opposite way:
+full question/answer text and full tool-call arguments and results flow to
+LangSmith today with no tenant gate, no role gate, and no redaction
+(`lib/copilot/agent.ts`). That is fine while every trace is demo-mock data. It
+stops being fine the day a real customer's compliance question — vendor names,
+attribute values, gap counts — is what's in that trace. Detail and a full
+pros/cons table of the available levers: `eval-framework-pm-presentation.md`
+§6a.
+
+### OBS-01 — Tenant- and role-gated trace access
+
+**Requirement.** Nobody outside a defined admin set can open another tenant's
+LangSmith traces. Mirrors ENT-10's audit-log property exactly: tenant-scoped,
+admin-gated, not open to "anyone with access to the tool."
+
+**Acceptance criteria**
+1. A viewer scoped to one customer's workspace cannot open another customer's
+   trace, by construction (workspace separation) rather than by convention.
+2. Trace access is restricted to a defined role (RBAC), not open to every
+   LangSmith org member by default.
+3. The restriction is auditable — who viewed which trace is itself knowable,
+   the same way `query_access_log` makes the connector's own access record
+   knowable (ENT-10).
+
+**Owner.** TGC + Aviator (workspace/project strategy) for the design; IT for
+the LangSmith Enterprise-tier procurement RBAC requires.
+
+**Demo status.** ❌ Not demonstrated. One shared LangSmith project, no gating —
+matches `eval-framework-pm-presentation.md` §5's own disclosure ("PM/anyone
+with LangSmith access").
+
+### OBS-02 — Content redaction before third-party egress
+
+**Requirement.** Before real customer data is in scope, an allow-list
+redaction function governs what content reaches LangSmith from a live
+production trace. Allow-list, not deny-list — a deny-list ships a new field
+unredacted the day some tool adds one; an allow-list fails closed instead.
+Blanket hiding (`hideInputs`/`hideOutputs: true`) is the acceptable interim
+default if the allow-list function isn't ready yet, because it fails toward
+protecting data rather than exposing it.
+
+**Acceptance criteria**
+1. The offline golden-set eval is explicitly exempted — it only ever runs
+   synthetic test questions, so there is nothing there to protect, and hiding
+   it would defeat the eval's purpose.
+2. A live production trace with redaction active never contains a
+   known-sensitive field (e.g. a supplier legal name) in its captured payload —
+   testable, not just asserted.
+3. Revisited on every `langsmith` SDK version bump: the JS SDK had a documented
+   window (pre-0.5.19) where `hideOutputs` did not cover streaming token
+   events, so a redaction control can regress silently on a routine dependency
+   update. `package.json` today pins a version past that fix; that fact does
+   not carry forward automatically.
+
+**Owner.** TGC engineering.
+
+**Demo status.** ❌ Not built. Named now, same pattern as ENT-07's outbound
+no-passthrough rule — a constraint on code (or configuration) that does not
+exist yet, so it is designed in rather than retrofitted under pressure once
+real customer data is already flowing.

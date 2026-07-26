@@ -537,6 +537,24 @@ settled mostly teaches the team to ignore a red build. The loop is useful the
 moment it catches a regression in review; the gate is worth adding when the
 scores are stable enough that a failure means something.
 
+**"That trace you just showed me is customer data going to a third-party
+dashboard — how do we keep it private?"**
+Right question, and it has an answer today, not a shrug. Two moves, in order.
+First — who can even open a trace: right now that's one shared LangSmith
+project with no gate, and the fix is the same shape as the audit log you saw in
+Act 3 — tenant-scoped, admin-only, via LangSmith's own workspace separation and
+RBAC. Second — what's in the trace at all: LangSmith supports redacting
+content before it ever leaves our process, either a blanket switch or a custom
+function that keeps tool names and timing but strips the actual question and
+answer text. We haven't built either yet, and I'd rather tell you that than
+have you find it — it's tracked as OBS-01 and OBS-02 in the TRD, the same way
+the outbound token rule was named before the code that needs it existed. It's
+genuinely a non-issue today because every trace in this room is mock data; it
+stops being a non-issue the day it isn't, which is exactly why it's written
+down now instead of later. Detail:
+[`eval-framework-pm-presentation.md`](./eval-framework-pm-presentation.md) §6a,
+[`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md) §7.
+
 ---
 
 ## Pre-flight checklist
