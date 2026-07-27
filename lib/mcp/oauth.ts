@@ -16,11 +16,21 @@
 //   - Workload (client-credentials) identities are provisioned per tenant, so
 //     an autonomous agent cannot choose which tenant it acts for either.
 //
-// What is not: key material, client registrations, and issued codes live in
-// process memory and reset on cold start (a client simply re-runs the flow).
+// What is not: client registrations and issued codes live in process memory and
+// reset on cold start (a client simply re-runs the flow). Signing keys used to
+// as well, which broke tokens across serverless instances — set
+// TGC_OAUTH_PRIVATE_JWK to pin one key across the whole deployment.
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
-import { SignJWT, exportJWK, generateKeyPair, jwtVerify, type JWK } from "jose"
+import {
+  SignJWT,
+  calculateJwkThumbprint,
+  exportJWK,
+  generateKeyPair,
+  importJWK,
+  jwtVerify,
+  type JWK,
+} from "jose"
 import { DEFAULT_SCOPES, isScope, type Scope } from "@/lib/mcp/context"
 import type { TenantRole } from "@/lib/mcp/tenants"
 
@@ -68,7 +78,63 @@ const globalScope = globalThis as typeof globalThis & {
   __tgcOAuthState?: OAuthState
 }
 
+/**
+ * A base64-encoded private JWK shared by every instance of this deployment.
+ *
+ * Without it each serverless instance generates its own key pair, so a token
+ * minted by one instance fails signature verification on the next — surfacing
+ * as a spurious "Refused before sign-in" line in the audit log and, for the
+ * caller, a full re-authentication mid-session (there is no refresh token).
+ * Generate a value with `pnpm gen:oauth-key`.
+ */
+const PRIVATE_JWK_ENV = "TGC_OAUTH_PRIVATE_JWK"
+
+/** JWK members that carry the private half and must never leave this module. */
+const PRIVATE_JWK_MEMBERS = ["d", "p", "q", "dp", "dq", "qi"] as const
+
+function publicHalfOf(jwk: JWK): JWK {
+  const pub: JWK = { ...jwk }
+  for (const member of PRIVATE_JWK_MEMBERS) delete pub[member]
+  delete pub.key_ops
+  delete pub.ext
+  return pub
+}
+
+async function keysFromJwk(encoded: string): Promise<KeyMaterial> {
+  let privateJwk: JWK
+  try {
+    privateJwk = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")) as JWK
+  } catch {
+    throw new Error(
+      `${PRIVATE_JWK_ENV} is set but is not a base64-encoded JWK. Regenerate it with \`pnpm gen:oauth-key\`.`
+    )
+  }
+  if (!privateJwk.d) {
+    throw new Error(`${PRIVATE_JWK_ENV} contains a public key. It must be the PRIVATE JWK — the one with a "d" member.`)
+  }
+
+  const publicJwk = publicHalfOf(privateJwk)
+  // RFC 7638 thumbprint, so every instance derives the same kid from the same
+  // key with nothing to keep in sync.
+  const kid = await calculateJwkThumbprint(publicJwk)
+  publicJwk.kid = kid
+  publicJwk.alg = JWT_ALG
+  publicJwk.use = "sig"
+
+  return {
+    privateKey: (await importJWK(privateJwk, JWT_ALG)) as CryptoKey,
+    publicKey: (await importJWK(publicJwk, JWT_ALG)) as CryptoKey,
+    publicJwk,
+    kid,
+  }
+}
+
 async function createKeys(): Promise<KeyMaterial> {
+  const configured = process.env[PRIVATE_JWK_ENV]?.trim()
+  // A malformed value throws rather than falling back: silently reverting to a
+  // per-instance key would reintroduce the exact bug this exists to prevent.
+  if (configured) return keysFromJwk(configured)
+
   const { privateKey, publicKey } = await generateKeyPair(JWT_ALG, { extractable: true })
   const publicJwk = await exportJWK(publicKey)
   const kid = randomBytes(8).toString("hex")

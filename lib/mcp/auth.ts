@@ -22,7 +22,7 @@
 // tenant id, not read from the token as its own claim. One less thing a forged
 // or stale token can assert.
 
-import { recordUnauthenticated } from "@/lib/mcp/audit"
+import { CONNECTION_EVENT, recordConnection, recordUnauthenticated } from "@/lib/mcp/audit"
 import type { CallerContext } from "@/lib/mcp/context"
 import { MCP_PATH, originFromRequest, resourceIdentifier, verifyAccessToken } from "@/lib/mcp/oauth"
 import { getTenant } from "@/lib/mcp/tenants"
@@ -68,7 +68,7 @@ export async function authenticateMcpRequest(req: Request): Promise<AuthResult> 
   const token = bearerFrom(req)
   if (!token) {
     recordUnauthenticated(
-      "(connection)",
+      CONNECTION_EVENT,
       "No bearer token presented — connection refused before any tool was reachable."
     )
     return {
@@ -89,7 +89,7 @@ export async function authenticateMcpRequest(req: Request): Promise<AuthResult> 
   if (!verified.ok) {
     const isAudience = verified.error.kind === "wrong_audience"
     recordUnauthenticated(
-      "(connection)",
+      CONNECTION_EVENT,
       isAudience
         ? `Token rejected: wrong audience. ${verified.error.detail}`
         : `Token rejected: ${verified.error.detail}`
@@ -108,26 +108,30 @@ export async function authenticateMcpRequest(req: Request): Promise<AuthResult> 
 
   const tenant = getTenant(verified.value.tenantId)
   if (!tenant) {
-    recordUnauthenticated("(connection)", `Token names an unknown tenant "${verified.value.tenantId}".`)
+    recordUnauthenticated(CONNECTION_EVENT, `Token names an unknown tenant "${verified.value.tenantId}".`)
     return {
       ok: false,
       response: challenge(req, "invalid_token", "The token's tenant is not provisioned on this server.", 403),
     }
   }
 
-  return {
-    ok: true,
-    ctx: {
-      tenantId: tenant.id,
-      // Resolved from the registry, not trusted from the token.
-      tenantClass: tenant.tenantClass,
-      subjectType: verified.value.subjectType,
-      subjectId: verified.value.subjectType === "workload" ? null : verified.value.subjectId,
-      // A workload has no role: it is not a person and holds no administrative
-      // standing, however broad its scopes.
-      role: verified.value.subjectType === "workload" ? null : verified.value.role,
-      agentId: verified.value.agentId,
-      scopes: new Set(verified.value.scopes),
-    },
+  const ctx: CallerContext = {
+    tenantId: tenant.id,
+    // Resolved from the registry, not trusted from the token.
+    tenantClass: tenant.tenantClass,
+    subjectType: verified.value.subjectType,
+    subjectId: verified.value.subjectType === "workload" ? null : verified.value.subjectId,
+    // A workload has no role: it is not a person and holds no administrative
+    // standing, however broad its scopes.
+    role: verified.value.subjectType === "workload" ? null : verified.value.role,
+    agentId: verified.value.agentId,
+    scopes: new Set(verified.value.scopes),
   }
+
+  // A refusal above is logged, so a success has to be too: otherwise a client
+  // that authenticates and only lists the tool catalogue is indistinguishable
+  // in the audit trail from one that never connected at all.
+  recordConnection(ctx)
+
+  return { ok: true, ctx }
 }

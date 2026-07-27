@@ -38,6 +38,15 @@ Sign in with `buyer@dillards.demo`, `buyer@belk.demo`, or `catalog@jrenee.demo` 
 > merge to `main` and use the production URL). Also check Firewall/Bot
 > Protection isn't challenging non-browser clients.
 
+> **Asked to sign in again part-way through a session, or seeing
+> `Token rejected: signature verification failed` in the Access log?** The
+> deployment is signing tokens with a different key per serverless instance, so
+> a token minted by one instance is rejected by the next. Run
+> `pnpm gen:oauth-key` and set the printed value as `TGC_OAUTH_PRIVATE_JWK` in
+> the Vercel project (Production **and** Preview), then redeploy. Without that
+> variable each instance generates a throwaway key on cold start — fine locally,
+> not on Vercel.
+
 ## 3. The end-to-end create flow — mandatory fields and drop-downs
 
 **Short answer: yes, the AI knows the mandatory fields and the drop-down options — natively.** This isn't prompt engineering; it's how MCP works. When the client connects, it calls `tools/list` and receives every tool's input contract as JSON Schema. Two parts of that schema do the work:

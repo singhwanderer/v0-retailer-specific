@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "check:exceptions": "tsx scripts/check-exception-seed.ts"
+    "check:exceptions": "tsx scripts/check-exception-seed.ts",
+    "gen:oauth-key": "node scripts/generate-oauth-key.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.21",
