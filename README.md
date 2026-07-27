@@ -127,6 +127,13 @@ example prompts above:
 > requirements, what is genuinely demonstrated, and what is deliberately not.
 > The authorization server here is a **demo** stand-in for a customer's own IdP
 > federated through the TG Aviator Gateway.
+>
+> **Deploying it:** run `pnpm gen:oauth-key` and set the printed value as
+> `TGC_OAUTH_PRIVATE_JWK` in the hosting project. Without it every serverless
+> instance signs tokens with its own key, so a token minted by one is rejected
+> by the next and callers are forced to re-authenticate mid-session. The audit
+> log remains per instance, so an empty Access log is not proof that nothing
+> happened.
 
 ## Supplier view design intent
 

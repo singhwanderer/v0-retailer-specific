@@ -435,9 +435,9 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
       </div>
 
       <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
-        Every tool call an AI assistant made against <span className="font-medium">{tenant.name}</span>, and every
-        call that was refused. Only this organisation&rsquo;s activity appears here. Updates live — make a request in
-        Claude and it shows up.
+        Every AI client that attached to <span className="font-medium">{tenant.name}</span>, every tool call it made,
+        and every call that was refused. Only this organisation&rsquo;s activity appears here. Updates live — connect
+        in Claude and it shows up.
       </p>
 
       <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}>
@@ -447,8 +447,10 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
           </p>
         ) : entries.length === 0 ? (
           <p className="px-4 py-6 text-xs font-light text-center" style={{ color: "#9CA3AF" }}>
-            No connector activity recorded for {tenant.name} yet. Connect an AI client from the Connect tab and ask it
-            something — every tool call it makes, allowed or refused, appears here.
+            No connector activity on this server instance for {tenant.name}. Connect an AI client from the Connect tab
+            — attaching is recorded on its own, and every tool call it makes, allowed or refused, appears here. In this
+            prototype the log lives in each instance&rsquo;s memory, so an empty table is not proof that nothing
+            happened; a refresh may reach a different instance.
           </p>
         ) : (
           <div className="overflow-x-auto">

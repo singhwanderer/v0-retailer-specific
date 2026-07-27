@@ -391,6 +391,13 @@ next thing on screen."*
 > "Every AI action against this organisation: who, which assistant, which tool,
 > which scope it required, allowed or refused."
 
+The first line is the attachment itself — the assistant authenticating, logged
+before it asked for anything:
+
+> "We don't only log what it did. We log that it showed up. A connector that
+> authenticates and reads the tool catalogue and stops there still leaves a
+> line, because 'nothing in the log' has to mean nothing happened."
+
 Point at the **Refused before sign-in** band — if it is empty, say what would land
 there rather than pretending; a refused connection from any client populates it.
 

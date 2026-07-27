@@ -76,8 +76,9 @@ lives in [`mcp-pm-presentation.md`](./mcp-pm-presentation.md).
    works, **Access log** is locked to administrators.
 2. Switch the role toggle to **Admin** — the sidebar item appears and the log
    opens, empty.
-3. Connect Claude, sign in as `buyer@dillards.demo`, ask a question. Lines
-   appear: the person, the assistant, the tool, the scope it required.
+3. Connect Claude and sign in as `buyer@dillards.demo`. A line appears as soon as
+   the client attaches — before you have asked it anything — then ask a question
+   and more follow: the person, the assistant, the tool, the scope it required.
 4. Ask it to change something. Two lines appear, not one — the proposal and then the
    approval, because no mutating tool acts on its first call.
 5. Flip the portal to the **supplier** persona (Admin) → the same screen shows
@@ -90,6 +91,12 @@ Steps 1-2 show the role gate; step 5 shows the tenant gate. A refusal — for
 example, a client that tries to connect without completing sign-in — appears in
 a separate **Refused before sign-in** band rather than under any organisation,
 because a rejected attempt isn't trustworthy evidence of who made it.
+
+> **The log is per server instance in this prototype.** It lives in each
+> instance's memory, so an empty table is not proof that nothing happened, a
+> refresh may reach a different instance, and **Clear** only clears the one that
+> serves the request. Production ships these lines to the platform log sink;
+> see [`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md) ENT-10.
 
 > The role and persona toggles are **demo persona switches**, not a login — the
 > prototype portal has no authentication of its own. The connector's equivalents

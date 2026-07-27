@@ -300,12 +300,17 @@ hold no cross-tenant state in module scope, which ENT-05 delivers.
 **Requirement.** Every tool call — allowed, denied, or errored — produces
 exactly one log line recording timestamp, tenant, tenant class, subject type,
 subject, agent, tool, required scope, outcome, reason, and latency.
-Authentication refusals that never reach a tool are logged too.
+Authentication refusals that never reach a tool are logged too, and so is a
+successful attachment: a client that authenticates and only reads the tool
+catalogue must not be indistinguishable from one that never connected.
 
 **Acceptance criteria**
 1. Every call in every other requirement's tests produces exactly one line.
 2. Refusals are logged with the reason, not silently dropped.
 3. There is a single emit point, so a new tool cannot skip auditing.
+4. Authenticating produces one attributed `(connection)` line per identity per
+   window — enough to evidence the attachment without every `tools/list` poll
+   burying the tool calls beneath it.
 
 #### Who may read it
 
@@ -502,8 +507,12 @@ must authenticate as someone who is one.
 Other demo-only compromises, none of which change the connector's security
 model:
 
-- Keys, client registrations, and audit lines live in process memory and reset
-  on cold start.
+- Client registrations and audit lines live in process memory and reset on cold
+  start. Signing keys did too, which broke tokens across serverless instances —
+  set `TGC_OAUTH_PRIVATE_JWK` (see `pnpm gen:oauth-key`) to pin one key across
+  the deployment. Because the audit buffer is still per instance, the portal
+  shows one instance's view: an empty table is not proof that nothing happened,
+  and **Clear** only clears the instance that serves the request.
 - The audit **read** endpoint takes its tenant from a query parameter, and the
   portal's role comes from a toggle — both because the prototype portal has no
   login of its own. See ENT-10; this is the one place the *portal* simulates a
