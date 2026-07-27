@@ -43,6 +43,7 @@ import {
   assembleBrickAttributes,
   describeProfileAttributes,
   findProfileForBrick,
+  resolveGs1Name,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
@@ -510,14 +511,20 @@ export function updateAttributeRequirement(
 ) {
   const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
+  // Callers may name the attribute either way — "Closure" or the full
+  // "Closure (GM03CLOS)" key. Resolve before touching the store, so an
+  // unmatched name is an error rather than an override nothing ever reads.
+  const resolved = resolveGs1Name(brickCode, gs1Name, ctx.tenantId)
+  if ("error" in resolved) return resolved
+  const key = resolved.gs1Name
   const extras = getProfileExtras(brickCode, ctx.tenantId)
-  const idx = extras.customAttributes.findIndex((a) => a.gs1Name === gs1Name)
+  const idx = extras.customAttributes.findIndex((a) => a.gs1Name === key)
   if (idx >= 0) {
     extras.customAttributes[idx] = { ...extras.customAttributes[idx], ...updates }
   } else {
-    extras.overrides[gs1Name] = { ...extras.overrides[gs1Name], ...updates }
+    extras.overrides[key] = { ...extras.overrides[key], ...updates }
   }
-  return { updated: { gs1Name, ...updates }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+  return { updated: { gs1Name: key, ...updates }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
 }
 
 /**
@@ -525,21 +532,28 @@ export function updateAttributeRequirement(
  * deleted outright; a standard row (GS1-inherited or global baseline) can't
  * be deleted since it isn't itself stored, so it's recorded as an exclusion
  * that assembleBrickAttributes filters out instead.
+ *
+ * The exclusion branch is why the name has to be resolved first: pushing an
+ * unmatched string produces an exclusion that filters nothing, and without a
+ * lookup there is no later point at which that reads as a failure.
  */
 export function removeAttributeRequirement(ctx: CallerContext, brickCode: string, gs1Name: string) {
   const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
+  const resolved = resolveGs1Name(brickCode, gs1Name, ctx.tenantId)
+  if ("error" in resolved) return resolved
+  const key = resolved.gs1Name
   const extras = getProfileExtras(brickCode, ctx.tenantId)
-  const idx = extras.customAttributes.findIndex((a) => a.gs1Name === gs1Name)
+  const idx = extras.customAttributes.findIndex((a) => a.gs1Name === key)
   if (idx >= 0) {
     const [removed] = extras.customAttributes.splice(idx, 1)
     return { removed, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
   }
-  if (!extras.excludedGs1Names.includes(gs1Name)) {
-    extras.excludedGs1Names.push(gs1Name)
+  if (!extras.excludedGs1Names.includes(key)) {
+    extras.excludedGs1Names.push(key)
   }
-  delete extras.overrides[gs1Name]
-  return { removed: { gs1Name }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+  delete extras.overrides[key]
+  return { removed: { gs1Name: key }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
 }
 
 export function removeImageRequirement(ctx: CallerContext, brickCode: string, requirementName: string) {

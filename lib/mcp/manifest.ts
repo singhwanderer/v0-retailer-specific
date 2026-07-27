@@ -54,7 +54,7 @@ import {
   updateAttributeRequirement,
 } from "@/lib/mcp/tools"
 import { getStore, readProfileExtras } from "@/lib/mcp/store"
-import { findProfileForBrick } from "@/lib/mcp/attribute-assembly"
+import { findProfileForBrick, gs1DisplayName, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
 import {
   createPendingChange,
   discardPendingChange,
@@ -506,7 +506,9 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       brickCode: z.string().describe("GS1 category code of the profile to modify"),
       gs1Name: z
         .string()
-        .describe("The attribute's GS1 name as returned by get_profile_detail, e.g. 'Heel Height'"),
+        .describe(
+          "The attribute's name as returned by get_profile_detail. Either the plain name ('Heel Height') or the full keyed form ('Heel Height (GM03HLHT)') is accepted; a name that matches no attribute on this profile is refused."
+        ),
       name: z.string().optional().describe("New display label for the attribute"),
       guidance: z.string().optional().describe("New guidance text shown to suppliers"),
     },
@@ -521,8 +523,10 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       if (a.name === undefined && a.guidance === undefined) {
         return { error: "Nothing to change — provide a new name, new guidance, or both." }
       }
+      const resolved = resolveGs1Name(a.brickCode, a.gs1Name, ctx.tenantId)
+      if ("error" in resolved) return resolved
       return {
-        summary: `Update "${a.gs1Name}" on ${profileLabel(ctx, a.brickCode)}.`,
+        summary: `Update "${gs1DisplayName(resolved.gs1Name)}" on ${profileLabel(ctx, a.brickCode)}.`,
         effect: [
           ...(a.name !== undefined ? [`Label becomes "${a.name}".`] : []),
           ...(a.guidance !== undefined ? [`Supplier guidance becomes "${a.guidance}".`] : []),
@@ -584,7 +588,11 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       "Remove an attribute from a profile's requirements. A retailer-added custom row is deleted; a row inherited from the GS1 standard is recorded as an exclusion (standard rows are derived, not stored). Requires the destructive scope in addition to the requirements-write scope. Returns a preview and a confirmation token; call confirm_pending_change to apply it.",
     schema: {
       brickCode: z.string().describe("GS1 category code of the profile to modify"),
-      gs1Name: z.string().describe("The attribute's GS1 name as returned by get_profile_detail"),
+      gs1Name: z
+        .string()
+        .describe(
+          "The attribute's name as returned by get_profile_detail. Either the plain name ('Closure') or the full keyed form ('Closure (GM03CLOS)') is accepted; a name that matches no attribute on this profile is refused."
+        ),
     },
     kind: "write",
     destructive: true,
@@ -596,8 +604,10 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     preview: (ctx, a: { brickCode: string; gs1Name: string }) => {
       const missing = profileMissing(ctx, a.brickCode)
       if (missing) return missing
+      const resolved = resolveGs1Name(a.brickCode, a.gs1Name, ctx.tenantId)
+      if ("error" in resolved) return resolved
       return {
-        summary: `Remove "${a.gs1Name}" from ${profileLabel(ctx, a.brickCode)}.`,
+        summary: `Remove "${gs1DisplayName(resolved.gs1Name)}" from ${profileLabel(ctx, a.brickCode)}.`,
         effect: [
           "Suppliers will no longer be asked for this attribute in this category.",
           "Any currently open gaps against it disappear from reports — reported compliance will improve without any supplier supplying anything.",
@@ -674,7 +684,9 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       return {
         summary: `Delete the "${profile.name}" profile (${profile.category}) and everything under it.`,
         effect: [
-          `${bricks.length} GS1 categor${bricks.length === 1 ? "y" : "ies"} lose their requirements: ${bricks.map((b) => b.name).join(", ")}.`,
+          bricks.length === 1
+            ? `1 GS1 category loses its requirements: ${bricks[0].name}.`
+            : `${bricks.length} GS1 categories lose their requirements: ${bricks.map((b) => b.name).join(", ")}.`,
           `Everything the profile carries goes with it — ${profile.attributes}${images ? `, including ${images} stored image rule${images === 1 ? "" : "s"}` : ""}.`,
           profile.status === "Active"
             ? "This profile is ACTIVE — vendor items in these categories stop being assessed the moment this applies."

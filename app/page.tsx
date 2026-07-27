@@ -161,6 +161,20 @@ export default function RetailerPortal() {
     setProfiles((prev) => prev.map((p) => (p.name === name ? { ...p, ...updates } : p)))
   }
 
+  // Both used by the agent panel's confirm cards, which have already mutated
+  // the shared store by the time these run — these keep the React copy of the
+  // profile list in step, the same way handleCreateProfile does.
+  function handleDeleteProfile(name: string) {
+    setProfiles((prev) => prev.filter((p) => p.name !== name))
+  }
+
+  function handleSetProfileStatus(name: string, status: "Active" | "Draft") {
+    handleUpdateProfile(name, {
+      status,
+      actions: status === "Active" ? ["Edit", "Deactivate"] : ["Edit", "Activate"],
+    })
+  }
+
   // Context passed from Screen 1 into Screen 2
   const [activeBrick, setActiveBrick] = useState<{ code: string; name: string } | null>(null)
   const [activeCategoryName, setActiveCategoryName] = useState<string | undefined>(undefined)
@@ -633,6 +647,8 @@ export default function RetailerPortal() {
         <ComplianceAgentPanel
           profiles={profiles}
           onCreateProfile={handleCreateProfile}
+          onDeleteProfile={handleDeleteProfile}
+          onSetProfileStatus={handleSetProfileStatus}
           onOpenAiAccess={() => setAiAccessOpen(true)}
         />
       )}

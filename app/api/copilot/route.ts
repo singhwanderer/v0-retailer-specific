@@ -9,7 +9,9 @@
 // see the README's store-separation caveat). Creates never mutate anything
 // here — they return a `proposal` the client renders as a confirm card and
 // only applies (client-side, the same way Screen 1/2 already do) once the user
-// clicks Apply. Read + Create only; there is no edit tool.
+// clicks Apply. The tool surface covers the whole lifecycle — read, create,
+// edit, remove, activate, delete — and the invariant that holds it together is
+// that none of those tools mutate, not that the list is short.
 
 import { after } from "next/server"
 import { RunTree } from "langsmith/run_trees"

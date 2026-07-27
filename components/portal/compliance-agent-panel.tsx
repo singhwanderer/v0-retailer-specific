@@ -11,6 +11,8 @@ import {
   updateAttributeRequirement,
   removeAttributeRequirement,
   removeImageRequirement,
+  setProfileStatus,
+  deleteAttributeProfile,
 } from "@/lib/mcp/tools"
 import { PORTAL_CTX } from "@/lib/mcp/context"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
@@ -33,6 +35,8 @@ interface PendingProposal {
 interface ComplianceAgentPanelProps {
   profiles: AttributeProfile[]
   onCreateProfile: (profile: AttributeProfile) => void
+  onDeleteProfile: (name: string) => void
+  onSetProfileStatus: (name: string, status: "Active" | "Draft") => void
   /** Open the external MCP connector signpost screen */
   onOpenAiAccess: () => void
 }
@@ -47,13 +51,21 @@ function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess }: ComplianceAgentPanelProps) {
+export function ComplianceAgentPanel({
+  profiles,
+  onCreateProfile,
+  onDeleteProfile,
+  onSetProfileStatus,
+  onOpenAiAccess,
+}: ComplianceAgentPanelProps) {
   const [sheetOpen, setSheetOpen] = useState(true)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [proposals, setProposals] = useState<PendingProposal[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Text typed into a confirmText card's field, keyed by proposal id. */
+  const [confirmInputs, setConfirmInputs] = useState<Record<string, string>>({})
 
   async function sendMessage(text: string) {
     const trimmed = text.trim()
@@ -101,6 +113,10 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
     const entry = proposals.find((p) => p.id === id)
     if (!entry || entry.status !== "pending") return
     const { proposal } = entry
+    // Belt and braces: the button is already disabled until this matches, but
+    // the check that actually gates the mutation should not live in a
+    // `disabled` prop.
+    if (proposal.confirmText && (confirmInputs[id] ?? "").trim() !== proposal.confirmText) return
 
     try {
       if (proposal.tool === "create_attribute_profile") {
@@ -201,6 +217,45 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
               : p
           )
         )
+      } else if (proposal.tool === "activate_profile") {
+        const { profileName, status } = proposal.args as { profileName: string; status: "Active" | "Draft" }
+        const result = setProfileStatus(PORTAL_CTX, profileName, status)
+        if ("error" in result) {
+          const message = String(result.error)
+          setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: message } : p)))
+          return
+        }
+        onSetProfileStatus(profileName, status)
+        setProposals((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  status: "applied",
+                  resultNote:
+                    status === "Active"
+                      ? "Now Active. Vendor items in this category are assessed against it from the next report."
+                      : "Returned to Draft. The requirements are kept but nothing is assessed against them.",
+                }
+              : p
+          )
+        )
+      } else if (proposal.tool === "delete_attribute_profile") {
+        const { profileName } = proposal.args as { profileName: string }
+        const result = deleteAttributeProfile(PORTAL_CTX, profileName)
+        if ("error" in result) {
+          const message = String(result.error)
+          setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: message } : p)))
+          return
+        }
+        onDeleteProfile(profileName)
+        setProposals((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? { ...p, status: "applied", resultNote: "Deleted, along with every attribute and image rule under it." }
+              : p
+          )
+        )
       }
     } catch {
       setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: "Could not apply this change." } : p)))
@@ -265,8 +320,9 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
             <div className="flex flex-col gap-3 py-4">
               <div className="flex items-start gap-2">
                 <div className="rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm max-w-[85%]" style={{ backgroundColor: "#F3F4F6", color: "#111827" }}>
-                  Ask me about your requirements, suppliers, or compliance — or ask me to set up a new one. I can create new
-                  profiles and requirements, but I can&rsquo;t edit anything that already exists.
+                  Ask me about your requirements, suppliers, or compliance — or ask me to change them. I can create,
+                  edit, remove, activate and delete requirement profiles. Nothing is applied until you confirm it on a
+                  card.
                 </div>
               </div>
 
@@ -313,14 +369,44 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
                     </p>
                   )}
                   {entry.status === "pending" && (
-                    <div className="mt-2.5 flex gap-2">
-                      <Button size="sm" onClick={() => applyProposal(entry.id)} className="h-7 px-3 text-xs">
-                        {entry.proposal.destructive ? "Remove it" : "Apply"}
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => cancelProposal(entry.id)} className="h-7 px-3 text-xs">
-                        Cancel
-                      </Button>
-                    </div>
+                    <>
+                      {entry.proposal.confirmText && (
+                        <div className="mt-2.5 ml-6 flex flex-col gap-1.5">
+                          <label
+                            htmlFor={`confirm-${entry.id}`}
+                            className="text-xs font-medium"
+                            style={{ color: "#991B1B" }}
+                          >
+                            Type <span className="font-semibold">{entry.proposal.confirmText}</span> to confirm
+                          </label>
+                          <Input
+                            id={`confirm-${entry.id}`}
+                            value={confirmInputs[entry.id] ?? ""}
+                            onChange={(e) =>
+                              setConfirmInputs((prev) => ({ ...prev, [entry.id]: e.target.value }))
+                            }
+                            autoComplete="off"
+                            className="h-7 max-w-[15rem] text-xs"
+                          />
+                        </div>
+                      )}
+                      <div className="mt-2.5 flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => applyProposal(entry.id)}
+                          disabled={
+                            !!entry.proposal.confirmText &&
+                            (confirmInputs[entry.id] ?? "").trim() !== entry.proposal.confirmText
+                          }
+                          className="h-7 px-3 text-xs"
+                        >
+                          {entry.proposal.destructive ? "Remove it" : "Apply"}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => cancelProposal(entry.id)} className="h-7 px-3 text-xs">
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
                   )}
                   {entry.status === "applied" && (
                     <p className="mt-2 text-xs font-medium" style={{ color: "#15803D" }}>

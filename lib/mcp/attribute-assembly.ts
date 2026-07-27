@@ -68,6 +68,61 @@ export function assembleBrickAttributes(brickCode: string, tenantId?: string): B
 }
 
 /**
+ * Retailer-facing display of a standard attribute's TGC/GS1 name — strips the
+ * trailing "(CODE)" that `gs1Name` carries as its store lookup key. Showing a
+ * raw GS1 code to a retailer would wrongly suggest they are prescribing a
+ * specific value; only suppliers fill in values, on their own screens.
+ *
+ * Lives here rather than in a screen because both the authoring UI and the
+ * agent surfaces have to render the same name for the same row.
+ */
+export function gs1DisplayName(gs1Name: string): string {
+  return gs1Name.replace(/\s*\([^()]*\)\s*$/, "")
+}
+
+/**
+ * Turn whatever a caller named an attribute into the canonical `gs1Name` key
+ * the store is keyed on.
+ *
+ * The key for a standard row is `"Closure (GM03CLOS)"`, but nothing outside
+ * this module should have to know that: the UI shows "Closure", and so does
+ * the agent. Accepting both forms is what lets the display name be the only
+ * one anybody ever sees. Matching widens in three steps — exact key, then
+ * display name, then case-insensitively on either — so a caller who does pass
+ * the full key still resolves.
+ *
+ * A miss is an error rather than a shrug: the mutation paths below used to
+ * record an exclusion for an unmatched string and report success, which looks
+ * identical to a real removal until you reopen the profile.
+ */
+export function resolveGs1Name(
+  brickCode: string,
+  input: string,
+  tenantId?: string
+): { gs1Name: string } | { error: string } {
+  const { coreAttributes, extendedAttributes } = assembleBrickAttributes(brickCode, tenantId)
+  const rows = [...coreAttributes, ...extendedAttributes]
+  const wanted = input.trim()
+  const lower = wanted.toLowerCase()
+
+  const match =
+    rows.find((r) => r.gs1Name === wanted) ??
+    rows.find((r) => gs1DisplayName(r.gs1Name) === wanted) ??
+    rows.find((r) => r.gs1Name.toLowerCase() === lower) ??
+    rows.find((r) => gs1DisplayName(r.gs1Name).toLowerCase() === lower)
+
+  if (!match) {
+    const names = rows.map((r) => gs1DisplayName(r.gs1Name))
+    return {
+      error: `No attribute named "${input}" on GS1 category ${brickCode}. ${
+        names.length ? `Attributes here: ${names.join(", ")}.` : "This profile has no attributes."
+      }`,
+    }
+  }
+  return { gs1Name: match.gs1Name }
+}
+
+/**
  * Find the profile mapped to a brick code — checks ALL of a profile's mapped
  * bricks (via getProfileBricks), not just its primary brickCode. A profile's
  * secondary bricks are otherwise invisible to a plain

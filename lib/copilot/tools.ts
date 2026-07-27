@@ -10,8 +10,12 @@
 // the same way Screen 1 / Screen 2 already do), so a chat-originated
 // change lands in the same place a manual edit would.
 //
-// updateAttributeRequirement is intentionally never imported here — the
-// agent has no code path to edit an existing requirement, by design.
+// The agent covers the whole requirement lifecycle — read, create, edit,
+// remove, activate. What it never does is apply any of it: the safety
+// property is that no tool in this file mutates, not that the tool list is
+// short. Deleting a profile is the one action that also demands the user
+// retype the profile name on the card (ProposedAction.confirmText), because
+// it is the widest-blast-radius write on this surface.
 
 import { tool } from "ai"
 import { z } from "zod"
@@ -21,7 +25,12 @@ import {
   getProfileBricks,
   type AttributeProfile,
 } from "@/lib/retailer-requirements"
-import { findProfileForBrick, assembleBrickAttributes } from "@/lib/mcp/attribute-assembly"
+import {
+  findProfileForBrick,
+  assembleBrickAttributes,
+  gs1DisplayName,
+  resolveGs1Name,
+} from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
 
@@ -41,6 +50,8 @@ export interface ProposedAction {
     | "update_attribute_requirement"
     | "remove_attribute_requirement"
     | "remove_image_requirement"
+    | "delete_attribute_profile"
+    | "activate_profile"
   summary: string
   args: Record<string, unknown>
   /**
@@ -51,10 +62,28 @@ export interface ProposedAction {
   destructive?: boolean
   /** What the user is actually agreeing to — shown on the confirm card. */
   consequence?: string
+  /**
+   * When set, the card keeps its button disabled until the user types this
+   * string exactly. The external connector gates a delete behind a
+   * single-use confirmation token it must redeem through a second tool; a
+   * card with one clickable button is a weaker gate than that, and profile
+   * deletion is the one action where the difference matters.
+   */
+  confirmText?: string
 }
 
 function knownSuppliers(): string[] {
   return [...new Set(RETAILER_SUPPLIERS.map((s) => s.supplier))].sort()
+}
+
+/** Profile lookup by name, matched the same way the store matches it. */
+function findProfileByName(ctx: CopilotContext, profileName: string): AttributeProfile | undefined {
+  const wanted = profileName.toLowerCase().trim()
+  return ctx.profiles.find((p) => p.name.toLowerCase() === wanted)
+}
+
+function unknownProfile(ctx: CopilotContext, profileName: string): string {
+  return `No attribute profile named "${profileName}". Your profiles: ${ctx.profiles.map((p) => p.name).join(", ")}.`
 }
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
@@ -64,12 +93,17 @@ function makeReadTools(ctx: CopilotContext) {
     search_gs1_bricks: tool({
       description: "Search GS1 product categories (bricks) by name or keyword.",
       inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'handbags' or 'footwear'") }),
+      // Attribute names come back as plain strings, with the GS1 codes in a
+      // parallel field. Returning "Closure (GM03CLOS)" here gave the model a
+      // ready-made display string it would paste straight into a reply, which
+      // is the one thing the retailer view never shows (see gs1DisplayName).
       execute: async ({ query }) =>
         searchBricks(query).map((b) => ({
           brickCode: b.brickCode,
           brickName: b.brickName,
           segment: b.segment,
-          standardExtendedAttributes: b.extendedAttributes.map((a) => `${a.name} (${a.code})`),
+          standardExtendedAttributes: b.extendedAttributes.map((a) => a.name),
+          attributeCodes: Object.fromEntries(b.extendedAttributes.map((a) => [a.name, a.code])),
         })),
     }),
 
@@ -92,7 +126,9 @@ function makeReadTools(ctx: CopilotContext) {
 
     get_profile_detail: tool({
       description: "Get the full attribute and image-requirement detail for one GS1 category code.",
-      inputSchema: z.object({ brickCode: z.string().describe("GS1 brick code, e.g. 10001077 for Shoes - General Purpose") }),
+      inputSchema: z.object({
+        brickCode: z.string().describe("GS1 brick code for the category, as returned by search_gs1_bricks or list_attribute_profiles"),
+      }),
       execute: async ({ brickCode }) => {
         const profile = findProfileForBrick(ctx.profiles, brickCode)
         const brick = getBrickByCode(brickCode)
@@ -228,16 +264,21 @@ function makeReadTools(ctx: CopilotContext) {
       inputSchema: z.object({}),
       execute: async () => ({
         about:
-          "TGC Compliance Agent — retailer-side requirement authoring (read + create only, never edits existing rows) and supplier compliance monitoring.",
+          "TGC Compliance Agent — retailer-side requirement authoring across the full lifecycle (read, create, edit, remove, activate) and supplier compliance monitoring. Nothing is ever applied without you confirming it on a card.",
         youCanAsk: {
           understandRequirements: "Look up what a product category requires (attributes, image rules).",
           monitorSuppliers: "See how your suppliers are doing on compliance and where the gaps are.",
           runComplianceReports: "Run a compliance report against a profile or a global System filter.",
-          createRequirements: "Create a new attribute profile, add a new custom attribute, or add a new image requirement — always with a confirm step before anything is applied.",
+          createRequirements: "Create a new attribute profile, add a new custom attribute, or add a new image requirement.",
+          changeRequirements: "Change an attribute's label or supplier guidance, stop requiring an attribute or an image, or activate a Draft profile and deactivate an Active one.",
+          deleteProfiles: "Delete a whole profile and everything under it — the widest-reaching action here, so the card makes you retype the profile name first.",
         },
+        everyChangeIsConfirmed:
+          "No action applies itself. Each one comes back as a proposal card with Apply and Cancel, and removals state what they do to your compliance numbers before you decide.",
         cannotDo: [
-          "Edit or delete an existing attribute, image rule, or profile — that stays a manual action in Attributes & Images.",
-          "Vendor exceptions (waivers, extended deadlines, reduced scope).",
+          "Apply any change without you confirming it.",
+          "Vendor exceptions (waivers, extended deadlines, reduced scope) — those stay a manual action.",
+          "Simulate a requirement change before making it, or read the AI access log. Both exist on the external MCP connector, not here.",
           "Other retailers' or peer accounts' data.",
           "Sales, logistics, or pricing.",
         ],
@@ -273,7 +314,7 @@ function makeCreateTools(ctx: CopilotContext) {
         const conflict = bricks.find((b) => findProfileForBrick(ctx.profiles, b.code))
         if (conflict) {
           const owner = findProfileForBrick(ctx.profiles, conflict.code)!
-          return { error: `GS1 category ${conflict.code} is already mapped to the "${owner.name}" profile. Ask to add a requirement to that profile instead — I can't edit an existing one, but you can from Attributes & Images.` }
+          return { error: `The "${conflict.brick!.brickName}" category is already mapped to the "${owner.name}" profile, and a category belongs to one profile at a time. Ask me to add a requirement to "${owner.name}" instead, or to delete it first if you mean to replace it.` }
         }
         const brickNames = bricks.map((b) => b.brick!.brickName).join(", ")
         const proposal: ProposedAction = {
@@ -358,7 +399,7 @@ function makeEditTools(ctx: CopilotContext) {
         "Propose changing an existing attribute's display label or supplier guidance on a profile. Works for both custom rows and rows inherited from the GS1 standard. Does not change anything — returns a proposal the user must confirm.",
       inputSchema: z.object({
         brickCode: z.string(),
-        gs1Name: z.string().describe("The attribute's GS1 name exactly as get_profile_detail returns it"),
+        gs1Name: z.string().describe("The attribute's name as get_profile_detail returns it"),
         name: z.string().optional().describe("New display label"),
         guidance: z.string().optional().describe("New supplier guidance"),
       }),
@@ -370,14 +411,18 @@ function makeEditTools(ctx: CopilotContext) {
         if (name === undefined && guidance === undefined) {
           return { error: "Nothing to change — I need a new label, new guidance, or both." }
         }
+        const resolved = resolveGs1Name(brickCode, gs1Name)
+        if ("error" in resolved) return resolved
         const changes = [
           ...(name !== undefined ? [`label → "${name}"`] : []),
           ...(guidance !== undefined ? [`guidance → "${guidance}"`] : []),
         ].join(", ")
         const proposal: ProposedAction = {
           tool: "update_attribute_requirement",
-          summary: `Update "${gs1Name}" on "${profile.name}": ${changes}.`,
-          args: { brickCode, gs1Name, name, guidance },
+          // The card shows the name the retailer sees on screen; args carry
+          // the canonical store key the apply path needs.
+          summary: `Update "${gs1DisplayName(resolved.gs1Name)}" on "${profile.name}": ${changes}.`,
+          args: { brickCode, gs1Name: resolved.gs1Name, name, guidance },
           consequence:
             "Changes how the requirement reads for suppliers. Gap counts are unaffected — this does not change whether it is met.",
         }
@@ -390,17 +435,19 @@ function makeEditTools(ctx: CopilotContext) {
         "Propose removing an attribute from a profile's requirements, so suppliers are no longer asked for it. Does not remove anything — returns a proposal the user must confirm. Always state the consequence before proposing this.",
       inputSchema: z.object({
         brickCode: z.string(),
-        gs1Name: z.string().describe("The attribute's GS1 name exactly as get_profile_detail returns it"),
+        gs1Name: z.string().describe("The attribute's name as get_profile_detail returns it"),
       }),
       execute: async ({ brickCode, gs1Name }) => {
         const profile = findProfileForBrick(ctx.profiles, brickCode)
         if (!profile) {
           return { error: `No attribute profile exists for GS1 category ${brickCode}.` }
         }
+        const resolved = resolveGs1Name(brickCode, gs1Name)
+        if ("error" in resolved) return resolved
         const proposal: ProposedAction = {
           tool: "remove_attribute_requirement",
-          summary: `Stop requiring "${gs1Name}" on "${profile.name}".`,
-          args: { brickCode, gs1Name },
+          summary: `Stop requiring "${gs1DisplayName(resolved.gs1Name)}" on "${profile.name}".`,
+          args: { brickCode, gs1Name: resolved.gs1Name },
           destructive: true,
           consequence:
             "Open gaps against this attribute disappear from reports, so compliance improves without any supplier supplying anything. That is lowering the bar, not closing a gap.",
@@ -438,6 +485,67 @@ function makeEditTools(ctx: CopilotContext) {
           args: { brickCode, requirementName: existing.requirementName },
           destructive: true,
           consequence: "Images already supplied are not deleted — only the requirement to supply them.",
+        }
+        return { proposal }
+      },
+    }),
+
+    activate_profile: tool({
+      description:
+        "Propose activating a Draft profile so its requirements start being enforced across the vendor base, or returning an Active profile to Draft. Does not change anything — returns a proposal the user must confirm.",
+      inputSchema: z.object({
+        profileName: z.string(),
+        status: z
+          .enum(["Active", "Draft"])
+          .describe("'Active' to start enforcing this profile, 'Draft' to stop and return it to editing"),
+      }),
+      execute: async ({ profileName, status }) => {
+        const profile = findProfileByName(ctx, profileName)
+        if (!profile) return { error: unknownProfile(ctx, profileName) }
+        if (profile.status === status) {
+          return { error: `"${profile.name}" is already ${status}. Nothing to change.` }
+        }
+        const proposal: ProposedAction = {
+          tool: "activate_profile",
+          summary: `Set the "${profile.name}" profile from ${profile.status} to ${status}.`,
+          args: { profileName: profile.name, status },
+          consequence:
+            status === "Active"
+              ? `Vendor items in ${profile.category} start being assessed against this profile. Expect reported gap counts to rise the first time a report runs — those gaps already existed, they were simply not being measured.`
+              : `Vendor items in ${profile.category} stop being assessed against this profile. The requirements are kept and can be re-activated.`,
+        }
+        return { proposal }
+      },
+    }),
+
+    delete_attribute_profile: tool({
+      description:
+        "Propose deleting a whole requirement profile and every attribute and image rule beneath it. This is the widest-reaching action available here. Does not delete anything — returns a proposal the user must confirm by retyping the profile name. Always state the consequence before proposing this.",
+      inputSchema: z.object({ profileName: z.string() }),
+      execute: async ({ profileName }) => {
+        const profile = findProfileByName(ctx, profileName)
+        if (!profile) return { error: unknownProfile(ctx, profileName) }
+        const bricks = getProfileBricks(profile)
+        const images = bricks.reduce(
+          (sum, b) => sum + assembleBrickAttributes(b.code).imageRequirements.length,
+          0
+        )
+        const proposal: ProposedAction = {
+          tool: "delete_attribute_profile",
+          summary: `Delete the "${profile.name}" profile (${profile.category}) and everything under it.`,
+          args: { profileName: profile.name },
+          destructive: true,
+          confirmText: profile.name,
+          consequence: [
+            bricks.length === 1
+              ? `1 GS1 category loses its requirements: ${bricks[0].name}.`
+              : `${bricks.length} GS1 categories lose their requirements: ${bricks.map((b) => b.name).join(", ")}.`,
+            `Everything the profile carries goes with it — ${profile.attributes}${images ? `, including ${images} stored image rule${images === 1 ? "" : "s"}` : ""}.`,
+            profile.status === "Active"
+              ? "This profile is ACTIVE — vendor items in these categories stop being assessed the moment this applies."
+              : "This profile is a Draft, so nothing is currently being assessed against it.",
+            "There is no undo in this prototype. The profile would have to be recreated from scratch.",
+          ].join(" "),
         }
         return { proposal }
       },

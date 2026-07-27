@@ -131,15 +131,30 @@ conclude tracing is broken. Extending the loop to the connector's tool layer is
 planned, not done — see
 [`eval-framework-pm-presentation.md`](./eval-framework-pm-presentation.md) §7.
 
-## One more capability, not yet clickable
+## One more capability, built but not yet scheduled
 
-The connector can also run checks on its own — for example, scanning for
-suppliers falling behind on a schedule, with nobody signed in at the time. When
-it does this, it acts under its own restricted identity rather than borrowing a
-person's login: it can only look things up, it's tied to one company's data,
-and it can never make a change, because no person is present to approve one.
+The connector can run checks with nobody signed in at the time — for example,
+scanning for suppliers falling behind. When it does, it acts under its own
+restricted identity rather than borrowing a person's login: it can only look
+things up, it's tied to one company's data, and it can never make a change,
+because no person is present to approve one.
 
-This is a real, standing part of how the connector works — it isn't only for
-demos. There's currently no button in the app to trigger it live and watch it
-happen; it runs automatically when scheduled. If it comes up in conversation,
-it's fine to describe it exactly as above.
+**Be precise about what "can" means here, because it splits in two:**
+
+- **The identity and its limits are real and enforced.** `POST
+  /api/demo/proactive-check` mints a workload token
+  (`subject_type: workload`, no human subject), verifies it exactly as
+  `/api/mcp` verifies any caller, and runs the report through the same
+  `runGuarded()` choke point — so it produces audit lines like anyone else.
+  Its provisioned scope set is `tgc.read` alone and it cannot be widened at the
+  token endpoint; every write tool carries `allowWorkload: false` and is
+  refused outright. That is ENT-04, and it holds.
+- **Nothing calls it on a schedule.** There is no cron entry, no
+  `vercel.json`, no scheduled function anywhere in this repo. The route runs
+  when something POSTs to it, and today nothing does.
+
+So describe it as *built and enforced, not yet scheduled*. Saying it "runs
+automatically" is the one version that will not survive someone opening the
+repo. Turning it on needs three things that are deliberately out of scope for a
+prototype: a scheduler, somewhere for the alerts to go, and durable storage —
+the audit trail is a 200-entry in-memory ring buffer that resets on cold start.
