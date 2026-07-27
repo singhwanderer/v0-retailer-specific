@@ -11,6 +11,12 @@
 // Scope, by contrast, IS consented: that is the user legitimately deciding how
 // much authority to delegate to the AI client, and it defaults to read-only
 // (§4A row 6, progressive scopes).
+//
+// One consequence of that, enforced in readParams below: `tgc.destructive` is
+// never rendered pre-ticked, however broad the client's `scope` request. A
+// client that asks for every advertised scope would otherwise have the user
+// consent to profile deletion by not noticing a checkbox — which is the whole
+// thing separating destructive from the write scopes was meant to prevent.
 
 import { DEFAULT_SCOPES, SCOPES, isScope, type Scope } from "@/lib/mcp/context"
 import { getClient, issueAuthCode } from "@/lib/mcp/oauth"
@@ -27,13 +33,23 @@ interface AuthorizeParams {
 
 function readParams(params: URLSearchParams): AuthorizeParams {
   const requested = (params.get("scope") ?? "").split(/[\s+]+/).filter(isScope)
+  // A client asks for scopes; it does not get to decide which boxes arrive
+  // ticked. Destructive is always unticked no matter what was requested —
+  // clients routinely request every scope the resource advertises, and a
+  // pre-ticked "delete profiles" box turns the one authority we deliberately
+  // separated out into something granted by reflex. Everything else honours
+  // the request, since re-ticking read and write on every reconnect is
+  // friction that buys nothing.
+  const preChecked = (requested.length > 0 ? requested : DEFAULT_SCOPES).filter(
+    (s) => s !== SCOPES.destructive
+  )
   return {
     clientId: params.get("client_id") ?? "",
     redirectUri: params.get("redirect_uri") ?? "",
     state: params.get("state") ?? "",
     codeChallenge: params.get("code_challenge") ?? "",
     codeChallengeMethod: params.get("code_challenge_method") ?? "",
-    scopes: requested.length > 0 ? requested : DEFAULT_SCOPES,
+    scopes: preChecked.length > 0 ? preChecked : DEFAULT_SCOPES,
   }
 }
 

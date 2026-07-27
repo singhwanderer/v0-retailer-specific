@@ -156,8 +156,10 @@ server-side, returning a `proposal` the panel renders as a confirm card, and onl
 an "Apply" click calls the same create/update functions Screen 1 and Screen 2
 already use. The connector's equivalent is protocol-level — a pending change plus
 a single-use token redeemed through `confirm_pending_change` — because an outside
-assistant has no UI of ours to render a card in. The panel also has a narrower
-surface overall: no simulation, exceptions, delete or audit tools.
+assistant has no UI of ours to render a card in. Deleting a profile is the one
+action where a single Apply click is too weak a gate for how far it reaches, so
+its card also makes the user retype the profile name. The panel still has a
+narrower surface overall: no simulation, exceptions or audit tools.
 
 **This is the surface under evaluation.** Every panel turn is traced to LangSmith
 (`lib/copilot/agent.ts`), and `lib/copilot/run-eval.ts` runs an uploaded golden

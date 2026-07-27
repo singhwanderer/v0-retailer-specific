@@ -27,7 +27,12 @@ import {
   type AttributeRequirement,
   type ImageRequirement,
 } from "@/lib/mcp/store"
-import { assembleBrickAttributes, describeProfileAttributes, type BrickAttributeSet } from "@/lib/mcp/attribute-assembly"
+import {
+  assembleBrickAttributes,
+  describeProfileAttributes,
+  gs1DisplayName,
+  type BrickAttributeSet,
+} from "@/lib/mcp/attribute-assembly"
 import {
   addAttributeRequirement,
   removeAttributeRequirement,
@@ -38,14 +43,6 @@ import { PORTAL_CTX } from "@/lib/mcp/context"
 
 function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-}
-
-// Retailer-facing display of a standard attribute's TGC/GS1 name — strips the
-// trailing "(CODE)" that `gs1Name` carries as its store lookup key. Showing a
-// raw GS1 code here would wrongly suggest the retailer is prescribing a
-// specific value; only suppliers fill in values, on their own screens.
-function gs1DisplayName(gs1Name: string): string {
-  return gs1Name.replace(/\s*\([^()]*\)\s*$/, "")
 }
 
 type ProfileStatus = "Active" | "Draft"

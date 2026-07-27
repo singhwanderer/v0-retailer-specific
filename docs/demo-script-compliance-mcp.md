@@ -120,6 +120,7 @@ the same thing:
 |---|---|---|
 | Reads | Shared — both call the same functions | Shared — both call the same functions |
 | Writes | Client-side confirm card | Protocol-level proposal + single-use token |
+| Delete a profile | Confirm card + retype the profile name | `tgc.destructive` scope + confirmation token |
 | Simulation | **Not available** | `simulate_requirement_change` |
 | Access log lines | None | Every call |
 | LangSmith traces | **Every turn** | None |

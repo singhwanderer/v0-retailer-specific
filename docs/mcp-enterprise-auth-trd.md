@@ -219,6 +219,14 @@ authority, and a single "write" bucket asks the user to consent to both at once.
 The consent screen carries a fourth checkbox, unchecked by default: *Remove
 requirements and revoke exceptions.*
 
+**"Unchecked by default" is forced, not merely a default.** The authorize
+endpoint pre-ticks the boxes a client asked for, and MCP clients routinely
+request every scope a resource advertises — which for a while meant
+`tgc.destructive` arrived pre-consented, exactly inverting this row. `readParams`
+in `app/oauth/authorize/route.ts` now strips that scope from the pre-checked set
+regardless of the request. The checkbox still renders and can still be ticked;
+it just cannot be granted by a user who never looked at it.
+
 ### ENT-06a — Two-phase confirmation for every mutation
 
 **Requirement.** No mutating tool acts on its first call. It validates, computes
