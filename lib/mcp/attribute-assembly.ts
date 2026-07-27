@@ -8,7 +8,14 @@
 // does this brick require" so the connector and the authoring screens read
 // and write through the same logic instead of two hand-synced copies.
 
-import { getBrickByCode } from "@/lib/gs1-standard-library"
+import {
+  GS1_BRICKS,
+  getBrickByCode,
+  getSegments,
+  searchBricks,
+  type Gs1Brick,
+  type Gs1ExtendedAttribute,
+} from "@/lib/gs1-standard-library"
 import { getProfileBricks, type AttributeProfile, type ProfileBrick } from "@/lib/retailer-requirements"
 import {
   BASELINE_CORE_ATTRIBUTES,
@@ -133,6 +140,127 @@ export function findProfileForBrick(
   brickCode: string
 ): AttributeProfile | undefined {
   return profiles.find((p) => getProfileBricks(p).some((b) => b.code === brickCode))
+}
+
+/**
+ * Every GS1 category not yet mapped to any profile, in library order. A new
+ * profile can only be built on one of these, so both the search tool and the
+ * mapping-conflict error quote from this list — the alternative is an agent
+ * that can discover a category is free only by proposing it and being refused.
+ */
+export function unmappedBricks(profiles: AttributeProfile[]): Gs1Brick[] {
+  return GS1_BRICKS.filter((b) => !findProfileForBrick(profiles, b.brickCode))
+}
+
+/**
+ * The error for "you asked for a GS1 category another profile already owns".
+ *
+ * It names the categories still free to map, and offers that as the FIRST way
+ * out. Listing only extend-or-delete — the two exits this string used to
+ * offer — meant a user who insisted ("create a new one already!") got the same
+ * refusal back, because those really were the only options the agent had been
+ * handed, while an unmapped category sat there the whole time.
+ *
+ * It also says "GS1 category" throughout: AttributeProfile.category is a
+ * separate free-text label that several profiles legitimately share, so an
+ * unqualified "a category belongs to one profile" reads as false to anyone
+ * looking at their own requirements list.
+ */
+export function mappingConflict(
+  profiles: AttributeProfile[],
+  brick: Gs1Brick,
+  ownerName: string
+): string {
+  const free = unmappedBricks(profiles)
+  const nearby = free.filter((b) => b.segment === brick.segment)
+  const suggest = (nearby.length ? nearby : free).map((b) => b.brickName)
+  const options = [
+    ...(suggest.length
+      ? [`map the new profile to a GS1 category that is still free — ${suggest.join(", ")}`]
+      : []),
+    `add the requirement to "${ownerName}" instead`,
+    `delete "${ownerName}" first, if you mean to replace it`,
+  ]
+  return (
+    `The GS1 category "${brick.brickName}" is already mapped to the "${ownerName}" profile, ` +
+    `and a GS1 category can belong to only one profile at a time. ` +
+    `(A profile's own category label is a different, free-text field — profiles may share that.) ` +
+    `Ways forward: ${options.join("; ")}. ` +
+    `Put these to the user and let them choose; do not pick a category on their behalf.`
+  )
+}
+
+export interface BrickMatch {
+  brickCode: string
+  brickName: string
+  segment: string
+  /** Whether a NEW profile can be mapped here — false once some profile owns it. */
+  available: boolean
+  /** The profile already holding this category, when `available` is false. */
+  mappedTo?: string
+  extendedAttributes: Gs1ExtendedAttribute[]
+}
+
+export interface BrickSearchResult {
+  matches: BrickMatch[]
+  /** Present only when the raw matches alone would strand the caller. */
+  note?: string
+}
+
+/**
+ * Search the GS1 library and say, per hit, whether the category is still free
+ * to map. The note carries the recovery path in the two cases where the match
+ * list on its own is a dead end: nothing matched at all, and everything that
+ * matched is already spoken for. Named alternatives come from the library, so
+ * the agent relays real categories instead of inventing a plausible one — the
+ * failure mode that put "Booties" onto an already-mapped footwear category.
+ */
+export function searchBricksWithMapping(
+  profiles: AttributeProfile[],
+  query: string
+): BrickSearchResult {
+  const matches: BrickMatch[] = searchBricks(query).map((b) => {
+    const owner = findProfileForBrick(profiles, b.brickCode)
+    return {
+      brickCode: b.brickCode,
+      brickName: b.brickName,
+      segment: b.segment,
+      available: !owner,
+      ...(owner ? { mappedTo: owner.name } : {}),
+      extendedAttributes: b.extendedAttributes,
+    }
+  })
+
+  const free = unmappedBricks(profiles)
+  const freeNames = (bricks: Gs1Brick[]) => bricks.map((b) => b.brickName).join(", ")
+
+  if (matches.length === 0) {
+    return {
+      matches,
+      note:
+        `No GS1 category matches "${query}". Do not substitute a similar-sounding category — ask the user which category to map. ` +
+        `Segments in the library: ${getSegments().join(", ")}. ` +
+        (free.length
+          ? `Categories not yet mapped to any profile: ${freeNames(free)}.`
+          : `Every GS1 category is already mapped to a profile.`),
+    }
+  }
+
+  if (matches.every((m) => !m.available)) {
+    const segments = new Set(matches.map((m) => m.segment))
+    const nearby = free.filter((b) => segments.has(b.segment))
+    const suggest = nearby.length ? nearby : free
+    return {
+      matches,
+      note:
+        `Every category matching "${query}" already belongs to a profile, and a GS1 category can belong to only one profile at a time. ` +
+        (suggest.length
+          ? `Still free to map to a new profile: ${freeNames(suggest)}.`
+          : `No GS1 category is left unmapped — a new profile is not possible until one is freed.`),
+    }
+  }
+
+  return { matches }
 }
 
 /**

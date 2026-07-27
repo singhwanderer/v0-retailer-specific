@@ -181,7 +181,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "search_gs1_bricks",
     description:
-      "Search the GS1 standard category library by name, segment, or category code. Returns each GS1 category's code, name, segment, and its standard extended attributes. Use this to resolve a product category like 'dresses' or 'footwear' to a GS1 category code before creating or inspecting an attribute profile.",
+      "Search the GS1 standard category library by name, segment, everyday synonym, or category code. Returns each GS1 category's code, name, segment, its standard extended attributes, and whether it is still free to map to a new profile (`available`, plus `mappedTo` when it is not). Use this to resolve a product category like 'dresses' or 'booties' to a GS1 category code before creating or inspecting an attribute profile. If nothing matches, or every match is already mapped, the result carries a `note` naming the categories that are still free — relay those rather than picking a similar-sounding category yourself.",
     schema: {
       query: z
         .string()
@@ -191,7 +191,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     requiredScope: SCOPES.read,
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: true,
-    handler: (_ctx, { query }: { query: string }) => searchGs1Bricks(query),
+    handler: (ctx, { query }: { query: string }) => searchGs1Bricks(ctx, query),
   },
   {
     name: "list_attribute_profiles",
@@ -311,7 +311,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "create_attribute_profile",
     description:
-      "Create a new attribute profile (requirement set) for a product category, mapped to one or more GS1 categories. The profile starts as Draft and is seeded with each mapped GS1 category's standard extended attributes — each brick keeps its own attribute set, with no merging across bricks. Before calling, confirm the category name, GS1 category choice(s), and free-text product-type label with the user, and afterwards show them the created profile.",
+      "Create a new attribute profile (requirement set) for a product category, mapped to one or more GS1 categories. The profile starts as Draft and is seeded with each mapped GS1 category's standard extended attributes — each brick keeps its own attribute set, with no merging across bricks. Every GS1 category belongs to at most one profile, so call search_gs1_bricks first and only pass categories it reports as available; if no GS1 category matches the name the user asked for, ask them which category to map rather than substituting a similar-sounding one. Before calling, confirm the category name, GS1 category choice(s), and free-text product-type label with the user, and afterwards show them the created profile.",
     schema: {
       categoryName: z.string().describe("The retailer's internal category name, e.g. 'Swimwear'"),
       brickCodes: z

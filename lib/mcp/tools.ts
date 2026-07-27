@@ -21,7 +21,7 @@
 // where every write lands — and that divergence is what the cross-tenant test
 // asserts.
 
-import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
+import { getBrickByCode, getSegments } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PERSONA, SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
   RETAILER_SUPPLIERS,
@@ -43,7 +43,10 @@ import {
   assembleBrickAttributes,
   describeProfileAttributes,
   findProfileForBrick,
+  mappingConflict,
   resolveGs1Name,
+  searchBricksWithMapping,
+  unmappedBricks,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
@@ -59,13 +62,17 @@ function knownSuppliers(): string[] {
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
-export function searchGs1Bricks(query: string) {
-  return searchBricks(query).map((b) => ({
-    brickCode: b.brickCode,
-    brickName: b.brickName,
-    segment: b.segment,
-    standardExtendedAttributes: b.extendedAttributes.map((a) => `${a.name} (${a.code})`),
+// Each hit says whether the category is still free to map, and an empty or
+// fully-taken result carries a note naming the categories that are — without
+// it a caller can only discover a clash by attempting create_attribute_profile
+// and being refused (see searchBricksWithMapping).
+export function searchGs1Bricks(ctx: CallerContext, query: string) {
+  const { matches, note } = searchBricksWithMapping(getStore(ctx.tenantId).profiles, query)
+  const shaped = matches.map(({ extendedAttributes, ...b }) => ({
+    ...b,
+    standardExtendedAttributes: extendedAttributes.map((a) => `${a.name} (${a.code})`),
   }))
+  return note ? { matches: shaped, note } : shaped
 }
 
 export function listAttributeProfiles(ctx: CallerContext, status?: ProfileStatus) {
@@ -414,16 +421,23 @@ export function createAttributeProfile(
     return { error: "At least one GS1 category code is required. Use search_gs1_bricks to find one." }
   }
   const bricks = brickCodes.map((code) => getBrickByCode(code))
+  const store = getStore(ctx.tenantId)
   const missingIdx = bricks.findIndex((b) => !b)
   if (missingIdx >= 0) {
-    return { error: `Unknown GS1 category code ${brickCodes[missingIdx]}. Use search_gs1_bricks to find the right category first.` }
+    const free = unmappedBricks(store.profiles).map((b) => b.brickName)
+    return {
+      error:
+        `Unknown GS1 category code ${brickCodes[missingIdx]}. Use search_gs1_bricks to find the right category first. ` +
+        (free.length
+          ? `Categories not yet mapped to any profile: ${free.join(", ")}.`
+          : `Every GS1 category is already mapped to a profile.`),
+    }
   }
   const resolvedBricks = bricks as NonNullable<(typeof bricks)[number]>[]
-  const store = getStore(ctx.tenantId)
-  const conflictCode = brickCodes.find((code) => findProfileForBrick(store.profiles, code))
-  if (conflictCode) {
-    const owner = findProfileForBrick(store.profiles, conflictCode)!
-    return { error: `GS1 category ${conflictCode} is already mapped to the "${owner.name}" profile. Use add_attribute_requirement or set_image_requirement to extend it.` }
+  const conflict = resolvedBricks.find((b) => findProfileForBrick(store.profiles, b.brickCode))
+  if (conflict) {
+    const owner = findProfileForBrick(store.profiles, conflict.brickCode)!
+    return { error: mappingConflict(store.profiles, conflict, owner.name) }
   }
   const [primary] = resolvedBricks
   const mappedBricks: ProfileBrick[] = resolvedBricks.map((b) => ({ code: b.brickCode, name: b.brickName }))

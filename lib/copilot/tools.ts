@@ -19,7 +19,7 @@
 
 import { tool } from "ai"
 import { z } from "zod"
-import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
+import { getBrickByCode, getSegments } from "@/lib/gs1-standard-library"
 import {
   RETAILER_SUPPLIERS,
   getProfileBricks,
@@ -29,7 +29,10 @@ import {
   findProfileForBrick,
   assembleBrickAttributes,
   gs1DisplayName,
+  mappingConflict,
   resolveGs1Name,
+  searchBricksWithMapping,
+  unmappedBricks,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
@@ -97,14 +100,19 @@ function makeReadTools(ctx: CopilotContext) {
       // parallel field. Returning "Closure (GM03CLOS)" here gave the model a
       // ready-made display string it would paste straight into a reply, which
       // is the one thing the retailer view never shows (see gs1DisplayName).
-      execute: async ({ query }) =>
-        searchBricks(query).map((b) => ({
-          brickCode: b.brickCode,
-          brickName: b.brickName,
-          segment: b.segment,
-          standardExtendedAttributes: b.extendedAttributes.map((a) => a.name),
-          attributeCodes: Object.fromEntries(b.extendedAttributes.map((a) => [a.name, a.code])),
-        })),
+      //
+      // Each hit says whether the category is still free to map, and an empty
+      // or fully-taken result carries a note naming the categories that are —
+      // see searchBricksWithMapping.
+      execute: async ({ query }) => {
+        const { matches, note } = searchBricksWithMapping(ctx.profiles, query)
+        const shaped = matches.map(({ extendedAttributes, ...b }) => ({
+          ...b,
+          standardExtendedAttributes: extendedAttributes.map((a) => a.name),
+          attributeCodes: Object.fromEntries(extendedAttributes.map((a) => [a.name, a.code])),
+        }))
+        return note ? { matches: shaped, note } : shaped
+      },
     }),
 
     list_attribute_profiles: tool({
@@ -299,7 +307,7 @@ function makeCreateTools(ctx: CopilotContext) {
   return {
     create_attribute_profile: tool({
       description:
-        "Propose a NEW attribute profile mapped to one or more GS1 categories. Does not create anything — returns a proposal the user must confirm.",
+        "Propose a NEW attribute profile mapped to one or more GS1 categories. Does not create anything — returns a proposal the user must confirm. Every GS1 category belongs to at most one profile, so call search_gs1_bricks first and only pass categories it reports as available. If no GS1 category matches the name the user asked for, ask them which category to map — never substitute a similar-sounding one.",
       inputSchema: z.object({
         name: z.string().describe("Profile name shown in the requirements list"),
         brickCodes: z.array(z.string()).min(1).describe("One or more GS1 brick codes, from search_gs1_bricks"),
@@ -309,12 +317,21 @@ function makeCreateTools(ctx: CopilotContext) {
         const bricks = brickCodes.map((code) => ({ code, brick: getBrickByCode(code) }))
         const missing = bricks.find((b) => !b.brick)
         if (missing) {
-          return { error: `Unknown GS1 category code ${missing.code}. Use search_gs1_bricks to find the right category first.` }
+          const free = unmappedBricks(ctx.profiles).map((b) => b.brickName)
+          return {
+            error:
+              `Unknown GS1 category code ${missing.code}. Use search_gs1_bricks to find the right category first. ` +
+              (free.length
+                ? `Categories not yet mapped to any profile: ${free.join(", ")}.`
+                : `Every GS1 category is already mapped to a profile.`),
+          }
         }
         const conflict = bricks.find((b) => findProfileForBrick(ctx.profiles, b.code))
         if (conflict) {
           const owner = findProfileForBrick(ctx.profiles, conflict.code)!
-          return { error: `The "${conflict.brick!.brickName}" category is already mapped to the "${owner.name}" profile, and a category belongs to one profile at a time. Ask me to add a requirement to "${owner.name}" instead, or to delete it first if you mean to replace it.` }
+          return {
+            error: mappingConflict(ctx.profiles, conflict.brick!, owner.name),
+          }
         }
         const brickNames = bricks.map((b) => b.brick!.brickName).join(", ")
         const proposal: ProposedAction = {
