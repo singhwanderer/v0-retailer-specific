@@ -75,7 +75,7 @@ Traceability: **§4A row** is the row in the presentation's checklist.
 | ENT-03 | 3 | Every call carries tenant and agent as **separate, independently checkable claims** — no shared service account. | TGC | ✅ Demoed |
 | ENT-04 | 4 | Agent-initiated actions run under their own scoped, short-lived workload identity, not a borrowed user token. | TGC | ✅ Demoed |
 | ENT-05 | 5 | Tenant is re-checked **on every tool call**, across both tenant classes — retailer↔supplier and peer↔peer. | TGC | ✅ Demoed |
-| ENT-06 | 6 | Least privilege: connections start read-only; write scopes are granted separately and enforced at discovery **and** invocation. | TGC | ✅ Demoed |
+| ENT-06 | 6 | Least privilege by authority: a connection is granted reading and authoring, never the authorities that bite — activation and removal are separate scopes, enforced at discovery **and** invocation. | TGC | ✅ Demoed |
 | ENT-07 | 7 | No token passthrough: never accept a token issued to another service, never forward an inbound token downstream. | TGC | ⚠️ Half demoed (inbound refusal is real; outbound rule is a constraint on code that doesn't exist yet) |
 | ENT-08 | 8 | Rate limits and bounded retrieval per call. | Shared | ⚠️ Partial (bounded retrieval only) |
 | ENT-09 | 9 | Container / process isolation per tenant or session. | Aviator | ❌ Not demoable here — see §6 |
@@ -196,19 +196,26 @@ and cannot see vendor B's.
 
 ### ENT-06 — Least privilege / progressive scopes
 
-**Requirement.** Four scopes: `tgc.read`, `tgc.requirements.write`,
-`tgc.exceptions.write`, `tgc.destructive`. Consent defaults to read-only.
-Enforced at discovery (a read-only connection is not shown write tools) **and**
-at invocation.
+**Requirement.** Five scopes: `tgc.read`, `tgc.requirements.write`,
+`tgc.exceptions.write`, `tgc.requirements.activate`, `tgc.destructive`. Consent
+defaults to read **plus authoring** — see "why authoring is a default" below.
+Enforced at discovery (a connection is not shown tools it lacks the scopes for)
+**and** at invocation.
 
 **Acceptance criteria**
-1. A read-only connection's `tools/list` contains zero write tools.
+1. A connection's `tools/list` contains zero tools whose scopes it lacks, and a
+   read-only connection (every optional box unticked) contains zero write tools.
 2. Calling a write tool directly with a read-only token is refused.
 3. Granting requirements-write does not grant exceptions-write — the tool that
    changes compliance numbers is separately consented.
 4. Granting either write scope does not grant `tgc.destructive`. A tool that
    removes something requires it **in addition to** the relevant write scope,
    and a connection without it does not see the removal tools at all.
+5. Granting requirements-write does not grant `tgc.requirements.activate`. A
+   connection can create and edit requirements but cannot switch enforcement on;
+   `activate_profile` is absent from its tool list.
+6. `get_capabilities` describes only what this caller's scopes actually permit,
+   and names the ungranted scopes rather than staying silent about them.
 
 **Note.** Discovery filtering is UX. The invocation check is the security
 boundary. Both are required; neither substitutes for the other.
@@ -216,16 +223,43 @@ boundary. Both are required; neither substitutes for the other.
 **Why removal is its own scope.** Adding an attribute to a profile and deleting
 the profile that thousands of vendor items are assessed against are not the same
 authority, and a single "write" bucket asks the user to consent to both at once.
-The consent screen carries a fourth checkbox, unchecked by default: *Remove
+The consent screen carries a checkbox for it, unchecked by default: *Remove
 requirements and revoke exceptions.*
+
+**Why activation is its own scope.** The same argument, one step earlier.
+Authoring produces a **Draft**, and nothing in the vendor base is assessed
+against a Draft; activating it is the moment the requirement acquires teeth
+across every item in the category. Those are different authorities, so
+`activate_profile` requires `tgc.requirements.activate` **in addition to**
+`tgc.requirements.write`, and a connection without it does not see the tool.
+
+**Why authoring is a consent default, and read-only is not.** Least privilege
+here is about which *authorities* a connection holds, not about refusing to write
+at all. An earlier revision pre-ticked read alone, which read as the safer
+choice, but in practice: most MCP clients send no `scope` parameter at all, so
+the fallback *is* what real connections got; a retailer who asked their assistant
+to set up a Swimwear category was told the connector could not do it; and
+`get_capabilities` advertised authoring regardless, so the model promised a
+capability whose tool was absent. Meanwhile authoring cannot act unilaterally —
+it previews and mints a confirmation token (ENT-06a), the human approves, and
+what appears is a Draft that still needs a separate grant to enforce. So the
+consent screen arrives with read and authoring ticked, and the two authorities
+that bite stay unticked.
+
+The read-only *floor* is unchanged and still matters: `DEFAULT_SCOPES` in
+`lib/mcp/context.ts` — what a token with no scope claim at all resolves to, and
+what a user who unticks every box gets — is `[tgc.read]`. The consent pre-tick is
+the separate `CONSENT_DEFAULT_SCOPES`, because a human looking at the list and
+approving it is a different situation from a grant that specified nothing.
 
 **"Unchecked by default" is forced, not merely a default.** The authorize
 endpoint pre-ticks the boxes a client asked for, and MCP clients routinely
 request every scope a resource advertises — which for a while meant
 `tgc.destructive` arrived pre-consented, exactly inverting this row. `readParams`
-in `app/oauth/authorize/route.ts` now strips that scope from the pre-checked set
-regardless of the request. The checkbox still renders and can still be ticked;
-it just cannot be granted by a user who never looked at it.
+in `app/oauth/authorize/route.ts` now strips both `tgc.destructive` and
+`tgc.requirements.activate` from the pre-checked set regardless of the request.
+The checkboxes still render and can still be ticked; they just cannot be granted
+by a user who never looked at them.
 
 ### ENT-06a — Two-phase confirmation for every mutation
 
@@ -473,8 +507,9 @@ Run it: see [`mcp-demo-quickstart.md`](./mcp-demo-quickstart.md).
 | Peer isolation | ENT-05 | Write as Dillard's; absent for Belk |
 | **Two audiences, one URL** | ENT-05 | Sign in as J.Renée → four *supplier* tools and none of the retailer set; sign in as Dillard's → the reverse |
 | Bilateral read | ENT-05a | Grant J.Renée an exception as Dillard's; J.Renée sees that row labelled `grantedBy`, and nothing else Dillard's holds |
-| Read-only consent | ENT-06 | Write tools absent from the tool list; refused if called. The Connect tab's "what a read-only connection sees" toggle shows the same filtering |
+| Read-only consent | ENT-06 | Untick the optional boxes: write tools absent from the tool list; refused if called. The Connect tab's "what a read-only connection sees" toggle shows the same filtering |
 | Destructive scope separated | ENT-06 | Consent to requirements-write only: the removal tools are still absent |
+| Activation scope separated | ENT-06 | Accept the pre-ticked boxes: `create_attribute_profile` is there and lands a Draft, `activate_profile` is absent until the user ticks it |
 | Two-phase confirmation | ENT-06a | Call any mutating tool: it returns a preview and a token and changes nothing. Confirm as another tenant → refused. Confirm as the right one → applied, exactly once |
 | Wrong-audience token | ENT-02 | A validly-signed token issued for a different resource is rejected on the audience check alone, before reaching any tool. No UI trigger exists for this today — see §5.2 |
 | Proactive agent | ENT-04 | Runs with no human present, under a read-only identity scoped to one tenant. No UI trigger exists for this today — see §5.2 |

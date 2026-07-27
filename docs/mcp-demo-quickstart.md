@@ -11,7 +11,7 @@ The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployme
 
 1. claude.ai → **Settings → Connectors → Add custom connector**
 2. Paste the endpoint URL. Your client discovers the sign-in automatically — there is no API key or token to create.
-3. **Sign in with one of the demo identities below** and choose how much access to grant (read-only is the default).
+3. **Sign in with one of the demo identities below** and choose how much access to grant (reading and authoring arrive ticked; activating and removing do not).
 4. Start a chat and enable the "tgc" connector via the tools menu
 
 ## Connect from ChatGPT
@@ -57,9 +57,10 @@ stands in for a customer's real IdP (Entra ID / Okta / Ping).
 2. **Tenant isolation.** As Dillard's, grant J.Renée an exception. As Belk, look
    for it — it isn't there. As J.Renée, `list_my_exceptions` shows it labelled
    *granted by Dillard's* — and nothing else Dillard's holds.
-3. **Progressive scopes.** Grant read-only at sign-in: the four write tools
-   don't appear in the assistant's tool list at all, and are refused if called
-   directly.
+3. **Progressive scopes.** Untick everything but read at sign-in: the write
+   tools don't appear in the assistant's tool list at all, and are refused if
+   called directly. Or accept the defaults and ask it to activate the profile it
+   just created — `activate_profile` is absent until that box is ticked.
 4. **The access log.** See the walkthrough below.
 
 ### Access log walkthrough (the security story in 5 steps)
