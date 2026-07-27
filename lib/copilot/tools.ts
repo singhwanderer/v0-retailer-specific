@@ -13,8 +13,11 @@
 // updateAttributeRequirement is intentionally never imported here — the
 // agent has no code path to edit an existing requirement, by design.
 
-import { tool } from "ai"
+import { tool, type Tool } from "ai"
 import { z } from "zod"
+import { auditFor } from "@/lib/mcp/audit"
+import { SCOPES, type CallerContext } from "@/lib/mcp/context"
+import { TOOL_MANIFEST } from "@/lib/mcp/manifest"
 import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
 import {
   RETAILER_SUPPLIERS,
@@ -445,6 +448,62 @@ function makeEditTools(ctx: CopilotContext) {
   }
 }
 
-export function buildCopilotTools(ctx: CopilotContext) {
-  return { ...makeReadTools(ctx), ...makeCreateTools(ctx), ...makeEditTools(ctx) }
+// ── Audit ────────────────────────────────────────────────────────────────────
+
+/**
+ * Emit one audit line per copilot tool call.
+ *
+ * The Access log's claim is "every AI action against this organisation", and
+ * this agent is an AI acting on catalogue data — it just arrives through
+ * /api/copilot instead of /api/mcp. Without this it is invisible, and
+ * `query_access_log` tells the AI it returns every tool call an assistant made
+ * while silently omitting a whole assistant.
+ *
+ * This RECORDS but does not GATE, which is the one way it differs from
+ * runGuarded(): there is no consent screen behind the copilot and so no grant to
+ * enforce against. runGuarded() is also deliberately not reused — its
+ * `invoke: () => T` is synchronous, so an async `execute` would be timed before
+ * it settled and a rejection would escape the try/catch entirely.
+ *
+ * Applied inside buildCopilotTools() so it is the single emit point for this
+ * path: a tool added to any of the three groups is audited without its author
+ * remembering to.
+ */
+function withCopilotAudit<T extends Record<string, Tool>>(tools: T, caller: CallerContext | null): T {
+  // No portal session behind this run (the eval harness), so there is no
+  // identity to attribute the calls to and nothing truthful to record.
+  if (!caller) return tools
+
+  const audited = Object.entries(tools).map(([name, definition]) => {
+    const execute = definition.execute
+    if (typeof execute !== "function") return [name, definition]
+
+    // Reuse the connector's declared scope for the same tool name rather than
+    // keeping a second table here that can drift out of step with it.
+    const requiredScope = TOOL_MANIFEST.find((t) => t.name === name)?.requiredScope ?? SCOPES.read
+
+    const wrapped: typeof execute = async (args, options) => {
+      const started = Date.now()
+      try {
+        const result = await execute(args, options)
+        auditFor(caller, name, requiredScope, "allowed", Date.now() - started)
+        return result
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        auditFor(caller, name, requiredScope, "error", Date.now() - started, reason)
+        // The agent loop decides what to do with a failure; auditing it must not
+        // change that.
+        throw err
+      }
+    }
+
+    return [name, { ...definition, execute: wrapped }]
+  })
+
+  return Object.fromEntries(audited) as T
+}
+
+export function buildCopilotTools(ctx: CopilotContext, caller: CallerContext | null) {
+  const tools = { ...makeReadTools(ctx), ...makeCreateTools(ctx), ...makeEditTools(ctx) }
+  return withCopilotAudit(tools, caller)
 }

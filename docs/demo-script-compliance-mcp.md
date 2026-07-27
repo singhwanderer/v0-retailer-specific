@@ -398,6 +398,18 @@ before it asked for anything:
 > authenticates and reads the tool catalogue and stops there still leaves a
 > line, because 'nothing in the log' has to mean nothing happened."
 
+If the Compliance Agent panel was used earlier in the demo, its calls are in the
+same table under the agent `tgc-compliance-agent`. Point at both:
+
+> "Two different assistants — the one in this product, and Claude out there
+> through the connector — one log. If we only logged the external one, the
+> answer to 'what has our AI been doing?' would be quietly wrong."
+
+Be straight about the difference if asked: the connector's identity is proved by
+a token this server validated, while the in-app agent's comes from the portal
+persona, because the prototype portal has no login. The note under the table
+says so.
+
 Point at the **Refused before sign-in** band — if it is empty, say what would land
 there rather than pretending; a refused connection from any client populates it.
 

@@ -534,6 +534,12 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
         shipped to the platform log sink. In this prototype the portal has no login, so it follows the persona and
         role selected in the top bar.
       </p>
+
+      <p className="text-[11px] font-light leading-relaxed" style={{ color: "#9CA3AF" }}>
+        Lines from the in-app Compliance Agent (<span className="font-mono">tgc-compliance-agent</span>) are
+        attributed from that persona rather than from a verified token — the portal has no login to prove an identity
+        with. Connector lines (<span className="font-mono">tgc-client-…</span>) carry a token this server validated.
+      </p>
     </section>
   )
 }

@@ -11,7 +11,13 @@
 // everyone shares (§4A row 3). And `subjectType` distinguishes a human-
 // delegated session from an autonomous workload (§4A row 4).
 
-import { PORTAL_TENANT_ID, type TenantClass, type TenantRole } from "@/lib/mcp/tenants"
+import {
+  DEMO_USERS,
+  PORTAL_TENANT_ID,
+  resolveTenantByRealm,
+  type TenantClass,
+  type TenantRole,
+} from "@/lib/mcp/tenants"
 
 /**
  * Progressive scopes (§4A row 6). A connection starts at read-only; write
@@ -95,4 +101,36 @@ export const PORTAL_CTX: CallerContext = {
   role: "admin",
   agentId: "tgc-portal-ui",
   scopes: new Set(ALL_SCOPES),
+}
+
+/** Distinguishes the in-app copilot from the connector in the audit trail. */
+export const COPILOT_AGENT_ID = "tgc-compliance-agent"
+
+/**
+ * The identity the in-app TGC Compliance Agent runs under.
+ *
+ * It is an AI agent reading this tenant's catalogue and compliance data, so its
+ * calls belong in the same access log as the external connector's. But note the
+ * difference the log has to stay honest about: a connector's identity is proved
+ * by a verified token, whereas this one is *asserted by the browser* — the
+ * prototype portal has no login to derive it from. Same documented compromise
+ * as the `?tenant=` parameter on /api/mcp-audit (ENT-10), and the reason these
+ * lines carry their own agent id rather than blending in.
+ */
+export function copilotCtx(role: TenantRole): CallerContext {
+  const persona = DEMO_USERS.find(
+    (u) => u.role === role && resolveTenantByRealm(u.email)?.id === PORTAL_TENANT_ID
+  )
+
+  return {
+    tenantId: PORTAL_TENANT_ID,
+    tenantClass: "retailer",
+    subjectType: "user",
+    subjectId: persona?.email ?? "portal-session",
+    role,
+    agentId: COPILOT_AGENT_ID,
+    // What this agent's own tools actually need — it reads, and it proposes
+    // changes the user applies by hand. It is never granted destructive scope.
+    scopes: new Set<Scope>([SCOPES.read, SCOPES.requirementsWrite]),
+  }
 }

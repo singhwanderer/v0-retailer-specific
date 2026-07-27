@@ -634,6 +634,7 @@ export default function RetailerPortal() {
           profiles={profiles}
           onCreateProfile={handleCreateProfile}
           onOpenAiAccess={() => setAiAccessOpen(true)}
+          role={role}
         />
       )}
 

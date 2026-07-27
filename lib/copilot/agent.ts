@@ -22,6 +22,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { wrapAISDK } from "langsmith/experimental/vercel"
 import { traceable } from "langsmith/traceable"
 import { buildCopilotTools, type ProposedAction } from "@/lib/copilot/tools"
+import { copilotCtx } from "@/lib/mcp/context"
+import type { TenantRole } from "@/lib/mcp/tenants"
 import { SYSTEM_PROMPT } from "@/lib/copilot/system-prompt"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 
@@ -38,6 +40,17 @@ export interface CopilotChatMessage {
 export interface CopilotAgentInput {
   messages: CopilotChatMessage[]
   profiles: AttributeProfile[]
+  /**
+   * The portal persona's role, used to attribute this run in the access log.
+   * Asserted by the browser rather than proved by a token — see copilotCtx().
+   *
+   * Omitted by callers with no portal session behind them, notably the eval
+   * harness (lib/copilot/run-eval.ts). Those runs are then not audited at all,
+   * which is the honest outcome: filing a batch of synthetic questions under a
+   * real person's name would be a false line in an audit trail, and a hundred
+   * of them would push a real session out of the ring buffer.
+   */
+  role?: TenantRole
 }
 
 /** Points the retailer user to an in-app screen where they can verify an
@@ -94,6 +107,7 @@ function sourcesFromSteps(steps: { toolCalls: readonly { toolName: string }[] }[
 async function runCopilotAgentInner({
   messages,
   profiles,
+  role,
 }: CopilotAgentInput): Promise<CopilotAgentResult> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
@@ -101,7 +115,7 @@ async function runCopilotAgentInner({
   }
 
   const google = createGoogleGenerativeAI({ apiKey })
-  const tools = buildCopilotTools({ profiles })
+  const tools = buildCopilotTools({ profiles }, role ? copilotCtx(role) : null)
 
   const result = await generateText({
     model: google(MODEL_ID),

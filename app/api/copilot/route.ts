@@ -18,6 +18,7 @@ import {
   CopilotConfigError,
   type CopilotChatMessage,
 } from "@/lib/copilot/agent"
+import type { TenantRole } from "@/lib/mcp/tenants"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 
 export async function POST(req: Request) {
@@ -28,7 +29,10 @@ export async function POST(req: Request) {
     )
   }
 
-  let body: { messages?: CopilotChatMessage[]; context?: { profiles?: AttributeProfile[] } }
+  let body: {
+    messages?: CopilotChatMessage[]
+    context?: { profiles?: AttributeProfile[]; role?: string }
+  }
   try {
     body = await req.json()
   } catch {
@@ -42,8 +46,13 @@ export async function POST(req: Request) {
 
   const profiles = body.context?.profiles ?? []
 
+  // Attributes this run in the access log. Anything unrecognised falls to the
+  // lesser standing rather than the greater: role governs who may read the log,
+  // so "member" is the safe default for a value the browser asserts.
+  const role: TenantRole = body.context?.role === "admin" ? "admin" : "member"
+
   try {
-    const { text, proposals, sources } = await runCopilotAgent({ messages, profiles })
+    const { text, proposals, sources } = await runCopilotAgent({ messages, profiles, role })
     return Response.json({ text, proposals, sources })
   } catch (error) {
     if (error instanceof CopilotConfigError) {

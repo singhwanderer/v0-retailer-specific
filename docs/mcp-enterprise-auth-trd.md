@@ -311,6 +311,9 @@ catalogue must not be indistinguishable from one that never connected.
 4. Authenticating produces one attributed `(connection)` line per identity per
    window — enough to evidence the attachment without every `tools/list` poll
    burying the tool calls beneath it.
+5. The in-app TGC Compliance Agent is logged too. "Every AI action against this
+   organisation" cannot mean "every action that arrived over MCP" while a second
+   assistant reads the same data through `/api/copilot`.
 
 #### Who may read it
 
@@ -517,6 +520,12 @@ model:
   portal's role comes from a toggle — both because the prototype portal has no
   login of its own. See ENT-10; this is the one place the *portal* simulates a
   boundary the *connector* genuinely enforces.
+- For the same reason, the in-app Compliance Agent's audit lines are attributed
+  from the portal persona rather than from a verified token. They carry their own
+  agent id (`tgc-compliance-agent`) so the log never implies its identity was
+  established the way a connector's is, and the screen says so beneath the table.
+  Eval runs pass no persona and are deliberately not logged: attributing
+  synthetic questions to a real employee would be a false line in an audit trail.
 - Demo passwords are documented in the quickstart. Obviously.
 
 ---

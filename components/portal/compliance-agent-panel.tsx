@@ -13,6 +13,7 @@ import {
   removeImageRequirement,
 } from "@/lib/mcp/tools"
 import { PORTAL_CTX } from "@/lib/mcp/context"
+import type { TenantRole } from "@/lib/mcp/tenants"
 import type { AttributeProfile } from "@/lib/retailer-requirements"
 import type { ProposedAction } from "@/lib/copilot/tools"
 import type { CopilotSource } from "@/lib/copilot/agent"
@@ -35,6 +36,9 @@ interface ComplianceAgentPanelProps {
   onCreateProfile: (profile: AttributeProfile) => void
   /** Open the external MCP connector signpost screen */
   onOpenAiAccess: () => void
+  /** The portal persona's role, so this agent's calls can be attributed in the
+   *  access log the same way the external connector's are. */
+  role: TenantRole
 }
 
 const STARTER_PROMPTS = [
@@ -47,7 +51,12 @@ function today(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess }: ComplianceAgentPanelProps) {
+export function ComplianceAgentPanel({
+  profiles,
+  onCreateProfile,
+  onOpenAiAccess,
+  role,
+}: ComplianceAgentPanelProps) {
   const [sheetOpen, setSheetOpen] = useState(true)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [proposals, setProposals] = useState<PendingProposal[]>([])
@@ -69,7 +78,7 @@ export function ComplianceAgentPanel({ profiles, onCreateProfile, onOpenAiAccess
       const res = await fetch("/api/copilot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages, context: { profiles } }),
+        body: JSON.stringify({ messages: nextMessages, context: { profiles, role } }),
       })
       const data = await res.json()
       if (!res.ok) {
