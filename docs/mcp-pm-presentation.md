@@ -90,7 +90,8 @@ sign in with their own work account and choose how much access to grant.
         │
         ▼
    They sign in with their OWN work account and pick how much
-   access to grant (read-only by default). Which organisation's
+   access to grant (reading and authoring by default; activating
+   and removing are separate). Which organisation's
    data they get is decided by WHO THEY ARE — never a choice.
         │
         ▼
@@ -348,7 +349,7 @@ it's catching up to a documented standard.
 | **Delegated identity, not a shared service account** | Every action needs to carry *both* "which customer/tenant" and "which agent" as separate, checkable claims — not one bucket credential everyone shares | OAuth token-exchange delegation (RFC 8693) — the emerging standard for agent-acts-on-behalf-of-user flows |
 | **Separate service/workload identity for agent-initiated actions** | A delegated user token only exists while a human is in the session. An agent acting on its own — e.g. a scheduled compliance check with no user connected at that moment — needs its own scoped, short-lived credential (client-credentials style), not a borrowed user token | Standard distinction between "on-behalf-of" delegation and workload identity for autonomous agent actions |
 | **Tenant checked on every tool call, not just at login — across *both* tenant classes** | A valid token isn't proof the caller should see *this* tenant's data — that check has to happen again at each individual tool invocation. For us specifically, that means keeping retailer tenants and supplier tenants isolated from each other, not just isolating peers within the same class | Called out repeatedly as the #1 multi-tenant MCP failure mode: isolation enforced at login but not re-checked per call |
-| **Least privilege / progressive scopes** | Start every connection at read-only/discovery; only grant write scopes when a specific action actually needs them — and separate *removing* things from *writing* things, since consenting to "author requirements" should not silently also consent to "delete requirements" | Standard "progressive scope" pattern for MCP servers handling sensitive data |
+| **Least privilege / progressive scopes** | Scope a connection by *authority*, not by refusing to write: authoring is safe to grant up front because it previews before it acts and can only produce Drafts, while the authorities that bite — *activating* a requirement across the vendor base, and *removing* things — are separate scopes. Consenting to "author requirements" should not silently also consent to "enforce" or "delete" them | Standard "progressive scope" pattern for MCP servers handling sensitive data |
 | **A human approves every mutation** | An assistant that can delete a requirement inside a chat window with no confirmation step is not a feature. Every mutating tool returns a preview and a token; a separate call executes. The token carries no authority of its own — scope and tenant are re-checked on confirm | The human-in-the-loop expectation for agentic write access; MCP's own tool annotations exist to signal exactly this |
 | **No token passthrough** | Our server must never blindly forward a token it didn't issue itself, or accept one meant for a different service | Explicitly called out as forbidden in current MCP security guidance |
 | **Rate limits and bounded retrieval per call** | Caps on how much a single tool call can fetch or how often it can be called — without this, tool surface growth means unpredictable cost and blast radius, not just a security gap | One of the 5 essential practices in current enterprise MCP security guidance |

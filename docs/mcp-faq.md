@@ -20,7 +20,7 @@ Sign in with `buyer@dillards.demo`, `buyer@belk.demo`, or `catalog@jrenee.demo` 
 **claude.ai (recommended for the demo)**
 1. Settings → **Connectors** → **Add custom connector**
 2. Name it "TGC", paste the endpoint URL → Add
-3. Sign in when prompted and choose the access to grant (read-only is the default)
+3. Sign in when prompted and choose the access to grant (reading and authoring arrive ticked; activating and removing do not)
 4. In a new chat, open the tools/search menu and enable the TGC connector
 4. Ask: *"Which of my suppliers are furthest behind on compliance?"*
 
