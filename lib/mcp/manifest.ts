@@ -54,7 +54,7 @@ import {
   updateAttributeRequirement,
 } from "@/lib/mcp/tools"
 import { getStore, readProfileExtras } from "@/lib/mcp/store"
-import { findProfileForBrick, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
+import { describeAvailableCategories, findProfileForBrick, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
 import {
   createPendingChange,
   discardPendingChange,
@@ -311,13 +311,15 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "create_attribute_profile",
     description:
-      "Create a new attribute profile (requirement set) for a product category, mapped to one or more GS1 categories. The profile starts as Draft and is seeded with each mapped GS1 category's standard extended attributes — each brick keeps its own attribute set, with no merging across bricks. Every GS1 category belongs to at most one profile, so call search_gs1_bricks first and only pass categories it reports as available; if no GS1 category matches the name the user asked for, ask them which category to map rather than substituting a similar-sounding one. Before calling, confirm the category name, GS1 category choice(s), and free-text product-type label with the user, and afterwards show them the created profile.",
+      "Create a new attribute profile (requirement set) for a product category, mapped to one or more GS1 categories. The profile starts as Draft and is seeded with each mapped GS1 category's standard extended attributes — each brick keeps its own attribute set, with no merging across bricks. A profile has two independent parts: `categoryName`, the retailer's own label, which can be anything, and `brickCodes`, the GS1 categories it covers. The name never implies the category — do not derive one from the other. Call without brickCodes when the user has named a profile but not said what it covers: the call is refused with the list of categories still free, to put to the user. Every GS1 category belongs to at most one profile. Before calling with a category, confirm the name, the GS1 category choice(s), and the free-text product-type label with the user, and afterwards show them the created profile.",
     schema: {
-      categoryName: z.string().describe("The retailer's internal category name, e.g. 'Swimwear'"),
+      categoryName: z.string().describe("The retailer's internal category name, e.g. 'Swimwear' — the retailer's own label, unconstrained"),
       brickCodes: z
         .array(z.string())
-        .min(1)
-        .describe("One or more GS1 category codes to map (find via search_gs1_bricks)"),
+        .optional()
+        .describe(
+          "GS1 category codes to map (find via search_gs1_bricks). Omit if the user has not said which category — the refusal names the available ones to ask them about."
+        ),
       category: z
         .string()
         .optional()
@@ -330,19 +332,35 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
     requiresConfirmation: true,
-    preview: (ctx, a: { categoryName: string; brickCodes: string[]; category?: string }) => ({
-      summary: `Create a new "${a.categoryName}" requirement profile mapped to ${a.brickCodes.length} GS1 categor${a.brickCodes.length === 1 ? "y" : "ies"}.`,
-      effect: [
-        `Free-text category label: "${a.category ?? a.categoryName}".`,
-        `GS1 categories mapped: ${a.brickCodes.join(", ")}. Each keeps its own attribute set — nothing is merged across them.`,
-        "The profile is seeded with each category's standard GS1 extended attributes.",
-        "It starts as a DRAFT, so nothing is assessed against it until it is activated.",
-      ],
-    }),
+    preview: (ctx, a: { categoryName: string; brickCodes?: string[]; category?: string }) => {
+      // A name on its own is not half a request — it is the normal state after
+      // "create a requirement called Troy". Refusing here means no confirmation
+      // token is minted (see the `preview` contract above), so the agent has to
+      // go back and ask which category rather than inventing one.
+      if (!a.brickCodes?.length) {
+        return {
+          error:
+            `"${a.categoryName}" is the retailer's own label for the profile and does not have to match a GS1 category ` +
+            `name. What is missing is which GS1 category it covers, and that is the user's decision: ask them, offering ` +
+            `the categories still free — ${describeAvailableCategories(getStore(ctx.tenantId).profiles)} ` +
+            `They can answer with a category name or its code.`,
+        }
+      }
+      const codes = a.brickCodes
+      return {
+        summary: `Create a new "${a.categoryName}" requirement profile mapped to ${codes.length} GS1 categor${codes.length === 1 ? "y" : "ies"}.`,
+        effect: [
+          `Free-text category label: "${a.category ?? a.categoryName}".`,
+          `GS1 categories mapped: ${codes.join(", ")}. Each keeps its own attribute set — nothing is merged across them.`,
+          "The profile is seeded with each category's standard GS1 extended attributes.",
+          "It starts as a DRAFT, so nothing is assessed against it until it is activated.",
+        ],
+      }
+    },
     handler: (
       ctx,
-      { categoryName, brickCodes, category }: { categoryName: string; brickCodes: string[]; category?: string }
-    ) => createAttributeProfile(ctx, categoryName, brickCodes, category),
+      { categoryName, brickCodes, category }: { categoryName: string; brickCodes?: string[]; category?: string }
+    ) => createAttributeProfile(ctx, categoryName, brickCodes ?? [], category),
   },
   {
     name: "add_attribute_requirement",

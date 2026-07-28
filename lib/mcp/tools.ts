@@ -43,10 +43,10 @@ import {
   assembleBrickAttributes,
   describeProfileAttributes,
   findProfileForBrick,
+  describeAvailableCategories,
   mappingConflict,
   resolveGs1Name,
   searchBricksWithMapping,
-  unmappedBricks,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
@@ -417,20 +417,23 @@ export function createAttributeProfile(
   brickCodes: string[],
   category?: string
 ) {
-  if (brickCodes.length === 0) {
-    return { error: "At least one GS1 category code is required. Use search_gs1_bricks to find one." }
-  }
   const bricks = brickCodes.map((code) => getBrickByCode(code))
   const store = getStore(ctx.tenantId)
+  if (brickCodes.length === 0) {
+    return {
+      error:
+        `"${categoryName}" is the retailer's own label for the profile and does not have to match a GS1 category name. ` +
+        `What is missing is which GS1 category it covers, and that is the user's decision: ask them, offering the ` +
+        `categories still free — ${describeAvailableCategories(store.profiles)} ` +
+        `They can answer with a category name or its code.`,
+    }
+  }
   const missingIdx = bricks.findIndex((b) => !b)
   if (missingIdx >= 0) {
-    const free = unmappedBricks(store.profiles).map((b) => b.brickName)
     return {
       error:
         `Unknown GS1 category code ${brickCodes[missingIdx]}. Use search_gs1_bricks to find the right category first. ` +
-        (free.length
-          ? `Categories not yet mapped to any profile: ${free.join(", ")}.`
-          : `Every GS1 category is already mapped to a profile.`),
+        `Categories still free to map — ${describeAvailableCategories(store.profiles)}`,
     }
   }
   const resolvedBricks = bricks as NonNullable<(typeof bricks)[number]>[]

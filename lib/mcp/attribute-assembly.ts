@@ -170,6 +170,40 @@ export function mappingConflict(
   )
 }
 
+export interface AvailableCategoryGroup {
+  segment: string
+  categories: { brickCode: string; brickName: string }[]
+}
+
+/**
+ * The GS1 categories a new profile could be mapped to, grouped by segment.
+ *
+ * Grouped rather than flat because there are usually well over a dozen, and a
+ * flat list is not something the agent can put to a user readably. Carries the
+ * code alongside the name so the user can answer with either — they may well be
+ * reading a code off the requirements screen.
+ */
+export function availableCategories(profiles: AttributeProfile[]): AvailableCategoryGroup[] {
+  const bySegment = new Map<string, { brickCode: string; brickName: string }[]>()
+  for (const b of unmappedBricks(profiles)) {
+    const group = bySegment.get(b.segment) ?? []
+    group.push({ brickCode: b.brickCode, brickName: b.brickName })
+    bySegment.set(b.segment, group)
+  }
+  return [...bySegment.entries()]
+    .map(([segment, categories]) => ({ segment, categories }))
+    .sort((a, b) => a.segment.localeCompare(b.segment))
+}
+
+/** The same list as one line of prose, for embedding in a tool's note. */
+export function describeAvailableCategories(profiles: AttributeProfile[]): string {
+  const groups = availableCategories(profiles)
+  if (!groups.length) return "Every GS1 category is already mapped to a profile."
+  return groups
+    .map((g) => `${g.segment}: ${g.categories.map((c) => c.brickName).join(", ")}`)
+    .join(". ")
+}
+
 export interface BrickMatch {
   brickCode: string
   brickName: string
@@ -214,14 +248,31 @@ export function searchBricksWithMapping(
   const free = unmappedBricks(profiles)
   const freeNames = (bricks: Gs1Brick[]) => bricks.map((b) => b.brickName).join(", ")
 
+  // No query at all: this is the "what could I map to?" call, so say so rather
+  // than returning 25 rows with no framing.
+  if (!query.trim()) {
+    return {
+      matches,
+      note:
+        `The full GS1 category library. Only the ones marked available can be mapped to a NEW profile; ` +
+        `the rest already belong to one. Still free — ${describeAvailableCategories(profiles)}`,
+    }
+  }
+
   if (matches.length === 0) {
     return {
       matches,
       note:
-        `No GS1 category matches "${query}". Do not substitute a similar-sounding category — ask the user which category to map. ` +
+        // Deliberately does NOT say "no category matches X". The caller may
+        // have passed a profile NAME, which is the retailer's own label and has
+        // no reason to match anything in the GS1 library — reporting that as a
+        // failed lookup is how "no GS1 category matches Troy" got said out loud.
+        `Nothing in the GS1 library matches "${query}". If that was a profile name rather than a product type, ` +
+        `it does not need to match anything — profile names are the retailer's own label. Ask the user which GS1 ` +
+        `category the profile should cover; do not infer one. ` +
         `Segments in the library: ${getSegments().join(", ")}. ` +
         (free.length
-          ? `Categories not yet mapped to any profile: ${freeNames(free)}.`
+          ? `Categories still free to map — ${describeAvailableCategories(profiles)}`
           : `Every GS1 category is already mapped to a profile.`),
     }
   }
@@ -235,7 +286,7 @@ export function searchBricksWithMapping(
       note:
         `Every category matching "${query}" already belongs to a profile, and a GS1 category can belong to only one profile at a time. ` +
         (suggest.length
-          ? `Still free to map to a new profile: ${freeNames(suggest)}.`
+          ? `Still free to map to a new profile: ${freeNames(suggest)}. Put these to the user and let them choose.`
           : `No GS1 category is left unmapped — a new profile is not possible until one is freed.`),
     }
   }

@@ -28,10 +28,11 @@ import {
 import {
   findProfileForBrick,
   assembleBrickAttributes,
+  availableCategories,
+  describeAvailableCategories,
   mappingConflict,
   resolveGs1Name,
   searchBricksWithMapping,
-  unmappedBricks,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
@@ -301,23 +302,41 @@ function makeCreateTools(ctx: CopilotContext) {
   return {
     create_attribute_profile: tool({
       description:
-        "Propose a NEW attribute profile mapped to one or more GS1 categories. Does not create anything — returns a proposal the user must confirm. Every GS1 category belongs to at most one profile, so call search_gs1_bricks first and only pass categories it reports as available. If no GS1 category matches the name the user asked for, ask them which category to map — never substitute a similar-sounding one.",
+        "Propose a NEW attribute profile. Does not create anything — returns a proposal the user must confirm. A profile has two independent parts: `name`, which is the retailer's own label and can be anything, and `brickCodes`, the GS1 categories it covers. The name never implies the category — do not derive one from the other. Call without brickCodes when the user has named a profile but not said what it covers: the result is the list of categories still free, to put to the user. Every GS1 category belongs to at most one profile.",
       inputSchema: z.object({
-        name: z.string().describe("Profile name shown in the requirements list"),
-        brickCodes: z.array(z.string()).min(1).describe("One or more GS1 brick codes, from search_gs1_bricks"),
+        name: z.string().describe("Profile name shown in the requirements list — the retailer's own label, unconstrained"),
+        brickCodes: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "GS1 brick codes the profile covers, from search_gs1_bricks. Omit if the user has not said which category — you will get the available ones back to ask them."
+          ),
         category: z.string().optional().describe("Free-text category label; defaults to name"),
       }),
       execute: async ({ name, brickCodes, category }) => {
+        // No category yet. This is the normal state after "create a requirement
+        // called Troy" — a name on its own says nothing about which GS1
+        // category it covers — so it returns the next step, not an error.
+        if (!brickCodes?.length) {
+          return {
+            needsCategory: true,
+            profileName: name,
+            availableCategories: availableCategories(ctx.profiles),
+            note:
+              `"${name}" is the retailer's own label for the profile and does not have to match a GS1 category name — ` +
+              `nothing needs to be looked up for it. What is still missing is which GS1 category the profile covers, ` +
+              `and that is the user's decision: ask them, offering the available categories below by segment. ` +
+              `They can answer with a category name or its code. Do not choose one for them, and do not call this tool ` +
+              `again until they have.`,
+          }
+        }
         const bricks = brickCodes.map((code) => ({ code, brick: getBrickByCode(code) }))
         const missing = bricks.find((b) => !b.brick)
         if (missing) {
-          const free = unmappedBricks(ctx.profiles).map((b) => b.brickName)
           return {
             error:
               `Unknown GS1 category code ${missing.code}. Use search_gs1_bricks to find the right category first. ` +
-              (free.length
-                ? `Categories not yet mapped to any profile: ${free.join(", ")}.`
-                : `Every GS1 category is already mapped to a profile.`),
+              `Categories still free to map — ${describeAvailableCategories(ctx.profiles)}`,
           }
         }
         const conflict = bricks.find((b) => findProfileForBrick(ctx.profiles, b.code))
