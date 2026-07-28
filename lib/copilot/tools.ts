@@ -29,6 +29,7 @@ import {
   findProfileForBrick,
   assembleBrickAttributes,
   availableCategories,
+  categoryLabel,
   describeAvailableCategories,
   mappingConflict,
   resolveGs1Name,
@@ -95,7 +96,7 @@ function makeReadTools(ctx: CopilotContext) {
   return {
     search_gs1_bricks: tool({
       description:
-        "Search GS1 product categories (bricks) by name, segment, or category code. Matching is literal against those fields, not fuzzy — a product type the GS1 names do not use will find nothing, which is a signal to ask the user, not to pick the nearest category. Each hit says whether it is still free to map to a new profile. Call with an empty query to list the whole library.",
+        "Search GS1 product categories (bricks) by name, segment, or category code. Matching is literal against those fields, not fuzzy — a product type the GS1 names do not use will find nothing, which is a signal to ask the user, not to pick the nearest category. Each hit says whether it is still free to map to a new profile. Call with an empty query to list every GS1 category.",
       inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'dresses' or 'footwear'; empty lists all categories") }),
       // Each hit says whether the category is still free to map, and an empty
       // or fully-taken result carries a note naming the categories that are —
@@ -323,11 +324,12 @@ function makeCreateTools(ctx: CopilotContext) {
             profileName: name,
             availableCategories: availableCategories(ctx.profiles),
             note:
-              `"${name}" is the retailer's own label for the profile and does not have to match a GS1 category name — ` +
-              `nothing needs to be looked up for it. What is still missing is which GS1 category the profile covers, ` +
-              `and that is the user's decision: ask them, offering the available categories below by segment. ` +
-              `They can answer with a category name or its code. Do not choose one for them, and do not call this tool ` +
-              `again until they have.`,
+              `Ask the user which GS1 category "${name}" should cover, offering the categories below grouped by ` +
+              `segment. Write each one as its name followed by its code — "Handbags/Purses (10006030)" — the way the ` +
+              `requirements screens show them, so the user can answer with either. ` +
+              `"${name}" is their own label for the profile and never had to match a GS1 category name, so do not ` +
+              `open by telling them it is not one, and do not report it as a failed lookup. ` +
+              `Do not choose a category for them, and do not call this tool again until they have.`,
           }
         }
         const bricks = brickCodes.map((code) => ({ code, brick: getBrickByCode(code) }))
@@ -346,7 +348,7 @@ function makeCreateTools(ctx: CopilotContext) {
             error: mappingConflict(ctx.profiles, conflict.brick!, owner.name),
           }
         }
-        const brickNames = bricks.map((b) => b.brick!.brickName).join(", ")
+        const brickNames = bricks.map((b) => categoryLabel(b.brick!)).join(", ")
         const proposal: ProposedAction = {
           tool: "create_attribute_profile",
           summary: `Create a new profile "${name}" mapped to: ${brickNames}.`,
@@ -568,8 +570,8 @@ function makeEditTools(ctx: CopilotContext) {
           confirmText: profile.name,
           consequence: [
             bricks.length === 1
-              ? `1 GS1 category loses its requirements: ${bricks[0].name}.`
-              : `${bricks.length} GS1 categories lose their requirements: ${bricks.map((b) => b.name).join(", ")}.`,
+              ? `1 GS1 category loses its requirements: ${categoryLabel(bricks[0])}.`
+              : `${bricks.length} GS1 categories lose their requirements: ${bricks.map(categoryLabel).join(", ")}.`,
             `Everything the profile carries goes with it — ${profile.attributes}${images ? `, including ${images} stored image rule${images === 1 ? "" : "s"}` : ""}.`,
             profile.status === "Active"
               ? "This profile is ACTIVE — vendor items in these categories stop being assessed the moment this applies."

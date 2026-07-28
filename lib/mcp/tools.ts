@@ -422,10 +422,11 @@ export function createAttributeProfile(
   if (brickCodes.length === 0) {
     return {
       error:
-        `"${categoryName}" is the retailer's own label for the profile and does not have to match a GS1 category name. ` +
-        `What is missing is which GS1 category it covers, and that is the user's decision: ask them, offering the ` +
-        `categories still free — ${describeAvailableCategories(store.profiles)} ` +
-        `They can answer with a category name or its code.`,
+        `Ask the user which GS1 category "${categoryName}" should cover, offering the ones still free — ` +
+        `${describeAvailableCategories(store.profiles)} ` +
+        `Give each as its name followed by its code, the way the requirements screens show them, so the user can ` +
+        `answer with either. "${categoryName}" is their own label for the profile and never had to match a GS1 ` +
+        `category name, so do not open by telling them it is not one.`,
     }
   }
   const missingIdx = bricks.findIndex((b) => !b)

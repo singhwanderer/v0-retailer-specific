@@ -54,7 +54,8 @@ import {
   updateAttributeRequirement,
 } from "@/lib/mcp/tools"
 import { getStore, readProfileExtras } from "@/lib/mcp/store"
-import { describeAvailableCategories, findProfileForBrick, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
+import { categoryLabel, describeAvailableCategories, findProfileForBrick, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
+import { getBrickByCode } from "@/lib/gs1-standard-library"
 import {
   createPendingChange,
   discardPendingChange,
@@ -181,7 +182,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "search_gs1_bricks",
     description:
-      "Search the GS1 standard category library by name, segment, or category code. Returns each GS1 category's code, name, segment, its standard extended attributes, and whether it is still free to map to a new profile (`available`, plus `mappedTo` when it is not). Use this to resolve a product category like 'dresses' or 'footwear' to a GS1 category code before creating or inspecting an attribute profile. Matching is literal against those fields, not fuzzy: a product type the GS1 names do not use will find nothing, and a profile name will usually find nothing — neither is a failure, both mean ask the user which category they mean. If nothing matches, or every match is already mapped, the result carries a `note` naming the categories that are still free — relay those rather than picking a similar-sounding category yourself. Call with an empty query to list the whole library.",
+      "Search the GS1 standard categories by name, segment, or category code. Returns each GS1 category's code, name, segment, its standard extended attributes, and whether it is still free to map to a new profile (`available`, plus `mappedTo` when it is not). Use this to resolve a product category like 'dresses' or 'footwear' to a GS1 category code before creating or inspecting an attribute profile. Matching is literal against those fields, not fuzzy: a product type the GS1 names do not use will find nothing, and a profile name will usually find nothing — neither is a failure, both mean ask the user which category they mean. If nothing matches, or every match is already mapped, the result carries a `note` naming the categories that are still free — relay those rather than picking a similar-sounding category yourself. Call with an empty query to list every GS1 category.",
     schema: {
       query: z
         .string()
@@ -340,18 +341,28 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       if (!a.brickCodes?.length) {
         return {
           error:
-            `"${a.categoryName}" is the retailer's own label for the profile and does not have to match a GS1 category ` +
-            `name. What is missing is which GS1 category it covers, and that is the user's decision: ask them, offering ` +
-            `the categories still free — ${describeAvailableCategories(getStore(ctx.tenantId).profiles)} ` +
-            `They can answer with a category name or its code.`,
+            `Ask the user which GS1 category "${a.categoryName}" should cover, offering the ones still free — ` +
+            `${describeAvailableCategories(getStore(ctx.tenantId).profiles)} ` +
+            `Give each as its name followed by its code, the way the requirements screens show them, so the user can ` +
+            `answer with either. "${a.categoryName}" is their own label for the profile and never had to match a GS1 ` +
+            `category name, so do not open by telling them it is not one.`,
         }
       }
       const codes = a.brickCodes
+      // Named, not just coded. This line used to be bare 8-digit codes, which
+      // made the one screen that has to spell out what is about to be created
+      // the least readable step in the flow.
+      const named = codes
+        .map((c) => {
+          const brick = getBrickByCode(c)
+          return brick ? categoryLabel(brick) : c
+        })
+        .join(", ")
       return {
         summary: `Create a new "${a.categoryName}" requirement profile mapped to ${codes.length} GS1 categor${codes.length === 1 ? "y" : "ies"}.`,
         effect: [
           `Free-text category label: "${a.category ?? a.categoryName}".`,
-          `GS1 categories mapped: ${codes.join(", ")}. Each keeps its own attribute set — nothing is merged across them.`,
+          `GS1 categories mapped: ${named}. Each keeps its own attribute set — nothing is merged across them.`,
           "The profile is seeded with each category's standard GS1 extended attributes.",
           "It starts as a DRAFT, so nothing is assessed against it until it is activated.",
         ],
@@ -703,8 +714,8 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
         summary: `Delete the "${profile.name}" profile (${profile.category}) and everything under it.`,
         effect: [
           bricks.length === 1
-            ? `1 GS1 category loses its requirements: ${bricks[0].name}.`
-            : `${bricks.length} GS1 categories lose their requirements: ${bricks.map((b) => b.name).join(", ")}.`,
+            ? `1 GS1 category loses its requirements: ${categoryLabel(bricks[0])}.`
+            : `${bricks.length} GS1 categories lose their requirements: ${bricks.map(categoryLabel).join(", ")}.`,
           `Everything the profile carries goes with it — ${profile.attributes}${images ? `, including ${images} stored image rule${images === 1 ? "" : "s"}` : ""}.`,
           profile.status === "Active"
             ? "This profile is ACTIVE — vendor items in these categories stop being assessed the moment this applies."

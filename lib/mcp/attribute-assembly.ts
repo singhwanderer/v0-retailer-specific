@@ -153,7 +153,7 @@ export function mappingConflict(
 ): string {
   const free = unmappedBricks(profiles)
   const nearby = free.filter((b) => b.segment === brick.segment)
-  const suggest = (nearby.length ? nearby : free).map((b) => b.brickName)
+  const suggest = (nearby.length ? nearby : free).map(categoryLabel)
   const options = [
     ...(suggest.length
       ? [`map the new profile to a GS1 category that is still free — ${suggest.join(", ")}`]
@@ -168,6 +168,25 @@ export function mappingConflict(
     `Ways forward: ${options.join("; ")}. ` +
     `Put these to the user and let them choose; do not pick a category on their behalf.`
   )
+}
+
+/**
+ * How a GS1 category is written into any prose an agent will read out:
+ * `Handbags/Purses (10006030)`.
+ *
+ * Name first, code after, because that is the order every screen uses — the
+ * picker renders the name with the code muted beside it, and a profile card
+ * puts `10006030 · Accessories` under the name. Bare names were what the agent
+ * relayed when offering categories to choose from, which left a user reading a
+ * code off the requirements screen with nothing to match it against, and gave
+ * them no way to answer with the code even though every path accepts one.
+ */
+export function categoryLabel(
+  brick: { brickName: string; brickCode: string } | { name: string; code: string }
+): string {
+  return "brickName" in brick
+    ? `${brick.brickName} (${brick.brickCode})`
+    : `${brick.name} (${brick.code})`
 }
 
 export interface AvailableCategoryGroup {
@@ -195,12 +214,16 @@ export function availableCategories(profiles: AttributeProfile[]): AvailableCate
     .sort((a, b) => a.segment.localeCompare(b.segment))
 }
 
-/** The same list as one line of prose, for embedding in a tool's note. */
+/**
+ * The same list as one line of prose, for embedding in a tool's note. Each
+ * entry carries its code (see categoryLabel) — this string is what most callers
+ * interpolate, so it is the one place worth getting right.
+ */
 export function describeAvailableCategories(profiles: AttributeProfile[]): string {
   const groups = availableCategories(profiles)
   if (!groups.length) return "Every GS1 category is already mapped to a profile."
   return groups
-    .map((g) => `${g.segment}: ${g.categories.map((c) => c.brickName).join(", ")}`)
+    .map((g) => `${g.segment}: ${g.categories.map(categoryLabel).join(", ")}`)
     .join(". ")
 }
 
@@ -222,10 +245,10 @@ export interface BrickSearchResult {
 }
 
 /**
- * Search the GS1 library and say, per hit, whether the category is still free
- * to map. The note carries the recovery path in the two cases where the match
+ * Search the GS1 categories and say, per hit, whether each is still free to
+ * map. The note carries the recovery path in the two cases where the match
  * list on its own is a dead end: nothing matched at all, and everything that
- * matched is already spoken for. Named alternatives come from the library, so
+ * matched is already spoken for. Named alternatives come from the data, so
  * the agent relays real categories instead of inventing a plausible one — the
  * failure mode that put "Booties" onto an already-mapped footwear category.
  */
@@ -246,7 +269,7 @@ export function searchBricksWithMapping(
   })
 
   const free = unmappedBricks(profiles)
-  const freeNames = (bricks: Gs1Brick[]) => bricks.map((b) => b.brickName).join(", ")
+  const freeNames = (bricks: Gs1Brick[]) => bricks.map(categoryLabel).join(", ")
 
   // No query at all: this is the "what could I map to?" call, so say so rather
   // than returning 25 rows with no framing.
@@ -254,7 +277,7 @@ export function searchBricksWithMapping(
     return {
       matches,
       note:
-        `The full GS1 category library. Only the ones marked available can be mapped to a NEW profile; ` +
+        `Every GS1 category. Only the ones marked available can be mapped to a NEW profile; ` +
         `the rest already belong to one. Still free — ${describeAvailableCategories(profiles)}`,
     }
   }
@@ -263,14 +286,18 @@ export function searchBricksWithMapping(
     return {
       matches,
       note:
-        // Deliberately does NOT say "no category matches X". The caller may
-        // have passed a profile NAME, which is the retailer's own label and has
-        // no reason to match anything in the GS1 library — reporting that as a
-        // failed lookup is how "no GS1 category matches Troy" got said out loud.
-        `Nothing in the GS1 library matches "${query}". If that was a profile name rather than a product type, ` +
-        `it does not need to match anything — profile names are the retailer's own label. Ask the user which GS1 ` +
-        `category the profile should cover; do not infer one. ` +
-        `Segments in the library: ${getSegments().join(", ")}. ` +
+        // Leads with the ACTION, not the miss. This note is paraphrased almost
+        // verbatim into the reply, so whatever comes first is what the user
+        // hears first — and opening with "nothing matches X" is how
+        // "'Swimwear' isn't a category in the GS1 library" got said out loud.
+        // A miss here is not a failure: the caller may have passed a profile
+        // NAME, which is the retailer's own label and never had to match, or a
+        // product type the GS1 names simply word differently.
+        `Ask the user which GS1 category "${query}" should cover, offering the free ones below; do not infer one. ` +
+        `Nothing matched it by name, which is normal and not worth reporting as a failure — a profile name is the ` +
+        `retailer's own label and never had to match, and a product type may just be worded differently here. ` +
+        `Do not tell the user their name "is not a GS1 category". ` +
+        `GS1 segments: ${getSegments().join(", ")}. ` +
         (free.length
           ? `Categories still free to map — ${describeAvailableCategories(profiles)}`
           : `Every GS1 category is already mapped to a profile.`),

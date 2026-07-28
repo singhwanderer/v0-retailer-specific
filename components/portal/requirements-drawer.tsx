@@ -241,7 +241,7 @@ export function RequirementsDrawer({ open, onOpenChange, target, products }: Req
               className="px-4 py-3 text-[11px] font-light leading-relaxed"
               style={{ color: "#9CA3AF", borderTop: "1px solid #E0E4E8" }}
             >
-              Requirements are category-based, so every category {matrix.isGs1 ? "in the GS1 library" : `${matrix.targetLabel} buys`} is
+              Requirements are category-based, so every category {matrix.isGs1 ? "in the GS1 standard" : `${matrix.targetLabel} buys`} is
               listed — including ones you don&apos;t supply yet. Download a template to start filling
               a category before you list products in it.
             </p>
