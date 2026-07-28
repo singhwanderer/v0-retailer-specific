@@ -432,8 +432,12 @@ function CreateRequirementModal({
                     <div>
                       {(() => {
                         const droppedNames = removed[brick.brickCode] ?? []
+                        // Keyed by name alone: an attribute's identity is its
+                        // name (see Gs1ExtendedAttribute), and these strings go
+                        // to removeAttributeRequirement, which resolves by name
+                        // and refuses anything it cannot match.
                         const standardRows = brick.extendedAttributes.filter(
-                          (a) => !droppedNames.includes(`${a.name} (${a.code})`)
+                          (a) => !droppedNames.includes(a.name)
                         )
                         const customRows = added[brick.brickCode] ?? []
                         const total = standardRows.length + customRows.length
@@ -468,7 +472,7 @@ function CreateRequirementModal({
                               >
                                 {standardRows.map((attr, i) => (
                                   <div
-                                    key={attr.code}
+                                    key={attr.name}
                                     className="group flex items-center justify-between gap-2 px-3 py-2 text-xs"
                                     style={{
                                       borderBottom: i < lastIndex ? "1px solid #F3F4F6" : undefined,
@@ -480,7 +484,7 @@ function CreateRequirementModal({
                                       onClick={() =>
                                         setPendingRemoval({
                                           code: brick.brickCode,
-                                          gs1Name: `${attr.name} (${attr.code})`,
+                                          gs1Name: attr.name,
                                           label: attr.name,
                                         })
                                       }
