@@ -181,7 +181,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "search_gs1_bricks",
     description:
-      "Search the GS1 standard category library by name, segment, everyday synonym, or category code. Returns each GS1 category's code, name, segment, its standard extended attributes, and whether it is still free to map to a new profile (`available`, plus `mappedTo` when it is not). Use this to resolve a product category like 'dresses' or 'booties' to a GS1 category code before creating or inspecting an attribute profile. If nothing matches, or every match is already mapped, the result carries a `note` naming the categories that are still free — relay those rather than picking a similar-sounding category yourself.",
+      "Search the GS1 standard category library by name, segment, or category code. Returns each GS1 category's code, name, segment, its standard extended attributes, and whether it is still free to map to a new profile (`available`, plus `mappedTo` when it is not). Use this to resolve a product category like 'dresses' or 'footwear' to a GS1 category code before creating or inspecting an attribute profile. Matching is literal against those fields, not fuzzy: a product type the GS1 names do not use will find nothing, and a profile name will usually find nothing — neither is a failure, both mean ask the user which category they mean. If nothing matches, or every match is already mapped, the result carries a `note` naming the categories that are still free — relay those rather than picking a similar-sounding category yourself. Call with an empty query to list the whole library.",
     schema: {
       query: z
         .string()

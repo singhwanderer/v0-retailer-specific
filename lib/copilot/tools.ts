@@ -95,8 +95,8 @@ function makeReadTools(ctx: CopilotContext) {
   return {
     search_gs1_bricks: tool({
       description:
-        "Search GS1 product categories (bricks) by name, everyday synonym, or keyword. Each hit says whether the category is still free to map to a new profile.",
-      inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'handbags' or 'booties'") }),
+        "Search GS1 product categories (bricks) by name, segment, or category code. Matching is literal against those fields, not fuzzy — a product type the GS1 names do not use will find nothing, which is a signal to ask the user, not to pick the nearest category. Each hit says whether it is still free to map to a new profile. Call with an empty query to list the whole library.",
+      inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'dresses' or 'footwear'; empty lists all categories") }),
       // Each hit says whether the category is still free to map, and an empty
       // or fully-taken result carries a note naming the categories that are —
       // see searchBricksWithMapping.

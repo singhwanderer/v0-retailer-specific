@@ -5,6 +5,7 @@
 // Each Gs1Brick has a code, human-readable name, the segment (CSV file origin),
 // and the full list of E-marked extended attributes defined for that brick,
 // identified by name — see Gs1ExtendedAttribute for why there is no code.
+// Everything in here comes from those source sheets; nothing is authored.
 
 /**
  * An E-marked extended attribute on a brick.
@@ -29,16 +30,6 @@ export interface Gs1Brick {
   brickCode: string
   brickName: string
   segment: string
-  /**
-   * Everyday retail vocabulary that the formal GS1 brick name does not
-   * contain, so a search for what a buyer actually calls the product still
-   * resolves. "Booties" matched nothing before this existed — the string
-   * "boot" appears nowhere in the GS1 names — which left the agent to guess
-   * at a category from memory. Matched with the same substring rule as the
-   * name, so list plurals and spelling variants separately ("boot" does not
-   * match a query of "boots").
-   */
-  synonyms?: string[]
   extendedAttributes: Gs1ExtendedAttribute[]
 }
 
@@ -49,7 +40,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001077",
     brickName: "Shoes - General Purpose",
     segment: "Footwear",
-    synonyms: ["boots", "booties", "ankle boots", "heels", "pumps", "sandals", "loafers", "flats", "mules", "espadrilles", "clogs"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -80,7 +70,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001070",
     brickName: "Athletic Footwear - General Purpose",
     segment: "Footwear",
-    synonyms: ["sneakers", "trainers", "running shoes", "athletic shoes", "gym shoes", "tennis shoes", "cleats"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -109,7 +98,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001333",
     brickName: "Dresses",
     segment: "Clothing",
-    synonyms: ["gowns", "sundresses", "frocks"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -143,7 +131,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001350",
     brickName: "Jackets/Blazers/Cardigans/Waistcoats",
     segment: "Clothing",
-    synonyms: ["coats", "outerwear", "vests", "parkas", "anoraks"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -179,7 +166,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001352",
     brickName: "Shirts/Blouses/Polo Shirts/T-Shirts",
     segment: "Clothing",
-    synonyms: ["tees", "tops", "button-downs", "button downs", "camisoles"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -212,7 +198,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001351",
     brickName: "Sweaters/Pullovers",
     segment: "Clothing",
-    synonyms: ["jumpers", "knitwear", "sweatshirts", "hoodies", "turtlenecks"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -246,7 +231,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001361",
     brickName: "Upper Body Wear/Tops Variety Packs",
     segment: "Clothing",
-    synonyms: ["top multipacks", "shirt multipacks"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -276,7 +260,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001332",
     brickName: "Overalls/Bodysuits",
     segment: "Clothing",
-    synonyms: ["dungarees", "jumpsuits", "rompers", "playsuits", "coveralls", "leotards"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -305,7 +288,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001356",
     brickName: "Lower Body Wear/Bottoms Variety Packs",
     segment: "Clothing",
-    synonyms: ["bottom multipacks", "trouser multipacks"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -335,7 +317,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001334",
     brickName: "Skirts",
     segment: "Clothing",
-    synonyms: ["miniskirts", "midi skirts", "maxi skirts", "kilts"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -367,7 +348,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001335",
     brickName: "Trousers/Shorts",
     segment: "Clothing",
-    synonyms: ["pants", "jeans", "chinos", "slacks", "culottes", "capris", "cargos"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -404,7 +384,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10006017",
     brickName: "Necklaces/Chains/Pendants",
     segment: "Jewellery",
-    synonyms: ["chokers", "lockets"],
     extendedAttributes: [
       { name: "Metal Type" },
       { name: "Metal Purity" },
@@ -431,7 +410,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10006019",
     brickName: "Earrings/Ear Cuffs",
     segment: "Jewellery",
-    synonyms: ["studs", "hoops", "drop earrings"],
     extendedAttributes: [
       { name: "Metal Type" },
       { name: "Metal Purity" },
@@ -448,7 +426,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10006030",
     brickName: "Handbags/Purses",
     segment: "Accessories",
-    synonyms: ["bags", "totes", "clutches", "satchels", "crossbody bags", "shoulder bags"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -472,7 +449,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001328",
     brickName: "Handwear/Gloves",
     segment: "Accessories",
-    synonyms: ["mittens", "mitts"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -497,7 +473,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001329",
     brickName: "Headwear",
     segment: "Accessories",
-    synonyms: ["hats", "caps", "beanies", "berets", "visors"],
     extendedAttributes: [
       { name: "Adjustable" },
       { name: "Advertised Origin" },
@@ -521,7 +496,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001327",
     brickName: "Pocket Squares/Handkerchiefs",
     segment: "Accessories",
-    synonyms: ["hankies", "kerchiefs"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -545,7 +519,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001330",
     brickName: "Scarves/Ties/Neckwear",
     segment: "Accessories",
-    synonyms: ["neckties", "bow ties", "bowties", "cravats", "ascots"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -571,7 +544,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001326",
     brickName: "Belts/Braces/Cummerbunds",
     segment: "Accessories",
-    synonyms: ["suspenders", "waist belts", "sashes"],
     extendedAttributes: [
       { name: "Adjustable" },
       { name: "Advertised Origin" },
@@ -600,7 +572,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10006032",
     brickName: "Scarves/Wraps/Shawls",
     segment: "Accessories",
-    synonyms: ["pashminas", "stoles", "ponchos"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -628,7 +599,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001400",
     brickName: "Sports/Performance Tops",
     segment: "Sportswear",
-    synonyms: ["activewear tops", "athleisure tops", "sports bras", "gym tops", "jerseys", "rash guards"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -655,7 +625,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10001401",
     brickName: "Sports/Performance Bottoms",
     segment: "Sportswear",
-    synonyms: ["leggings", "joggers", "sweatpants", "track pants", "gym shorts", "yoga pants", "tights"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -683,7 +652,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10002100",
     brickName: "Nightwear/Pyjamas",
     segment: "Homewear",
-    synonyms: ["pajamas", "sleepwear", "nightgowns", "nighties", "loungewear"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -706,7 +674,6 @@ export const GS1_BRICKS: Gs1Brick[] = [
     brickCode: "10002101",
     brickName: "Robes/Dressing Gowns",
     segment: "Homewear",
-    synonyms: ["bathrobes", "housecoats", "kimonos"],
     extendedAttributes: [
       { name: "Advertised Origin" },
       { name: "Brand Name" },
@@ -738,7 +705,27 @@ export function getSegments(): string[] {
   return [...new Set(GS1_BRICKS.map((b) => b.segment))].sort()
 }
 
-/** Search bricks by name, code, segment, or everyday synonym (case-insensitive). */
+/**
+ * Search bricks by name, code, or segment (case-insensitive).
+ *
+ * Deliberately literal. A `synonyms` field once mapped everyday retail
+ * vocabulary onto bricks ("booties" -> Shoes - General Purpose) so a fuzzy
+ * query would still resolve. It was removed for two reasons.
+ *
+ * Those mappings were authored here rather than taken from GS1 — the same
+ * invented-data problem as the attribute codes, and just as arguable ("
+ * leggings" had been filed under Sports/Performance Bottoms, not
+ * Trousers/Shorts).
+ *
+ * And a fuzzy match is actively harmful on the path that matters. A profile
+ * name is the retailer's own label, so a one-word one can collide with the
+ * vocabulary: "Boots" matched Shoes - General Purpose, "Bags" matched
+ * Handbags/Purses, "Tops" matched three bricks. A retailer naming a profile
+ * "Boots" would have been told that category already belongs to Footwear
+ * instead of being asked which category they meant — exactly the guessing
+ * create_attribute_profile now exists to prevent. Matching nothing is the
+ * safe outcome: it routes to asking the user.
+ */
 export function searchBricks(query: string): Gs1Brick[] {
   const q = query.toLowerCase().trim()
   if (!q) return GS1_BRICKS
@@ -746,7 +733,6 @@ export function searchBricks(query: string): Gs1Brick[] {
     (b) =>
       b.brickName.toLowerCase().includes(q) ||
       b.brickCode.includes(q) ||
-      b.segment.toLowerCase().includes(q) ||
-      (b.synonyms ?? []).some((s) => s.includes(q))
+      b.segment.toLowerCase().includes(q)
   )
 }
