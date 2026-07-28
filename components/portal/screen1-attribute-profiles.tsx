@@ -113,7 +113,7 @@ function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () => void 
             style={{ backgroundColor: "#F4F6F8", color: "#6B7280" }}
           >
             <p className="font-medium text-[#111827] mb-1">Required CSV columns</p>
-            <p>Category Name · Attribute Name · TGC GS1 Code · Guidance Note (optional)</p>
+            <p>Category Name · Attribute Name · Guidance Note (optional)</p>
           </div>
         </div>
         <DialogFooter>

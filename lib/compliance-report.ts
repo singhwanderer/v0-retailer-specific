@@ -67,7 +67,6 @@ export interface ReportOptions {
 
 export interface RankedAttribute {
   name: string
-  code?: string
   /** How many assessed items are missing this attribute. */
   count: number
 }
@@ -158,11 +157,11 @@ function pct(complete: number, total: number): number {
 }
 
 function rankMissing(
-  counts: Map<string, { code?: string; count: number }>,
+  counts: Map<string, number>,
   maxAttributes: number
 ): { ranked: RankedAttribute[]; distinct: number } {
   const all = [...counts.entries()]
-    .map(([name, { code, count }]) => ({ name, code, count }))
+    .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   const limit = maxAttributes >= 999 ? all.length : Math.max(1, maxAttributes)
   return { ranked: all.slice(0, limit), distinct: all.length }
@@ -186,7 +185,7 @@ function supplierGapAllocation(
   product: SupplierProduct,
   filter: ReportFilterRef,
   rawGaps: number
-): { effectiveGaps: number; missing: { name: string; code?: string }[] } {
+): { effectiveGaps: number; missing: { name: string }[] } {
   const brickCode = product.brickCode ?? ""
 
   if (filter.kind === "system" && (filter.id === "gs1-core" || filter.id === "nrf-retail-ready")) {
@@ -202,10 +201,7 @@ function supplierGapAllocation(
   const pool = (
     filter.kind === "account"
       ? resolveAccountFilterAttributes(filter.retailer, brickCode)
-      : (getBrickByCode(brickCode)?.extendedAttributes ?? []).map((a) => ({
-          name: a.name,
-          code: a.code,
-        }))
+      : (getBrickByCode(brickCode)?.extendedAttributes ?? []).map((a) => ({ name: a.name }))
   ).filter((a) => !CORE_ATTR_NAMES.has(a.name))
 
   const fromPool = Math.min(rawGaps, pool.length)
@@ -243,7 +239,7 @@ export function runSupplierReport(
   options: ReportOptions
 ): ReportResult {
   const excluded = { uncategorised: 0, discontinued: 0, updatedBefore: 0 }
-  const missingCounts = new Map<string, { code?: string; count: number }>()
+  const missingCounts = new Map<string, number>()
   const byCat = new Map<string, { total: number; complete: number; gaps: number }>()
   const rows: ReportRow[] = []
 
@@ -283,9 +279,7 @@ export function runSupplierReport(
     totalGaps += effectiveGaps
 
     for (const m of missing) {
-      const entry = missingCounts.get(m.name) ?? { code: m.code, count: 0 }
-      entry.count++
-      missingCounts.set(m.name, entry)
+      missingCounts.set(m.name, (missingCounts.get(m.name) ?? 0) + 1)
     }
 
     const cat = byCat.get(category) ?? { total: 0, complete: 0, gaps: 0 }
@@ -361,7 +355,7 @@ export function runRetailerReport(
     scoped = scoped.filter((s) => coveredBricks.has(s.brickCode))
   }
 
-  const missingCounts = new Map<string, { code?: string; count: number }>()
+  const missingCounts = new Map<string, number>()
   const byCat = new Map<string, { total: number; complete: number; gaps: number }>()
   const rows: ReportRow[] = []
 
@@ -376,17 +370,13 @@ export function runRetailerReport(
     }
 
     // Attribute pool for this vendor's category under the chosen filter.
-    let pool: { name: string; code?: string }[]
+    let pool: { name: string }[]
     if (filter.kind === "account") {
       pool = assembleBrickAttributes(s.brickCode, options.tenantId).extendedAttributes.map((a) => ({
         name: a.name,
-        code: a.source === "standard" ? a.gs1Name.match(/\(([^)]+)\)$/)?.[1] : undefined,
       }))
     } else if (filter.id === "gs1-extended") {
-      pool = (getBrickByCode(s.brickCode)?.extendedAttributes ?? []).map((a) => ({
-        name: a.name,
-        code: a.code,
-      }))
+      pool = (getBrickByCode(s.brickCode)?.extendedAttributes ?? []).map((a) => ({ name: a.name }))
     } else {
       pool = (filter.id === "gs1-core" ? GUIDANCE_CORE_ATTRIBUTES : NRF_AUDIT_ATTRIBUTES).map(
         (name) => ({ name })
@@ -421,9 +411,7 @@ export function runRetailerReport(
     const k = Math.min(pool.length, gaps)
     for (let i = 0; i < k; i++) {
       const share = Math.floor(gaps / k) + (i < gaps % k ? 1 : 0)
-      const entry = missingCounts.get(pool[i].name) ?? { code: pool[i].code, count: 0 }
-      entry.count += share
-      missingCounts.set(pool[i].name, entry)
+      missingCounts.set(pool[i].name, (missingCounts.get(pool[i].name) ?? 0) + share)
     }
 
     productsTotal += s.productsTotal
@@ -514,8 +502,8 @@ export function reportToCsv(report: ReportRequest): string {
       `${r.excluded.uncategorised} uncategorised / ${r.excluded.discontinued} discontinued / ${r.excluded.updatedBefore} updated before cutoff`
     ),
     "",
-    line("Missing Attribute", "GS1 Code", "Items Missing It"),
-    ...r.missingAttributes.map((a) => line(a.name, a.code ?? "", a.count)),
+    line("Missing Attribute", "Items Missing It"),
+    ...r.missingAttributes.map((a) => line(a.name, a.count)),
     "",
   ]
 

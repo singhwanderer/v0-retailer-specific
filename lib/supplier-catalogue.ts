@@ -32,9 +32,13 @@ export type SupplierProduct = {
   retailers?: RetailerStatus[]
   /**
    * Attribute values the supplier has filled in from the gap-detail screen,
-   * keyed by GS1 attribute code → chosen value. A filled attribute is a
+   * keyed by GS1 attribute NAME → chosen value. A filled attribute is a
    * product-level fact: it satisfies that attribute for every target (GS1
    * baseline and every retailer), mirroring the "you keep one product" model.
+   *
+   * Keyed by code until those codes turned out to be fabricated and, worse,
+   * shared: Closure Type and Collar Type carried the same one, so filling
+   * either marked both done. Names are unique across the GS1 library.
    */
   filledAttributes?: Record<string, string>
 }
@@ -559,7 +563,7 @@ export function countUncategorised(products: SupplierProduct[]): number {
 
 export type GapTarget = { kind: "gs1" } | { kind: "retailer"; name: string }
 
-export type MissingAttribute = { name: string; code: string }
+export type MissingAttribute = { name: string }
 export type MissingImage = { name: string; spec: string }
 
 export type GapRecords = {
@@ -624,7 +628,7 @@ function stableHash(s: string): number {
   return h
 }
 
-type BrickAttribute = { name: string; code: string }
+type BrickAttribute = { name: string }
 
 type GapAllocation = {
   /** The head-slice of the brick pool this product's gaps resolve to. */
@@ -675,7 +679,7 @@ function allocateGaps(
   }
 
   return {
-    allocatedAttrs: attrPool.slice(0, attrCount).map((a) => ({ name: a.name, code: a.code })),
+    allocatedAttrs: attrPool.slice(0, attrCount).map((a) => ({ name: a.name })),
     imageGaps: IMAGE_REQUIREMENT_POOL.slice(0, imageGapCount),
     attrPoolSize: attrPool.length,
   }
@@ -701,20 +705,20 @@ export function getGapRecords(
   // requirements show — both only ever reduce the attribute portion.
   const { allocatedAttrs, imageGaps, attrPoolSize } = allocateGaps(product, target)
 
-  const filledCodes = new Set(product?.filledAttributes ? Object.keys(product.filledAttributes) : [])
+  const filledNames = new Set(product?.filledAttributes ? Object.keys(product.filledAttributes) : [])
   const waivedNames = waivedAttributesForTarget(product?.brickCode, target)
 
   // Attributes this retailer has waived for us: no longer outstanding, but
   // surfaced separately so the detail screen can say "waived by Dillard's"
   // rather than having the requirement silently disappear.
   const waivedAttrs = allocatedAttrs.filter(
-    (a) => !filledCodes.has(a.code) && isAttributeWaived(a.name, waivedNames)
+    (a) => !filledNames.has(a.name) && isAttributeWaived(a.name, waivedNames)
   )
-  const waivedCodes = new Set(waivedAttrs.map((a) => a.code))
+  const waivedAttrNames = new Set(waivedAttrs.map((a) => a.name))
 
   // What's genuinely still open: not filled in by us, not waived by them.
   const missingAttrs = allocatedAttrs.filter(
-    (a) => !filledCodes.has(a.code) && !waivedCodes.has(a.code)
+    (a) => !filledNames.has(a.name) && !waivedAttrNames.has(a.name)
   )
 
   return {
@@ -743,7 +747,6 @@ export function getGapRecords(
 export type ResolvedAttributeStatus = "provided" | "missing" | "waived"
 
 export type ResolvedAttribute = {
-  code: string
   name: string
   /** Empty only when status is "missing" (or "waived" and never supplied). */
   value: string
@@ -759,8 +762,8 @@ export type ResolvedAttribute = {
  * no enumerated values to choose from.
  */
 function seededAttributeValue(productId: string, attr: BrickAttribute): string {
-  const options = getAllowedValues(attr.code)
-  const hash = stableHash(`${productId}|${attr.code}`)
+  const options = getAllowedValues(attr.name)
+  const hash = stableHash(`${productId}|${attr.name}`)
   if (options && options.length > 0) return options[hash % options.length].value
 
   // No GS1 code list — a free-text field. Match on the attribute name so the
@@ -822,22 +825,21 @@ export function getProductAttributes(
   const pool = brick?.extendedAttributes ?? []
 
   const { missingAttrs, waivedAttrs } = getGapRecords(product, target)
-  const missingCodes = new Set(missingAttrs.map((a) => a.code))
-  const waivedCodes = new Set(waivedAttrs.map((a) => a.code))
+  const missingNames = new Set(missingAttrs.map((a) => a.name))
+  const waivedAttrNames = new Set(waivedAttrs.map((a) => a.name))
 
   return pool.map((attr) => {
-    const filled = product?.filledAttributes?.[attr.code]
+    const filled = product?.filledAttributes?.[attr.name]
     if (filled) {
-      return { code: attr.code, name: attr.name, value: filled, status: "provided" as const, source: "filled" as const }
+      return { name: attr.name, value: filled, status: "provided" as const, source: "filled" as const }
     }
-    if (missingCodes.has(attr.code)) {
-      return { code: attr.code, name: attr.name, value: "", status: "missing" as const, source: "seeded" as const }
+    if (missingNames.has(attr.name)) {
+      return { name: attr.name, value: "", status: "missing" as const, source: "seeded" as const }
     }
-    if (waivedCodes.has(attr.code)) {
-      return { code: attr.code, name: attr.name, value: "", status: "waived" as const, source: "seeded" as const }
+    if (waivedAttrNames.has(attr.name)) {
+      return { name: attr.name, value: "", status: "waived" as const, source: "seeded" as const }
     }
     return {
-      code: attr.code,
       name: attr.name,
       value: product ? seededAttributeValue(product.id, attr) : "",
       status: "provided" as const,
@@ -966,14 +968,14 @@ export function assignCategory(
 export function fillAttribute(
   products: SupplierProduct[],
   productId: string,
-  attributeCode: string,
+  attributeName: string,
   value: string
 ): SupplierProduct[] {
   return products.map((p) => {
     if (p.id !== productId) return p
     const next = { ...(p.filledAttributes ?? {}) }
-    if (value) next[attributeCode] = value
-    else delete next[attributeCode]
+    if (value) next[attributeName] = value
+    else delete next[attributeName]
     return { ...p, filledAttributes: next }
   })
 }

@@ -87,7 +87,6 @@ export function resolveSystemFilterAttributes(
   if (id === "gs1-core") return core
   const extended = (getBrickByCode(brickCode)?.extendedAttributes ?? []).map((a) => ({
     name: a.name,
-    code: a.code,
   }))
   return [...core, ...extended]
 }

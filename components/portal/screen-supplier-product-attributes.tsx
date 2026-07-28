@@ -67,11 +67,11 @@ function AttributeValueEditor({
   initialValue,
   onSubmit,
 }: {
-  attr: { code: string; name: string }
+  attr: { name: string }
   initialValue: string
   onSubmit: (value: string) => void
 }) {
-  const allowedValues = getAllowedValues(attr.code)
+  const allowedValues = getAllowedValues(attr.name)
 
   if (allowedValues && allowedValues.length > 0) {
     return (
@@ -234,7 +234,7 @@ export function ScreenSupplierProductAttributes({
   const [pendingFill, setPendingFill] = useState<{ attr: MissingAttribute; value: string } | null>(
     null
   )
-  const [editingAttrCode, setEditingAttrCode] = useState<string | null>(null)
+  const [editingAttrName, setEditingAttrName] = useState<string | null>(null)
 
   const isGs1 = target.kind === "gs1"
   const targetLabel = isGs1 ? "GS1 Standard" : target.name
@@ -251,18 +251,18 @@ export function ScreenSupplierProductAttributes({
 
   const handleConfirm = () => {
     if (pendingFill) {
-      onFillAttribute(productId, pendingFill.attr.code, pendingFill.value)
+      onFillAttribute(productId, pendingFill.attr.name, pendingFill.value)
       setPendingFill(null)
-      setEditingAttrCode(null)
+      setEditingAttrName(null)
     }
   }
 
   const handleSubmitValue = (attr: ResolvedAttribute, value: string) => {
     if (!value || value === attr.value) {
-      setEditingAttrCode(null)
+      setEditingAttrName(null)
       return
     }
-    setPendingFill({ attr: { code: attr.code, name: attr.name }, value })
+    setPendingFill({ attr: { name: attr.name }, value })
   }
 
   return (
@@ -371,11 +371,11 @@ export function ScreenSupplierProductAttributes({
                 <tbody>
                   {attributes.map((attr, idx) => {
                     const tone = STATUS_TONE[attr.status]
-                    const isEditing = editingAttrCode === attr.code
+                    const isEditing = editingAttrName === attr.name
                     const isWaived = attr.status === "waived"
                     return (
                       <tr
-                        key={attr.code}
+                        key={attr.name}
                         style={{
                           borderBottom:
                             idx < attributes.length - 1 ? "1px solid #F3F4F6" : undefined,
@@ -410,7 +410,7 @@ export function ScreenSupplierProductAttributes({
                         <td className="px-4 py-3 text-right align-middle w-12">
                           {attr.status === "provided" && !isEditing && (
                             <button
-                              onClick={() => setEditingAttrCode(attr.code)}
+                              onClick={() => setEditingAttrName(attr.name)}
                               className="inline-flex items-center justify-center p-1.5 rounded hover:bg-[#F3F4F6] transition-colors"
                               aria-label={`Edit ${attr.name}`}
                             >
@@ -449,7 +449,7 @@ export function ScreenSupplierProductAttributes({
         onOpenChange={(open) => {
           if (!open) {
             setPendingFill(null)
-            setEditingAttrCode(null)
+            setEditingAttrName(null)
           }
         }}
         attributeName={pendingFill?.attr.name ?? ""}

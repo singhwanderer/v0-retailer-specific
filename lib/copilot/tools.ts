@@ -19,7 +19,7 @@
 
 import { tool } from "ai"
 import { z } from "zod"
-import { getBrickByCode, getSegments, searchBricks } from "@/lib/gs1-standard-library"
+import { getBrickByCode, getSegments } from "@/lib/gs1-standard-library"
 import {
   RETAILER_SUPPLIERS,
   getProfileBricks,
@@ -28,8 +28,11 @@ import {
 import {
   findProfileForBrick,
   assembleBrickAttributes,
-  gs1DisplayName,
+  availableCategories,
+  describeAvailableCategories,
+  mappingConflict,
   resolveGs1Name,
+  searchBricksWithMapping,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
@@ -91,20 +94,20 @@ function unknownProfile(ctx: CopilotContext, profileName: string): string {
 function makeReadTools(ctx: CopilotContext) {
   return {
     search_gs1_bricks: tool({
-      description: "Search GS1 product categories (bricks) by name or keyword.",
-      inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'handbags' or 'footwear'") }),
-      // Attribute names come back as plain strings, with the GS1 codes in a
-      // parallel field. Returning "Closure (GM03CLOS)" here gave the model a
-      // ready-made display string it would paste straight into a reply, which
-      // is the one thing the retailer view never shows (see gs1DisplayName).
-      execute: async ({ query }) =>
-        searchBricks(query).map((b) => ({
-          brickCode: b.brickCode,
-          brickName: b.brickName,
-          segment: b.segment,
-          standardExtendedAttributes: b.extendedAttributes.map((a) => a.name),
-          attributeCodes: Object.fromEntries(b.extendedAttributes.map((a) => [a.name, a.code])),
-        })),
+      description:
+        "Search GS1 product categories (bricks) by name, segment, or category code. Matching is literal against those fields, not fuzzy — a product type the GS1 names do not use will find nothing, which is a signal to ask the user, not to pick the nearest category. Each hit says whether it is still free to map to a new profile. Call with an empty query to list the whole library.",
+      inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'dresses' or 'footwear'; empty lists all categories") }),
+      // Each hit says whether the category is still free to map, and an empty
+      // or fully-taken result carries a note naming the categories that are —
+      // see searchBricksWithMapping.
+      execute: async ({ query }) => {
+        const { matches, note } = searchBricksWithMapping(ctx.profiles, query)
+        const shaped = matches.map(({ extendedAttributes, ...b }) => ({
+          ...b,
+          standardExtendedAttributes: extendedAttributes.map((a) => a.name),
+        }))
+        return note ? { matches: shaped, note } : shaped
+      },
     }),
 
     list_attribute_profiles: tool({
@@ -299,22 +302,49 @@ function makeCreateTools(ctx: CopilotContext) {
   return {
     create_attribute_profile: tool({
       description:
-        "Propose a NEW attribute profile mapped to one or more GS1 categories. Does not create anything — returns a proposal the user must confirm.",
+        "Propose a NEW attribute profile. Does not create anything — returns a proposal the user must confirm. A profile has two independent parts: `name`, which is the retailer's own label and can be anything, and `brickCodes`, the GS1 categories it covers. The name never implies the category — do not derive one from the other. Call without brickCodes when the user has named a profile but not said what it covers: the result is the list of categories still free, to put to the user. Every GS1 category belongs to at most one profile.",
       inputSchema: z.object({
-        name: z.string().describe("Profile name shown in the requirements list"),
-        brickCodes: z.array(z.string()).min(1).describe("One or more GS1 brick codes, from search_gs1_bricks"),
+        name: z.string().describe("Profile name shown in the requirements list — the retailer's own label, unconstrained"),
+        brickCodes: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "GS1 brick codes the profile covers, from search_gs1_bricks. Omit if the user has not said which category — you will get the available ones back to ask them."
+          ),
         category: z.string().optional().describe("Free-text category label; defaults to name"),
       }),
       execute: async ({ name, brickCodes, category }) => {
+        // No category yet. This is the normal state after "create a requirement
+        // called Troy" — a name on its own says nothing about which GS1
+        // category it covers — so it returns the next step, not an error.
+        if (!brickCodes?.length) {
+          return {
+            needsCategory: true,
+            profileName: name,
+            availableCategories: availableCategories(ctx.profiles),
+            note:
+              `"${name}" is the retailer's own label for the profile and does not have to match a GS1 category name — ` +
+              `nothing needs to be looked up for it. What is still missing is which GS1 category the profile covers, ` +
+              `and that is the user's decision: ask them, offering the available categories below by segment. ` +
+              `They can answer with a category name or its code. Do not choose one for them, and do not call this tool ` +
+              `again until they have.`,
+          }
+        }
         const bricks = brickCodes.map((code) => ({ code, brick: getBrickByCode(code) }))
         const missing = bricks.find((b) => !b.brick)
         if (missing) {
-          return { error: `Unknown GS1 category code ${missing.code}. Use search_gs1_bricks to find the right category first.` }
+          return {
+            error:
+              `Unknown GS1 category code ${missing.code}. Use search_gs1_bricks to find the right category first. ` +
+              `Categories still free to map — ${describeAvailableCategories(ctx.profiles)}`,
+          }
         }
         const conflict = bricks.find((b) => findProfileForBrick(ctx.profiles, b.code))
         if (conflict) {
           const owner = findProfileForBrick(ctx.profiles, conflict.code)!
-          return { error: `The "${conflict.brick!.brickName}" category is already mapped to the "${owner.name}" profile, and a category belongs to one profile at a time. Ask me to add a requirement to "${owner.name}" instead, or to delete it first if you mean to replace it.` }
+          return {
+            error: mappingConflict(ctx.profiles, conflict.brick!, owner.name),
+          }
         }
         const brickNames = bricks.map((b) => b.brick!.brickName).join(", ")
         const proposal: ProposedAction = {
@@ -421,7 +451,7 @@ function makeEditTools(ctx: CopilotContext) {
           tool: "update_attribute_requirement",
           // The card shows the name the retailer sees on screen; args carry
           // the canonical store key the apply path needs.
-          summary: `Update "${gs1DisplayName(resolved.gs1Name)}" on "${profile.name}": ${changes}.`,
+          summary: `Update "${resolved.gs1Name}" on "${profile.name}": ${changes}.`,
           args: { brickCode, gs1Name: resolved.gs1Name, name, guidance },
           consequence:
             "Changes how the requirement reads for suppliers. Gap counts are unaffected — this does not change whether it is met.",
@@ -446,7 +476,7 @@ function makeEditTools(ctx: CopilotContext) {
         if ("error" in resolved) return resolved
         const proposal: ProposedAction = {
           tool: "remove_attribute_requirement",
-          summary: `Stop requiring "${gs1DisplayName(resolved.gs1Name)}" on "${profile.name}".`,
+          summary: `Stop requiring "${resolved.gs1Name}" on "${profile.name}".`,
           args: { brickCode, gs1Name: resolved.gs1Name },
           destructive: true,
           consequence:
