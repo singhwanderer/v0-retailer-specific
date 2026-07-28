@@ -27,7 +27,6 @@ export type RequirementTarget = { kind: "gs1" } | { kind: "retailer"; name: stri
 /** One required attribute, tagged by where the requirement originates. */
 export type RequirementAttribute = {
   name: string
-  code?: string
   /** "extra" = retailer-specific requirement on top of GS1; "gs1" = baseline */
   origin: "gs1" | "extra"
 }
@@ -127,7 +126,6 @@ export function getRequirementMatrix(
     if (isGs1) {
       attributes = (getBrickByCode(brickCode)?.extendedAttributes ?? []).map((a) => ({
         name: a.name,
-        code: a.code,
         origin: "gs1" as const,
       }))
     } else {
@@ -136,7 +134,6 @@ export function getRequirementMatrix(
       extraCount = extras.length
       attributes = resolveAccountFilterAttributes(target.name, brickCode).map((a) => ({
         name: a.name,
-        code: a.code,
         origin: extraSet.has(a.name) ? ("extra" as const) : ("gs1" as const),
       }))
     }
@@ -205,14 +202,13 @@ export function buildCategoryTemplateCsv(
   matrix: RequirementMatrix,
   category: CategoryRequirement
 ): CsvTemplate {
-  const header = ["Category", "GS1 Brick", "Attribute", "Attribute Code", "Requirement Source", "Value"]
+  const header = ["Category", "GS1 Brick", "Attribute", "Requirement Source", "Value"]
   const rows: string[][] = [header]
   for (const attr of category.attributes) {
     rows.push([
       category.category,
       category.brickName,
       attr.name,
-      attr.code ?? "",
       attr.origin === "extra" ? `${matrix.targetLabel} (extra)` : "GS1 Standard",
       "",
     ])
@@ -225,7 +221,7 @@ export function buildCategoryTemplateCsv(
 
 /** A blank requirement template covering every category the target requires. */
 export function buildTargetTemplateCsv(matrix: RequirementMatrix): CsvTemplate {
-  const header = ["Category", "GS1 Brick", "Attribute", "Attribute Code", "Requirement Source", "Value"]
+  const header = ["Category", "GS1 Brick", "Attribute", "Requirement Source", "Value"]
   const rows: string[][] = [header]
   for (const cat of matrix.categories) {
     for (const attr of cat.attributes) {
@@ -233,7 +229,6 @@ export function buildTargetTemplateCsv(matrix: RequirementMatrix): CsvTemplate {
         cat.category,
         cat.brickName,
         attr.name,
-        attr.code ?? "",
         attr.origin === "extra" ? `${matrix.targetLabel} (extra)` : "GS1 Standard",
         "",
       ])

@@ -70,7 +70,7 @@ export function searchGs1Bricks(ctx: CallerContext, query: string) {
   const { matches, note } = searchBricksWithMapping(getStore(ctx.tenantId).profiles, query)
   const shaped = matches.map(({ extendedAttributes, ...b }) => ({
     ...b,
-    standardExtendedAttributes: extendedAttributes.map((a) => `${a.name} (${a.code})`),
+    standardExtendedAttributes: extendedAttributes.map((a) => a.name),
   }))
   return note ? { matches: shaped, note } : shaped
 }
@@ -456,7 +456,7 @@ export function createAttributeProfile(
   store.profiles.push(profile)
   return {
     created: profile,
-    seededStandardAttributes: resolvedBricks.flatMap((b) => b.extendedAttributes.map((a) => `${a.name} (${a.code})`)),
+    seededStandardAttributes: resolvedBricks.flatMap((b) => b.extendedAttributes.map((a) => a.name)),
     demo_note: DEMO_NOTE,
   }
 }
@@ -525,9 +525,9 @@ export function updateAttributeRequirement(
 ) {
   const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
-  // Callers may name the attribute either way — "Closure" or the full
-  // "Closure (GM03CLOS)" key. Resolve before touching the store, so an
-  // unmatched name is an error rather than an override nothing ever reads.
+  // Resolve the caller's spelling to the canonical key before touching the
+  // store, so an unmatched name is an error rather than an override nothing
+  // ever reads.
   const resolved = resolveGs1Name(brickCode, gs1Name, ctx.tenantId)
   if ("error" in resolved) return resolved
   const key = resolved.gs1Name

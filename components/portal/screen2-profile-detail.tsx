@@ -30,7 +30,6 @@ import {
 import {
   assembleBrickAttributes,
   describeProfileAttributes,
-  gs1DisplayName,
   type BrickAttributeSet,
 } from "@/lib/mcp/attribute-assembly"
 import {
@@ -58,21 +57,6 @@ const EMPTY_ATTRS: BrickAttributeSet = {
   extendedAttributes: [],
   imageRequirements: [],
 }
-
-// ── GS1 catalogue (mock) ──────────────────────────────────────────────────────
-const gs1Catalogue = [
-  { name: "Heel Type", code: "GM03HLTY" },
-  { name: "Heel Height Range", code: "GM03HLHT" },
-  { name: "Toe Shape", code: "GM03TOES" },
-  { name: "Outsole Type", code: "GM03OUTS" },
-  { name: "Closure", code: "GM03CLOS" },
-  { name: "Lining Material", code: "GM03LIMT" },
-  { name: "Fabric or Material", code: "GM03FBMC" },
-  { name: "Fit", code: "GM03FITT" },
-  { name: "Fur Treatment", code: "GM03FTMT" },
-  { name: "Gender", code: "GENDER" },
-  { name: "Consumer Life Stage", code: "CONLIFESTAGE" },
-]
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
@@ -291,7 +275,7 @@ function EditAttributeDialog({
               className="px-3 py-2 rounded-md text-sm"
               style={{ backgroundColor: "#F4F6F8", color: "#6B7280", border: "1px solid #E0E4E8" }}
             >
-              {row ? gs1DisplayName(row.gs1Name) : ""}
+              {row ? row.gs1Name : ""}
             </div>
           </div>
           {/* Retailer label — editable */}
@@ -413,7 +397,7 @@ function AttributeTable({
                 className="px-4 py-2.5 text-xs"
                 style={{ color: "#6B7280", backgroundColor: "#F9FAFB" }}
               >
-                {gs1DisplayName(row.gs1Name)}
+                {row.gs1Name}
               </td>
               <td className="px-4 py-2.5 text-xs leading-relaxed" style={{ color: "#6B7280" }}>
                 {row.guidance ? row.guidance : <span style={{ color: "#D1D5DB" }}>—</span>}

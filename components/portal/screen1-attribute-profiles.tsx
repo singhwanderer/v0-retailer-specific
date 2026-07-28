@@ -103,7 +103,7 @@ function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () => void 
             style={{ backgroundColor: "#F4F6F8", color: "#6B7280" }}
           >
             <p className="font-medium text-[#111827] mb-1">Required CSV columns</p>
-            <p>Category Name · Attribute Name · TGC GS1 Code · Guidance Note (optional)</p>
+            <p>Category Name · Attribute Name · Guidance Note (optional)</p>
           </div>
         </div>
         <DialogFooter>
@@ -376,7 +376,7 @@ function CreateRequirementModal({
                       >
                         {brick.extendedAttributes.map((attr, i) => (
                           <div
-                            key={attr.code}
+                            key={attr.name}
                             className="flex items-center justify-between px-3 py-2 text-xs"
                             style={{
                               borderBottom: i < brick.extendedAttributes.length - 1 ? "1px solid #F3F4F6" : undefined,

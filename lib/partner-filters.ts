@@ -90,11 +90,10 @@ export function getPartnerExtraAttributes(retailer: string, brickCode: string): 
 export function resolveAccountFilterAttributes(
   retailer: string,
   brickCode: string
-): { name: string; code?: string }[] {
+): { name: string }[] {
   const extras = getPartnerExtraAttributes(retailer, brickCode).map((name) => ({ name }))
   const standard = (getBrickByCode(brickCode)?.extendedAttributes ?? []).map((a) => ({
     name: a.name,
-    code: a.code,
   }))
   return [...extras, ...standard]
 }

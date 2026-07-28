@@ -508,12 +508,11 @@ export function ScreenSupplierProducts({
           <div className="flex items-center gap-1.5 flex-wrap">
             {activeBrick.extendedAttributes.map((attr) => (
               <span
-                key={attr.code}
+                key={attr.name}
                 className="inline-flex items-baseline gap-1.5 px-2 py-1 rounded text-xs"
                 style={{ backgroundColor: "#F4F6F8", color: "#374151", border: "1px solid #E0E4E8" }}
               >
                 {attr.name}
-                <span className="text-[9px] font-mono" style={{ color: "#9CA3AF" }}>{attr.code}</span>
               </span>
             ))}
           </div>

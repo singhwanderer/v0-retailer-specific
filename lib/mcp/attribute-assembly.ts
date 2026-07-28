@@ -56,11 +56,14 @@ export function assembleBrickAttributes(brickCode: string, tenantId?: string): B
   const baseline = BASELINE_CORE_ATTRIBUTES.filter((a) => !excluded.has(a.gs1Name)).map((a) =>
     applyOverride(a, extras.overrides)
   )
+  // gs1Name is the attribute's name. It used to be `"Closure (GM03CLOS)"` —
+  // name plus a fabricated attribute code — which is why several places had to
+  // strip a trailing "(CODE)" before showing a row to anyone.
   const standardExtended: AttributeRequirement[] = (brick?.extendedAttributes ?? [])
-    .filter((a) => !excluded.has(`${a.name} (${a.code})`))
+    .filter((a) => !excluded.has(a.name))
     .map((a) =>
       applyOverride(
-        { name: a.name, gs1Name: `${a.name} (${a.code})`, guidance: "", source: "standard", target: "extended" },
+        { name: a.name, gs1Name: a.name, guidance: "", source: "standard", target: "extended" },
         extras.overrides
       )
     )
@@ -75,28 +78,8 @@ export function assembleBrickAttributes(brickCode: string, tenantId?: string): B
 }
 
 /**
- * Retailer-facing display of a standard attribute's TGC/GS1 name — strips the
- * trailing "(CODE)" that `gs1Name` carries as its store lookup key. Showing a
- * raw GS1 code to a retailer would wrongly suggest they are prescribing a
- * specific value; only suppliers fill in values, on their own screens.
- *
- * Lives here rather than in a screen because both the authoring UI and the
- * agent surfaces have to render the same name for the same row.
- */
-export function gs1DisplayName(gs1Name: string): string {
-  return gs1Name.replace(/\s*\([^()]*\)\s*$/, "")
-}
-
-/**
  * Turn whatever a caller named an attribute into the canonical `gs1Name` key
- * the store is keyed on.
- *
- * The key for a standard row is `"Closure (GM03CLOS)"`, but nothing outside
- * this module should have to know that: the UI shows "Closure", and so does
- * the agent. Accepting both forms is what lets the display name be the only
- * one anybody ever sees. Matching widens in three steps — exact key, then
- * display name, then case-insensitively on either — so a caller who does pass
- * the full key still resolves.
+ * the store is keyed on — matching exactly first, then case-insensitively.
  *
  * A miss is an error rather than a shrug: the mutation paths below used to
  * record an exclusion for an unmatched string and report success, which looks
@@ -113,13 +96,10 @@ export function resolveGs1Name(
   const lower = wanted.toLowerCase()
 
   const match =
-    rows.find((r) => r.gs1Name === wanted) ??
-    rows.find((r) => gs1DisplayName(r.gs1Name) === wanted) ??
-    rows.find((r) => r.gs1Name.toLowerCase() === lower) ??
-    rows.find((r) => gs1DisplayName(r.gs1Name).toLowerCase() === lower)
+    rows.find((r) => r.gs1Name === wanted) ?? rows.find((r) => r.gs1Name.toLowerCase() === lower)
 
   if (!match) {
-    const names = rows.map((r) => gs1DisplayName(r.gs1Name))
+    const names = rows.map((r) => r.gs1Name)
     return {
       error: `No attribute named "${input}" on GS1 category ${brickCode}. ${
         names.length ? `Attributes here: ${names.join(", ")}.` : "This profile has no attributes."

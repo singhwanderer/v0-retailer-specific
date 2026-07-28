@@ -216,7 +216,7 @@ export function ScreenSupplierGapDetail({
               <tbody>
                 {waivedAttrs.map((attr, idx) => (
                   <tr
-                    key={attr.code}
+                    key={attr.name}
                     style={{
                       borderBottom: idx < waivedAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
                     }}
@@ -268,10 +268,10 @@ export function ScreenSupplierGapDetail({
             <table className="w-full text-sm">
               <tbody>
                 {missingAttrs.map((attr, idx) => {
-                  const allowedValues = getAllowedValues(attr.code)
+                  const allowedValues = getAllowedValues(attr.name)
                   return (
                     <tr
-                      key={attr.code}
+                      key={attr.name}
                       style={{
                         borderBottom:
                           idx < missingAttrs.length - 1 ? "1px solid #F3F4F6" : undefined,
@@ -428,7 +428,7 @@ export function ScreenSupplierGapDetail({
       productLabel={productDescription || productId}
       onViewGtins={() => onViewGtins(productId)}
       onConfirm={() => {
-        if (pendingFill) onFillAttribute(productId, pendingFill.attr.code, pendingFill.value)
+        if (pendingFill) onFillAttribute(productId, pendingFill.attr.name, pendingFill.value)
         setPendingFill(null)
       }}
     />

@@ -28,7 +28,6 @@ import {
 import {
   findProfileForBrick,
   assembleBrickAttributes,
-  gs1DisplayName,
   mappingConflict,
   resolveGs1Name,
   searchBricksWithMapping,
@@ -94,13 +93,9 @@ function unknownProfile(ctx: CopilotContext, profileName: string): string {
 function makeReadTools(ctx: CopilotContext) {
   return {
     search_gs1_bricks: tool({
-      description: "Search GS1 product categories (bricks) by name or keyword.",
-      inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'handbags' or 'footwear'") }),
-      // Attribute names come back as plain strings, with the GS1 codes in a
-      // parallel field. Returning "Closure (GM03CLOS)" here gave the model a
-      // ready-made display string it would paste straight into a reply, which
-      // is the one thing the retailer view never shows (see gs1DisplayName).
-      //
+      description:
+        "Search GS1 product categories (bricks) by name, everyday synonym, or keyword. Each hit says whether the category is still free to map to a new profile.",
+      inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'handbags' or 'booties'") }),
       // Each hit says whether the category is still free to map, and an empty
       // or fully-taken result carries a note naming the categories that are —
       // see searchBricksWithMapping.
@@ -109,7 +104,6 @@ function makeReadTools(ctx: CopilotContext) {
         const shaped = matches.map(({ extendedAttributes, ...b }) => ({
           ...b,
           standardExtendedAttributes: extendedAttributes.map((a) => a.name),
-          attributeCodes: Object.fromEntries(extendedAttributes.map((a) => [a.name, a.code])),
         }))
         return note ? { matches: shaped, note } : shaped
       },
@@ -438,7 +432,7 @@ function makeEditTools(ctx: CopilotContext) {
           tool: "update_attribute_requirement",
           // The card shows the name the retailer sees on screen; args carry
           // the canonical store key the apply path needs.
-          summary: `Update "${gs1DisplayName(resolved.gs1Name)}" on "${profile.name}": ${changes}.`,
+          summary: `Update "${resolved.gs1Name}" on "${profile.name}": ${changes}.`,
           args: { brickCode, gs1Name: resolved.gs1Name, name, guidance },
           consequence:
             "Changes how the requirement reads for suppliers. Gap counts are unaffected — this does not change whether it is met.",
@@ -463,7 +457,7 @@ function makeEditTools(ctx: CopilotContext) {
         if ("error" in resolved) return resolved
         const proposal: ProposedAction = {
           tool: "remove_attribute_requirement",
-          summary: `Stop requiring "${gs1DisplayName(resolved.gs1Name)}" on "${profile.name}".`,
+          summary: `Stop requiring "${resolved.gs1Name}" on "${profile.name}".`,
           args: { brickCode, gs1Name: resolved.gs1Name },
           destructive: true,
           consequence:

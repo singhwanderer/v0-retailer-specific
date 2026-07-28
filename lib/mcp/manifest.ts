@@ -54,7 +54,7 @@ import {
   updateAttributeRequirement,
 } from "@/lib/mcp/tools"
 import { getStore, readProfileExtras } from "@/lib/mcp/store"
-import { findProfileForBrick, gs1DisplayName, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
+import { findProfileForBrick, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
 import {
   createPendingChange,
   discardPendingChange,
@@ -507,7 +507,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       gs1Name: z
         .string()
         .describe(
-          "The attribute's name as returned by get_profile_detail. Either the plain name ('Heel Height') or the full keyed form ('Heel Height (GM03HLHT)') is accepted; a name that matches no attribute on this profile is refused."
+          "The attribute's name as returned by get_profile_detail, e.g. 'Heel Height'. A name that matches no attribute on this profile is refused."
         ),
       name: z.string().optional().describe("New display label for the attribute"),
       guidance: z.string().optional().describe("New guidance text shown to suppliers"),
@@ -526,7 +526,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       const resolved = resolveGs1Name(a.brickCode, a.gs1Name, ctx.tenantId)
       if ("error" in resolved) return resolved
       return {
-        summary: `Update "${gs1DisplayName(resolved.gs1Name)}" on ${profileLabel(ctx, a.brickCode)}.`,
+        summary: `Update "${resolved.gs1Name}" on ${profileLabel(ctx, a.brickCode)}.`,
         effect: [
           ...(a.name !== undefined ? [`Label becomes "${a.name}".`] : []),
           ...(a.guidance !== undefined ? [`Supplier guidance becomes "${a.guidance}".`] : []),
@@ -591,7 +591,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       gs1Name: z
         .string()
         .describe(
-          "The attribute's name as returned by get_profile_detail. Either the plain name ('Closure') or the full keyed form ('Closure (GM03CLOS)') is accepted; a name that matches no attribute on this profile is refused."
+          "The attribute's name as returned by get_profile_detail, e.g. 'Closure'. A name that matches no attribute on this profile is refused."
         ),
     },
     kind: "write",
@@ -607,7 +607,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       const resolved = resolveGs1Name(a.brickCode, a.gs1Name, ctx.tenantId)
       if ("error" in resolved) return resolved
       return {
-        summary: `Remove "${gs1DisplayName(resolved.gs1Name)}" from ${profileLabel(ctx, a.brickCode)}.`,
+        summary: `Remove "${resolved.gs1Name}" from ${profileLabel(ctx, a.brickCode)}.`,
         effect: [
           "Suppliers will no longer be asked for this attribute in this category.",
           "Any currently open gaps against it disappear from reports — reported compliance will improve without any supplier supplying anything.",

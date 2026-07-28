@@ -108,7 +108,6 @@ const { GS1_BRICKS } = await import(join(repoRoot, "lib", "gs1-standard-library.
 
 interface Gs1ExtendedAttribute {
   name: string
-  code: string
 }
 interface Gs1Brick {
   brickCode: string
