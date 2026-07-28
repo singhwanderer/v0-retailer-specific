@@ -20,7 +20,7 @@ Sign in with `buyer@dillards.demo`, `buyer@belk.demo`, or `catalog@jrenee.demo` 
 **claude.ai (recommended for the demo)**
 1. Settings → **Connectors** → **Add custom connector**
 2. Name it "TGC", paste the endpoint URL → Add
-3. Sign in when prompted and choose the access to grant (read-only is the default)
+3. Sign in when prompted and choose the access to grant (reading and authoring arrive ticked; activating and removing do not)
 4. In a new chat, open the tools/search menu and enable the TGC connector
 4. Ask: *"Which of my suppliers are furthest behind on compliance?"*
 
@@ -37,6 +37,15 @@ Sign in with `buyer@dillards.demo`, `buyer@belk.demo`, or `catalog@jrenee.demo` 
 > Deployment Protection → turn Vercel Authentication off for previews (or
 > merge to `main` and use the production URL). Also check Firewall/Bot
 > Protection isn't challenging non-browser clients.
+
+> **Asked to sign in again part-way through a session, or seeing
+> `Token rejected: signature verification failed` in the Access log?** The
+> deployment is signing tokens with a different key per serverless instance, so
+> a token minted by one instance is rejected by the next. Run
+> `pnpm gen:oauth-key` and set the printed value as `TGC_OAUTH_PRIVATE_JWK` in
+> the Vercel project (Production **and** Preview), then redeploy. Without that
+> variable each instance generates a throwaway key on cold start — fine locally,
+> not on Vercel.
 
 ## 3. The end-to-end create flow — mandatory fields and drop-downs
 

@@ -580,6 +580,11 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     },
     kind: "write",
     requiredScope: SCOPES.requirementsWrite,
+    // Authoring produces Drafts; this is the switch that starts measuring every
+    // vendor item in the category against them. Separate authority, separate
+    // grant — so a connection that can create requirements still cannot enforce
+    // one without a human ticking this box (or activating in the portal).
+    additionalScopes: [SCOPES.activate],
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
     requiresConfirmation: true,

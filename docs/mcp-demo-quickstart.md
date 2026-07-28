@@ -11,7 +11,7 @@ The prototype now serves a live MCP endpoint at **`/api/mcp`** on every deployme
 
 1. claude.ai → **Settings → Connectors → Add custom connector**
 2. Paste the endpoint URL. Your client discovers the sign-in automatically — there is no API key or token to create.
-3. **Sign in with one of the demo identities below** and choose how much access to grant (read-only is the default).
+3. **Sign in with one of the demo identities below** and choose how much access to grant (reading and authoring arrive ticked; activating and removing do not).
 4. Start a chat and enable the "tgc" connector via the tools menu
 
 ## Connect from ChatGPT
@@ -57,9 +57,10 @@ stands in for a customer's real IdP (Entra ID / Okta / Ping).
 2. **Tenant isolation.** As Dillard's, grant J.Renée an exception. As Belk, look
    for it — it isn't there. As J.Renée, `list_my_exceptions` shows it labelled
    *granted by Dillard's* — and nothing else Dillard's holds.
-3. **Progressive scopes.** Grant read-only at sign-in: the four write tools
-   don't appear in the assistant's tool list at all, and are refused if called
-   directly.
+3. **Progressive scopes.** Untick everything but read at sign-in: the write
+   tools don't appear in the assistant's tool list at all, and are refused if
+   called directly. Or accept the defaults and ask it to activate the profile it
+   just created — `activate_profile` is absent until that box is ticked.
 4. **The access log.** See the walkthrough below.
 
 ### Access log walkthrough (the security story in 5 steps)
@@ -76,8 +77,9 @@ lives in [`mcp-pm-presentation.md`](./mcp-pm-presentation.md).
    works, **Access log** is locked to administrators.
 2. Switch the role toggle to **Admin** — the sidebar item appears and the log
    opens, empty.
-3. Connect Claude, sign in as `buyer@dillards.demo`, ask a question. Lines
-   appear: the person, the assistant, the tool, the scope it required.
+3. Connect Claude and sign in as `buyer@dillards.demo`. A line appears as soon as
+   the client attaches — before you have asked it anything — then ask a question
+   and more follow: the person, the assistant, the tool, the scope it required.
 4. Ask it to change something. Two lines appear, not one — the proposal and then the
    approval, because no mutating tool acts on its first call.
 5. Flip the portal to the **supplier** persona (Admin) → the same screen shows
@@ -90,6 +92,12 @@ Steps 1-2 show the role gate; step 5 shows the tenant gate. A refusal — for
 example, a client that tries to connect without completing sign-in — appears in
 a separate **Refused before sign-in** band rather than under any organisation,
 because a rejected attempt isn't trustworthy evidence of who made it.
+
+> **The log is per server instance in this prototype.** It lives in each
+> instance's memory, so an empty table is not proof that nothing happened, a
+> refresh may reach a different instance, and **Clear** only clears the one that
+> serves the request. Production ships these lines to the platform log sink;
+> see [`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md) ENT-10.
 
 > The role and persona toggles are **demo persona switches**, not a login — the
 > prototype portal has no authentication of its own. The connector's equivalents

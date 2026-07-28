@@ -29,7 +29,7 @@ import {
   type ProfileBrick,
   type ProfileStatus,
 } from "@/lib/retailer-requirements"
-import type { CallerContext } from "@/lib/mcp/context"
+import { SCOPES, type CallerContext, type Scope } from "@/lib/mcp/context"
 import { getSupplierCapabilities } from "@/lib/mcp/tools-supplier"
 import {
   getProfileExtras,
@@ -316,9 +316,26 @@ export function setVendorException(ctx: CallerContext, args: {
   return { created, ...(assumedVendor ? { assumedVendor: vendor } : {}), demo_note: DEMO_NOTE }
 }
 
+/**
+ * What each optional scope unlocks, in the consent screen's own words — so the
+ * model can name the exact box a user has to tick rather than inventing a
+ * description of it. Keep the labels in step with app/oauth/authorize/route.ts.
+ */
+const SCOPE_LABELS: Record<string, string> = {
+  [SCOPES.requirementsWrite]: "Author requirements — create profiles, add attributes and image rules",
+  [SCOPES.exceptionsWrite]: "Grant vendor exceptions — waivers and deadline extensions",
+  [SCOPES.activate]: "Activate requirements — start enforcing a profile across your vendor base",
+  [SCOPES.destructive]: "Remove requirements and revoke exceptions",
+}
+
 // Plain-English catalog of what this connector can do, plus a live snapshot of
 // the demo data so the model can answer "what can I ask?" without guessing.
 // Built from the store, so it never drifts from the actual seeded data.
+//
+// Every capability below is gated on the scopes this caller actually holds.
+// Advertising an action whose tool is absent from tools/list is worse than
+// saying nothing: the model promises the user it can author requirements, finds
+// no tool, and reports the connector cannot do it at all.
 export function getCapabilities(ctx: CallerContext) {
   // A supplier and a retailer are asking genuinely different questions, and a
   // capability list that describes the wrong half is worse than none — it
@@ -333,6 +350,14 @@ export function getCapabilities(ctx: CallerContext) {
       )
     ),
   ].sort()
+
+  const can = (s: Scope) => ctx.scopes.has(s)
+  const canAuthor = can(SCOPES.requirementsWrite)
+  const canException = can(SCOPES.exceptionsWrite)
+  const notGranted = [SCOPES.requirementsWrite, SCOPES.exceptionsWrite, SCOPES.activate, SCOPES.destructive]
+    .filter((s) => !can(s))
+    .map((s) => ({ scope: s, unlocks: SCOPE_LABELS[s] }))
+
   return {
     about:
       "TGC demo connector — retailer-side requirement authoring and supplier compliance monitoring over mock Trading Grid Catalogue data. Ask in your own words; the examples below are illustrations, not a fixed command list.",
@@ -362,30 +387,61 @@ export function getCapabilities(ctx: CallerContext) {
           "Which attributes are my vendors missing most often?",
         ],
       },
-      authorRequirements: {
-        summary: "Create and extend requirement profiles conversationally (writes to the demo store).",
-        examples: [
-          "Set up requirements for a new Swimwear category.",
-          "Add a 'Care Instructions' attribute to the Apparel profile.",
-          "Require a lifestyle image on Handbags, JPEG, white background.",
-        ],
-      },
-      manageExceptions: {
-        summary:
-          "Grant, look up, or revoke vendor exceptions — waivers, extended deadlines, or reduced scope on specific attributes. Active exceptions reduce that vendor's compliance gap count.",
-        examples: [
-          "Give Levi's a 60-day extension on sustainable-materials fields.",
-          "Show all active exceptions.",
-          "Waive the Heel Height requirement for J.Renée.",
-        ],
-      },
+      ...(canAuthor
+        ? {
+            authorRequirements: {
+              summary:
+                "Create and extend requirement profiles conversationally (writes to the demo store). A new profile is created as a Draft — nothing is assessed against it until someone activates it, which is a separate permission.",
+              examples: [
+                "Set up requirements for a new Swimwear category.",
+                "Add a 'Care Instructions' attribute to the Apparel profile.",
+                "Require a lifestyle image on Handbags, JPEG, white background.",
+              ],
+            },
+          }
+        : {}),
+      ...(canException
+        ? {
+            manageExceptions: {
+              summary:
+                "Grant, look up, or revoke vendor exceptions — waivers, extended deadlines, or reduced scope on specific attributes. Active exceptions reduce that vendor's compliance gap count.",
+              examples: [
+                "Give Levi's a 60-day extension on sustainable-materials fields.",
+                "Show all active exceptions.",
+                "Waive the Heel Height requirement for J.Renée.",
+              ],
+            },
+          }
+        : {}),
     },
+    // Derived from this caller's scopes, so it always matches tools/list.
     writeActions: [
-      "create_attribute_profile",
-      "add_attribute_requirement",
-      "set_image_requirement",
-      "set_vendor_exception",
+      ...(canAuthor
+        ? [
+            "create_attribute_profile",
+            "add_attribute_requirement",
+            "set_image_requirement",
+            "update_attribute_requirement",
+          ]
+        : []),
+      ...(canException ? ["set_vendor_exception"] : []),
+      ...(canAuthor && can(SCOPES.activate) ? ["activate_profile"] : []),
+      ...(canAuthor && can(SCOPES.destructive)
+        ? ["remove_attribute_requirement", "remove_image_requirement", "delete_attribute_profile"]
+        : []),
+      ...(canException && can(SCOPES.destructive) ? ["revoke_vendor_exception"] : []),
     ],
+    // Every write is two-phase: the first call previews and returns a token,
+    // and only confirm_pending_change applies it. Say so, so the model sets the
+    // right expectation instead of reporting a change that has not happened.
+    writesRequireConfirmation: true,
+    ...(notGranted.length > 0
+      ? {
+          notGranted,
+          howToEnable:
+            "These permissions were not granted to this connection. To add one, the user reconnects the TGC connector and ticks that box on the consent screen. Tell them which box; never imply the connector cannot do it at all.",
+        }
+      : {}),
     liveSnapshot: {
       attributeProfiles: store.profiles.map((p) => ({
         name: p.name,

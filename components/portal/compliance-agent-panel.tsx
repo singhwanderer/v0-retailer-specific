@@ -41,9 +41,11 @@ interface ComplianceAgentPanelProps {
   onOpenAiAccess: () => void
 }
 
+// One authoring prompt on purpose: the panel can create and edit requirements,
+// but an all-read-only starter list taught people it could only look things up.
 const STARTER_PROMPTS = [
   "What does my Footwear profile require?",
-  "Which supplier has the most open compliance gaps?",
+  "Create a requirement for Swimwear",
   "Run a GS1 Core scorecard across my vendor base",
 ]
 
