@@ -22,7 +22,17 @@ export const SCOPES = {
   requirementsWrite: "tgc.requirements.write",
   exceptionsWrite: "tgc.exceptions.write",
   /**
-   * Removal and deactivation, required IN ADDITION to the relevant write scope.
+   * Switching enforcement on or off for a whole profile, required IN ADDITION
+   * to `requirementsWrite`.
+   *
+   * Authoring produces a Draft, which nothing is assessed against — activating
+   * it starts measuring every vendor item in the category against it. That is
+   * the moment the requirement acquires teeth, so it is a separate grant and is
+   * never pre-checked: a human ticks it, or a human activates in the portal.
+   */
+  activate: "tgc.requirements.activate",
+  /**
+   * Removal, required IN ADDITION to the relevant write scope.
    *
    * Adding an attribute to a profile and deleting a profile that thousands of
    * vendor items are assessed against are not the same authority, and consenting
@@ -38,11 +48,31 @@ export const ALL_SCOPES: Scope[] = [
   SCOPES.read,
   SCOPES.requirementsWrite,
   SCOPES.exceptionsWrite,
+  SCOPES.activate,
   SCOPES.destructive,
 ]
 
-/** The default a fresh connection gets if it asks for nothing specific. */
+/**
+ * The default a fresh connection gets if it asks for nothing specific — i.e.
+ * the floor for a token whose grant carries no scope claim at all. Read-only,
+ * deliberately: an unspecified grant should never be able to write.
+ */
 export const DEFAULT_SCOPES: Scope[] = [SCOPES.read]
+
+/**
+ * What the consent screen arrives with pre-checked, which is a different
+ * question from the fallback above: here a human is looking at the list and
+ * approving it.
+ *
+ * Authoring is included because it cannot act unilaterally — a write previews
+ * first and only applies once the person approves the confirmation token, and
+ * what it produces is a Draft that nothing is assessed against until someone
+ * activates it. Activation and removal are the authorities that bite, and they
+ * stay unchecked (see SCOPES.activate / SCOPES.destructive). Least privilege
+ * here is about which authorities a connection holds, not about refusing to
+ * write at all.
+ */
+export const CONSENT_DEFAULT_SCOPES: Scope[] = [SCOPES.read, SCOPES.requirementsWrite]
 
 export function isScope(value: string): value is Scope {
   return (ALL_SCOPES as string[]).includes(value)

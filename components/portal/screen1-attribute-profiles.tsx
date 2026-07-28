@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Info, Upload, Plus, X, CheckCircle, Check } from "lucide-react"
+import { Info, Upload, Plus, Trash2, X, CheckCircle, Check } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,17 @@ import type { Gs1Brick } from "@/lib/gs1-standard-library"
 import { getProfileBricks, type AttributeProfile } from "@/lib/retailer-requirements"
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
 import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
-import { createAttributeProfile } from "@/lib/mcp/tools"
+import {
+  AddAttributeDialog,
+  ConfirmDeleteAttributeModal,
+  SourcePill,
+} from "@/components/portal/attribute-edit-dialogs"
+import {
+  addAttributeRequirement,
+  createAttributeProfile,
+  removeAttributeRequirement,
+} from "@/lib/mcp/tools"
+import { describeProfileAttributes } from "@/lib/mcp/attribute-assembly"
 import { PORTAL_CTX } from "@/lib/mcp/context"
 
 interface Screen1Props {
@@ -177,6 +187,15 @@ interface CreateRequirementResult {
   name: string
   bricks: { code: string; name: string }[]
   initialStatus: StatusType
+  /** Standard GS1 attributes the retailer dropped in Step 3, per brick code. */
+  removed: Record<string, string[]>
+  /** Custom attributes the retailer added in Step 3, per brick code. */
+  added: Record<string, CustomAttrDraft[]>
+}
+
+interface CustomAttrDraft {
+  name: string
+  guidance: string
 }
 
 function CreateRequirementModal({
@@ -201,6 +220,14 @@ function CreateRequirementModal({
   const [skipped, setSkipped] = useState(false)
   const establishedSegment = selectedBricks[0]?.segment
 
+  // Step 3 state — the profile does not exist yet, and every store mutator
+  // starts with requireProfile(), so edits are held here per brick code and
+  // replayed against the store once the profile has actually been created.
+  const [removed, setRemoved] = useState<Record<string, string[]>>({})
+  const [added, setAdded] = useState<Record<string, CustomAttrDraft[]>>({})
+  const [addAttrBrick, setAddAttrBrick] = useState<string | null>(null)
+  const [pendingRemoval, setPendingRemoval] = useState<{ code: string; gs1Name: string; label: string } | null>(null)
+
   function reset() {
     setStep(1)
     setReqName("")
@@ -208,6 +235,16 @@ function CreateRequirementModal({
     setSelectedBricks([])
     setPendingBrick(null)
     setSkipped(false)
+    setRemoved({})
+    setAdded({})
+    setAddAttrBrick(null)
+    setPendingRemoval(null)
+  }
+
+  /** Drop a deselected brick's pending edits so they cannot resurface. */
+  function forgetBrickEdits(code: string) {
+    setRemoved(({ [code]: _dropped, ...rest }) => rest)
+    setAdded(({ [code]: _dropped, ...rest }) => rest)
   }
 
   function handleClose() {
@@ -217,6 +254,8 @@ function CreateRequirementModal({
 
   function handleSkip() {
     setSelectedBricks([])
+    setRemoved({})
+    setAdded({})
     setSkipped(true)
     setStep(3)
   }
@@ -226,6 +265,7 @@ function CreateRequirementModal({
     const already = selectedBricks.some((b) => b.brickCode === brick.brickCode)
     if (already) {
       setSelectedBricks((prev) => prev.filter((b) => b.brickCode !== brick.brickCode))
+      forgetBrickEdits(brick.brickCode)
       return
     }
     if (isDifferentSegment(brick.segment, establishedSegment)) {
@@ -245,22 +285,45 @@ function CreateRequirementModal({
       name: reqName.trim(),
       bricks: selectedBricks.map((b) => ({ code: b.brickCode, name: b.brickName })),
       initialStatus,
+      removed,
+      added,
     })
     reset()
     onClose()
   }
 
+  function handleAddCustomAttr(input: CustomAttrDraft) {
+    if (!addAttrBrick) return
+    setAdded((prev) => ({ ...prev, [addAttrBrick]: [...(prev[addAttrBrick] ?? []), input] }))
+  }
+
+  function handleRemoveCustomAttr(code: string, index: number) {
+    setAdded((prev) => ({ ...prev, [code]: (prev[code] ?? []).filter((_, i) => i !== index) }))
+  }
+
+  function confirmRemoveStandard() {
+    if (!pendingRemoval) return
+    const { code, gs1Name } = pendingRemoval
+    setRemoved((prev) => ({ ...prev, [code]: [...(prev[code] ?? []), gs1Name] }))
+  }
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      {/* Pinned header/step-indicator/footer with a scrolling body. Step 3 lists
+          every standard attribute of every selected brick (up to 28 rows each),
+          so without this the Create Requirement button lands off-screen. */}
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-base font-semibold text-[#111827]">
             Create New Requirement
           </DialogTitle>
         </DialogHeader>
 
-        <StepIndicator current={step} />
+        <div className="shrink-0">
+          <StepIndicator current={step} />
+        </div>
 
+        <div className="flex-1 overflow-y-auto">
         {/* ── Step 1: Name ── */}
         {step === 1 && (
           <div className="flex flex-col gap-4 py-1">
@@ -367,26 +430,104 @@ function CreateRequirementModal({
                       </div>
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-[#111827] mb-2">
-                        {brick.extendedAttributes.length} standard extended attributes will be pre-loaded:
-                      </p>
-                      <div
-                        className="rounded-md border overflow-hidden"
-                        style={{ borderColor: "#E0E4E8" }}
-                      >
-                        {brick.extendedAttributes.map((attr, i) => (
-                          <div
-                            key={attr.name}
-                            className="flex items-center justify-between px-3 py-2 text-xs"
-                            style={{
-                              borderBottom: i < brick.extendedAttributes.length - 1 ? "1px solid #F3F4F6" : undefined,
-                              backgroundColor: i % 2 === 0 ? "#fff" : "#F9FAFB",
-                            }}
-                          >
-                            <span className="font-medium text-[#111827]">{attr.name}</span>
-                          </div>
-                        ))}
-                      </div>
+                      {(() => {
+                        const droppedNames = removed[brick.brickCode] ?? []
+                        const standardRows = brick.extendedAttributes.filter(
+                          (a) => !droppedNames.includes(`${a.name} (${a.code})`)
+                        )
+                        const customRows = added[brick.brickCode] ?? []
+                        const total = standardRows.length + customRows.length
+                        const lastIndex = total - 1
+                        return (
+                          <>
+                            <div className="flex items-center justify-between mb-2 gap-2">
+                              <p className="text-xs font-medium text-[#111827]">
+                                {total} attribute{total !== 1 ? "s" : ""} will be pre-loaded:
+                              </p>
+                              <button
+                                onClick={() => setAddAttrBrick(brick.brickCode)}
+                                className="inline-flex items-center gap-1 text-xs font-medium hover:underline shrink-0"
+                                style={{ color: "#0168B3" }}
+                              >
+                                <Plus className="w-3 h-3" />
+                                Add Attribute
+                              </button>
+                            </div>
+                            {total === 0 ? (
+                              <p
+                                className="rounded-md border px-3 py-3 text-xs text-center"
+                                style={{ borderColor: "#E0E4E8", color: "#9CA3AF" }}
+                              >
+                                Every standard attribute has been removed. Add one, or suppliers
+                                will only be asked for the baseline core fields.
+                              </p>
+                            ) : (
+                              <div
+                                className="rounded-md border overflow-hidden"
+                                style={{ borderColor: "#E0E4E8" }}
+                              >
+                                {standardRows.map((attr, i) => (
+                                  <div
+                                    key={attr.code}
+                                    className="group flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                                    style={{
+                                      borderBottom: i < lastIndex ? "1px solid #F3F4F6" : undefined,
+                                      backgroundColor: i % 2 === 0 ? "#fff" : "#F9FAFB",
+                                    }}
+                                  >
+                                    <span className="font-medium text-[#111827]">{attr.name}</span>
+                                    <button
+                                      onClick={() =>
+                                        setPendingRemoval({
+                                          code: brick.brickCode,
+                                          gs1Name: `${attr.name} (${attr.code})`,
+                                          label: attr.name,
+                                        })
+                                      }
+                                      title={`Remove ${attr.name}`}
+                                      aria-label={`Remove ${attr.name}`}
+                                      className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
+                                      style={{ color: "#DC2626" }}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                                {customRows.map((attr, i) => {
+                                  const rowIndex = standardRows.length + i
+                                  return (
+                                    <div
+                                      key={`${attr.name}-${i}`}
+                                      className="group flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                                      style={{
+                                        borderBottom: rowIndex < lastIndex ? "1px solid #F3F4F6" : undefined,
+                                        backgroundColor: rowIndex % 2 === 0 ? "#fff" : "#F9FAFB",
+                                      }}
+                                    >
+                                      <span className="flex items-center gap-2 min-w-0">
+                                        <span className="font-medium text-[#111827] truncate">{attr.name}</span>
+                                        <SourcePill source="custom" />
+                                      </span>
+                                      {/* No confirmation — this row was never a
+                                          standard requirement, so removing it
+                                          only undoes an unsaved addition. */}
+                                      <button
+                                        onClick={() => handleRemoveCustomAttr(brick.brickCode, i)}
+                                        title={`Remove ${attr.name}`}
+                                        aria-label={`Remove ${attr.name}`}
+                                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
+                                        style={{ color: "#DC2626" }}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -398,14 +539,21 @@ function CreateRequirementModal({
                 >
                   <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: "#0168B3" }} />
                   <p>
-                    These attributes will appear with a{" "}
+                    Attributes from the GS1 standard carry a{" "}
                     <span
                       className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
                       style={{ backgroundColor: "#EFF6FF", color: "#0168B3" }}
                     >
                       Standard
                     </span>{" "}
-                    tag. You can edit, remove, or add new attributes after creation.
+                    tag; the ones you add here carry a{" "}
+                    <span
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      style={{ backgroundColor: "#F4F6F8", color: "#6B7280" }}
+                    >
+                      Custom
+                    </span>{" "}
+                    tag. Guidance notes and further changes can be edited after creation.
                   </p>
                 </div>
               </>
@@ -428,9 +576,24 @@ function CreateRequirementModal({
             )}
           </div>
         )}
+        </div>
+
+        {/* Nested dialogs for the Step 3 edits. Edits are staged in component
+            state, not written to the store — the profile does not exist yet. */}
+        <AddAttributeDialog
+          open={addAttrBrick !== null}
+          onClose={() => setAddAttrBrick(null)}
+          onAdd={handleAddCustomAttr}
+        />
+        <ConfirmDeleteAttributeModal
+          open={pendingRemoval !== null}
+          onClose={() => setPendingRemoval(null)}
+          onConfirm={confirmRemoveStandard}
+          attributeName={pendingRemoval?.label ?? ""}
+        />
 
         {/* ── Footer ── */}
-        <DialogFooter className="mt-2">
+        <DialogFooter className="mt-2 shrink-0">
           <button
             onClick={handleClose}
             className="px-3.5 py-2 rounded-md text-sm border hover:bg-[#F4F6F8] transition-colors"
@@ -606,10 +769,36 @@ export function Screen1AttributeProfiles({
         showToast(created.error ?? "Could not create the requirement.")
         return
       }
+
+      // Replay the wizard's Step 3 edits now that the profile exists — the
+      // store mutators all require it. Same functions the connector calls.
+      const failures: string[] = []
+      for (const code of brickCodes) {
+        for (const gs1Name of result.removed[code] ?? []) {
+          const res = removeAttributeRequirement(PORTAL_CTX, code, gs1Name)
+          if ("error" in res && res.error) failures.push(res.error)
+        }
+        for (const attr of result.added[code] ?? []) {
+          const res = addAttributeRequirement(PORTAL_CTX, code, attr.name, "extended", attr.guidance)
+          if ("error" in res && res.error) failures.push(res.error)
+        }
+      }
+
       const profile: AttributeProfile = {
         ...created.created,
+        // Recomputed after the replay — describeProfileAttributes counts the
+        // store's per-brick extras, so summarising earlier reports stale totals.
+        attributes: describeProfileAttributes(created.created.bricks ?? []),
         status: result.initialStatus,
         actions: result.initialStatus === "Active" ? ["Edit", "Deactivate"] : ["Edit", "Activate"],
+      }
+      if (failures.length > 0) {
+        // The profile itself was created, so surface the partial failure
+        // rather than losing it silently.
+        showToast(`"${result.name}" created, but some attribute changes failed: ${failures[0]}`)
+        onCreateProfile(profile)
+        onNavigateToProfile(profile.brickCode, profile.brickName, result.name, result.initialStatus)
+        return
       }
       onCreateProfile(profile)
       showToast(`"${result.name}" created as ${result.initialStatus}, mapped to ${result.bricks.length} GS1 categor${result.bricks.length !== 1 ? "ies" : "y"}.`)

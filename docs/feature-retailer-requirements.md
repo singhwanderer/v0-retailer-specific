@@ -155,5 +155,7 @@ exposed via `getProfileDetail(brickCode)`.
 
 - Vendor exceptions (`screen3-vendor-exceptions.tsx`: waivers, extended deadlines, reduced
   scope) exist in code but are not wired into retailer navigation — in or out of scope?
-- Should `updateAttributeRequirement` (editing a standard row via an override) become an
-  external MCP tool too, or stay UI-internal as it is today?
+- ~~Should `updateAttributeRequirement` (editing a standard row via an override) become an
+  external MCP tool too, or stay UI-internal as it is today?~~ Resolved: it is an external
+  tool (`update_attribute_requirement`) under `tgc.requirements.write`, alongside the rest of
+  authoring. Activation and removal are the operations held back behind their own scopes.

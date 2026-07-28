@@ -47,11 +47,12 @@ const RETAILER_TOOLS: ToolRow[] = [
   { name: "draft_vendor_outreach", kind: "Read", scope: "tgc.read", description: "Draft a remediation message to one supplier from their actual open gaps." },
   { name: "query_access_log", kind: "Read", scope: "tgc.read", description: "Search this organisation's own AI access log. Administrators only." },
   { name: "list_pending_changes", kind: "Read", scope: "tgc.read", description: "Proposals awaiting confirmation, with what each would do." },
+  { name: "discard_pending_change", kind: "Read", scope: "tgc.read", description: "Throw away a proposal without applying it." },
   { name: "create_attribute_profile", kind: "Write", scope: "tgc.requirements.write", description: "Create a new attribute profile for a product category." },
   { name: "add_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add a custom attribute requirement to a profile." },
   { name: "update_attribute_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Change an attribute's label or supplier guidance." },
   { name: "set_image_requirement", kind: "Write", scope: "tgc.requirements.write", description: "Add or update an image requirement on a profile." },
-  { name: "activate_profile", kind: "Write", scope: "tgc.requirements.write", description: "Start or stop enforcing a profile across the vendor base." },
+  { name: "activate_profile", kind: "Write", scope: "tgc.requirements.write + tgc.requirements.activate", description: "Start or stop enforcing a profile across the vendor base." },
   { name: "set_vendor_exception", kind: "Write", scope: "tgc.exceptions.write", description: "Grant or update a vendor exception for one category." },
   { name: "confirm_pending_change", kind: "Write", scope: "tgc.read", description: "Apply a proposed change after the user has approved it." },
   { name: "remove_attribute_requirement", kind: "Remove", scope: "tgc.requirements.write + tgc.destructive", description: "Stop requiring an attribute. Open gaps against it disappear." },
@@ -328,16 +329,19 @@ function ConnectTab({ perspective }: { perspective: AccessPerspective }) {
         <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
           {readOnlyView ? (
             <>
-              Read-only is the default at the consent screen. The {allTools.length - visibleTools.length} tools that
-              write, remove, or confirm are not merely disabled — they are absent from the tool list the assistant is
-              given, and refused if called directly. Filtering the list is the experience; the check at invocation is
-              the boundary.
+              A connection consents to read-only by unticking the rest. The {allTools.length - visibleTools.length}{" "}
+              tools that write, remove, or confirm are then not merely disabled — they are absent from the tool list the
+              assistant is given, and refused if called directly. Filtering the list is the experience; the check at
+              invocation is the boundary.
             </>
           ) : (
             <>
-              This is the full surface a {perspective} may grant, not what any one connection holds. Removals need the
-              destructive scope <em>on top of</em> the relevant write scope, and every write returns a preview and a
-              confirmation token rather than acting — nothing changes until a person approves it.
+              This is the full surface a {perspective} may grant, not what any one connection holds. The consent screen
+              arrives with reading and authoring ticked: every write returns a preview and a confirmation token rather
+              than acting, and a new profile is created as a Draft that nothing is assessed against. The authorities
+              that bite are separate, unticked grants — activating a profile needs{" "}
+              <em>tgc.requirements.activate</em> and removals need <em>tgc.destructive</em>, each <em>on top of</em> the
+              relevant write scope.
             </>
           )}
         </p>
@@ -435,9 +439,9 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
       </div>
 
       <p className="text-xs font-light leading-relaxed" style={{ color: "#6B7280" }}>
-        Every tool call an AI assistant made against <span className="font-medium">{tenant.name}</span>, and every
-        call that was refused. Only this organisation&rsquo;s activity appears here. Updates live — make a request in
-        Claude and it shows up.
+        Every AI client that attached to <span className="font-medium">{tenant.name}</span>, every tool call it made,
+        and every call that was refused. Only this organisation&rsquo;s activity appears here. Updates live — connect
+        in Claude and it shows up.
       </p>
 
       <div className="rounded-lg overflow-hidden" style={{ border: "1px solid #E0E4E8", backgroundColor: "#FFFFFF" }}>
@@ -447,8 +451,10 @@ function AccessLogTab({ perspective, role }: { perspective: AccessPerspective; r
           </p>
         ) : entries.length === 0 ? (
           <p className="px-4 py-6 text-xs font-light text-center" style={{ color: "#9CA3AF" }}>
-            No connector activity recorded for {tenant.name} yet. Connect an AI client from the Connect tab and ask it
-            something — every tool call it makes, allowed or refused, appears here.
+            No connector activity on this server instance for {tenant.name}. Connect an AI client from the Connect tab
+            — attaching is recorded on its own, and every tool call it makes, allowed or refused, appears here. In this
+            prototype the log lives in each instance&rsquo;s memory, so an empty table is not proof that nothing
+            happened; a refresh may reach a different instance.
           </p>
         ) : (
           <div className="overflow-x-auto">

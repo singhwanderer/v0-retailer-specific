@@ -315,11 +315,15 @@ Then the rule everything hangs off:
 **Click:** connect the connector from claude.ai and let the sign-in screen come up
 on the projector. (Have this pre-staged — see the checklist.)
 
-Point at the four checkboxes.
+Point at the five checkboxes.
 
-> "Read your catalogue. Author requirements. Grant vendor exceptions. Remove
-> requirements and revoke exceptions. Read-only is the default; the last one is
-> unchecked.
+> "Read your catalogue. Author requirements. Grant vendor exceptions. Activate
+> requirements. Remove requirements and revoke exceptions. The first two arrive
+> ticked; the last two cannot be, however broad the client's request.
+>
+> Note what authoring can and can't do on its own. It creates a *Draft* — nothing
+> in the vendor base is measured against a Draft. Switching enforcement on is a
+> separate permission, because that's the moment the requirement acquires teeth.
 >
 > Note that removal is its own permission, on top of the write permission.
 > Consenting to 'author requirements' is not consenting to delete them — adding an
@@ -391,6 +395,13 @@ next thing on screen."*
 
 > "Every AI action against this organisation: who, which assistant, which tool,
 > which scope it required, allowed or refused."
+
+The first line is the attachment itself — the assistant authenticating, logged
+before it asked for anything:
+
+> "We don't only log what it did. We log that it showed up. A connector that
+> authenticates and reads the tool catalogue and stops there still leaves a
+> line, because 'nothing in the log' has to mean nothing happened."
 
 Point at the **Refused before sign-in** band — if it is empty, say what would land
 there rather than pretending; a refused connection from any client populates it.

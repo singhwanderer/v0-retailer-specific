@@ -18,7 +18,7 @@
 // consent to profile deletion by not noticing a checkbox — which is the whole
 // thing separating destructive from the write scopes was meant to prevent.
 
-import { DEFAULT_SCOPES, SCOPES, isScope, type Scope } from "@/lib/mcp/context"
+import { CONSENT_DEFAULT_SCOPES, DEFAULT_SCOPES, SCOPES, isScope, type Scope } from "@/lib/mcp/context"
 import { getClient, issueAuthCode } from "@/lib/mcp/oauth"
 import { findDemoUser, getTenant, resolveTenantByRealm } from "@/lib/mcp/tenants"
 
@@ -34,14 +34,19 @@ interface AuthorizeParams {
 function readParams(params: URLSearchParams): AuthorizeParams {
   const requested = (params.get("scope") ?? "").split(/[\s+]+/).filter(isScope)
   // A client asks for scopes; it does not get to decide which boxes arrive
-  // ticked. Destructive is always unticked no matter what was requested —
-  // clients routinely request every scope the resource advertises, and a
-  // pre-ticked "delete profiles" box turns the one authority we deliberately
-  // separated out into something granted by reflex. Everything else honours
-  // the request, since re-ticking read and write on every reconnect is
-  // friction that buys nothing.
-  const preChecked = (requested.length > 0 ? requested : DEFAULT_SCOPES).filter(
-    (s) => s !== SCOPES.destructive
+  // ticked. Activation and destructive are always unticked no matter what was
+  // requested — clients routinely request every scope the resource advertises,
+  // and a pre-ticked "enforce this across my vendor base" or "delete profiles"
+  // box turns the authorities we deliberately separated out into something
+  // granted by reflex. Everything else honours the request, since re-ticking
+  // read and write on every reconnect is friction that buys nothing.
+  //
+  // Most clients send no scope at all, so the fallback is what a real
+  // connection actually gets: read plus authoring, which previews before it
+  // writes and can only produce Drafts. See CONSENT_DEFAULT_SCOPES.
+  const NEVER_PRE_CHECKED: Scope[] = [SCOPES.activate, SCOPES.destructive]
+  const preChecked = (requested.length > 0 ? requested : CONSENT_DEFAULT_SCOPES).filter(
+    (s) => !NEVER_PRE_CHECKED.includes(s)
   )
   return {
     clientId: params.get("client_id") ?? "",
@@ -49,7 +54,7 @@ function readParams(params: URLSearchParams): AuthorizeParams {
     state: params.get("state") ?? "",
     codeChallenge: params.get("code_challenge") ?? "",
     codeChallengeMethod: params.get("code_challenge_method") ?? "",
-    scopes: preChecked.length > 0 ? preChecked : DEFAULT_SCOPES,
+    scopes: preChecked.length > 0 ? preChecked : CONSENT_DEFAULT_SCOPES,
   }
 }
 
@@ -135,6 +140,7 @@ function consentForm(p: AuthorizeParams, clientName: string, error?: string): st
     ${scopeRow(SCOPES.read, "Read your catalogue", " — profiles, suppliers, compliance reports, exceptions.", p.scopes.includes(SCOPES.read))}
     ${scopeRow(SCOPES.requirementsWrite, "Author requirements", " — create profiles, add attributes and image rules.", p.scopes.includes(SCOPES.requirementsWrite))}
     ${scopeRow(SCOPES.exceptionsWrite, "Grant vendor exceptions", " — waivers and deadline extensions that change compliance numbers.", p.scopes.includes(SCOPES.exceptionsWrite))}
+    ${scopeRow(SCOPES.activate, "Activate requirements", " — start enforcing a profile across your vendor base. Authoring alone only produces Drafts, which nothing is assessed against. Required in addition to the write permissions above.", p.scopes.includes(SCOPES.activate))}
     ${scopeRow(SCOPES.destructive, "Remove requirements and revoke exceptions", " — delete profiles, drop attributes and image rules, revoke waivers. Required in addition to the write permissions above.", p.scopes.includes(SCOPES.destructive))}
   </fieldset>
 
@@ -177,7 +183,9 @@ export async function POST(req: Request) {
 
   const p = readParams(params)
   // Checkboxes arrive as repeated `scope` fields rather than a space-delimited
-  // string, so re-read them here.
+  // string, so re-read them here. Note this falls back to DEFAULT_SCOPES, not
+  // the consent defaults: someone who unticks every box is asking for less, and
+  // must not be handed back the authoring scope they just declined.
   const checked = form.getAll("scope").filter((v): v is string => typeof v === "string").filter(isScope)
   p.scopes = checked.length > 0 ? checked : DEFAULT_SCOPES
 
