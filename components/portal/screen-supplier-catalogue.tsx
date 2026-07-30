@@ -90,7 +90,7 @@ function AssignCategoryModal({
 
         <div className="flex flex-col gap-3 py-1">
           <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>
-            Choose the GS1 category for the selected products. Its standard attributes
+            Choose the GPC classification for the selected products. Its standard attributes
             become their GS1 baseline requirements.
           </p>
 

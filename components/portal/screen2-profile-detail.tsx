@@ -22,6 +22,7 @@ import { getBrickByCode, segmentExtendedAttributeNames, type Gs1Brick } from "@/
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
 import { ProfileBrickSelector } from "@/components/portal/profile-brick-selector"
 import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
+import { GpcInfoTooltip } from "@/components/portal/gpc-info-tooltip"
 import {
   AddAttributeDialog,
   ConfirmDeleteAttributeModal,
@@ -701,10 +702,11 @@ function CategorySummaryCard({
         >
           <div className="flex items-center justify-between">
             <span
-              className="text-[10px] font-medium leading-tight"
+              className="inline-flex items-center gap-1 text-[10px] font-medium leading-tight"
               style={{ color: hasBricks ? "#0168B3" : "#9CA3AF" }}
             >
-              GS1 Category Mapping{bricks.length > 1 ? "s" : ""}
+              GPC Classification Mapping{bricks.length > 1 ? "s" : ""}
+              <GpcInfoTooltip />
             </span>
             <button
               onClick={onAddCategory}
@@ -712,7 +714,7 @@ function CategorySummaryCard({
               style={{ color: "#0168B3" }}
             >
               <Plus className="w-3 h-3" />
-              Add GS1 Category
+              Add GPC Classification
             </button>
           </div>
           {hasBricks ? (
@@ -774,7 +776,7 @@ function CategorySummaryCard({
   )
 }
 
-// ── Add GS1 Category dialog ───────────────────────────────────────────────────
+// ── Add GPC Classification dialog ─────────────────────────────────────────────
 // Reuses the shared brick picker so a requirement can map to more than one GS1
 // brick. The selected brick is handed back to the parent, which runs the
 // cross-category check before committing.
@@ -809,14 +811,15 @@ function AddGs1CategoryDialog({
           enough to push "Add Category" off-screen otherwise. */}
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader className="shrink-0">
-          <DialogTitle className="text-base font-semibold text-[#111827]">
-            Add a GS1 Category
+          <DialogTitle className="flex items-center gap-1.5 text-base font-semibold text-[#111827]">
+            Add a GPC Classification
+            <GpcInfoTooltip />
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto">
           <p className="text-xs leading-relaxed pb-1" style={{ color: "#6B7280" }}>
-            Map another GS1 standard category to this requirement. It keeps its own standard
-            extended attributes — nothing is merged with the requirement&apos;s other categories.
+            Map another GPC classification to this requirement. It keeps its own standard
+            extended attributes — nothing is merged with the requirement&apos;s other classifications.
           </p>
           <Gs1BrickPicker selected={candidate} onSelect={setCandidate} excludeCodes={excludeCodes} />
         </div>
@@ -1062,7 +1065,7 @@ export function Screen2ProfileDetail({
                 </>
               ) : (
                 <p className="text-xs" style={{ color: "#6B7280" }}>
-                  {bricks.length > 0 ? `GS1 Category: ${bricks[0].name} · ` : ""}
+                  {bricks.length > 0 ? `GPC Classification: ${bricks[0].name} · ` : ""}
                   {coreRows.length + extendedRows.length} attributes required
                 </p>
               )}
@@ -1076,7 +1079,7 @@ export function Screen2ProfileDetail({
               count={coreRows.length}
               defaultExpanded
               onAddClick={() =>
-                selectedBrickCode ? setAddAttrTarget("core") : showToast("Map a GS1 category first.")
+                selectedBrickCode ? setAddAttrTarget("core") : showToast("Map a GPC classification first.")
               }
             >
               <AttributeTable
@@ -1091,7 +1094,7 @@ export function Screen2ProfileDetail({
               count={extendedRows.length}
               defaultExpanded
               onAddClick={() =>
-                selectedBrickCode ? setAddAttrTarget("extended") : showToast("Map a GS1 category first.")
+                selectedBrickCode ? setAddAttrTarget("extended") : showToast("Map a GPC classification first.")
               }
             >
               <AttributeTable
@@ -1107,7 +1110,7 @@ export function Screen2ProfileDetail({
               count={imageRows.length}
               defaultExpanded
               onAddClick={() =>
-                selectedBrickCode ? setAddImageOpen(true) : showToast("Map a GS1 category first.")
+                selectedBrickCode ? setAddImageOpen(true) : showToast("Map a GPC classification first.")
               }
               addLabel="+ Add Image Requirement"
             >

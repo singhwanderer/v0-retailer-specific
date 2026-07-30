@@ -60,7 +60,7 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   {
     name: "Apparel",
     category: "Women's Apparel",
-    attributes: "59 attributes · 2 GS1 categories",
+    attributes: "59 attributes · 2 GPC classifications",
     status: "Active",
     lastUpdated: "Feb 14, 2026",
     actions: ["Edit", "Deactivate"],

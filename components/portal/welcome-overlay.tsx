@@ -50,7 +50,7 @@ export function WelcomeOverlay({ open, onClose }: WelcomeOverlayProps) {
               </div>
               <p className="text-xs leading-relaxed" style={{ color: "#374151" }}>
                 Define the attributes and images suppliers must provide per product category,
-                mapped to a GS1 category.
+                mapped to a GPC classification.
               </p>
             </div>
             <div

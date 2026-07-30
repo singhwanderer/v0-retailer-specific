@@ -12,6 +12,7 @@ import {
 import { segmentExtendedAttributeNames, type Gs1Brick } from "@/lib/gs1-standard-library"
 import { getProfileBricks, type AttributeProfile } from "@/lib/retailer-requirements"
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
+import { GpcInfoTooltip } from "@/components/portal/gpc-info-tooltip"
 import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
 import {
   AddAttributeDialog,
@@ -141,7 +142,7 @@ function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () => void 
 function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
   const steps = [
     { n: 1, label: "Name" },
-    { n: 2, label: "GS1 Category" },
+    { n: 2, label: "GPC Classification" },
     { n: 3, label: "Preview" },
   ] as const
 
@@ -369,14 +370,17 @@ function CreateRequirementModal({
           </div>
         )}
 
-        {/* ── Step 2: GS1 Category Mapping ── */}
+        {/* ── Step 2: GPC Classification Mapping ── */}
         {step === 2 && (
           <div className="flex flex-col gap-3 py-1">
-            <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>
-              Map <span className="font-medium text-[#111827]">{reqName}</span> to one or more GS1
-              standard categories. Each keeps its own standard extended attributes — nothing is
-              merged across categories.
-            </p>
+            <div className="flex items-start gap-1.5">
+              <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>
+                Map <span className="font-medium text-[#111827]">{reqName}</span> to one or more GPC
+                classifications. Each keeps its own standard extended attributes — nothing is
+                merged across classifications.
+              </p>
+              <GpcInfoTooltip className="mt-0.5 shrink-0" />
+            </div>
 
             <Gs1BrickPicker
               multiSelect
@@ -422,7 +426,7 @@ function CreateRequirementModal({
                       style={{ backgroundColor: "#EFF6FF", border: "1px solid #BFDBFE" }}
                     >
                       <div className="flex-1">
-                        <p className="text-xs font-medium text-[#0168B3]">GS1 Category Mapping</p>
+                        <p className="text-xs font-medium text-[#0168B3]">GPC Classification Mapping</p>
                         <p className="text-sm font-semibold text-[#111827] mt-0.5">
                           {brick.brickName}
                         </p>
@@ -580,7 +584,7 @@ function CreateRequirementModal({
                 <div className="text-center">
                   <p className="text-sm font-medium text-[#111827]">No standard attributes pre-loaded</p>
                   <p className="text-xs mt-1 leading-relaxed" style={{ color: "#6B7280" }}>
-                    You skipped the GS1 category mapping. You can add attributes manually after the requirement is created.
+                    You skipped the GPC classification mapping. You can add attributes manually after the requirement is created.
                   </p>
                 </div>
               </div>
@@ -813,7 +817,7 @@ export function Screen1AttributeProfiles({
         return
       }
       onCreateProfile(profile)
-      showToast(`"${result.name}" created as ${result.initialStatus}, mapped to ${result.bricks.length} GS1 categor${result.bricks.length !== 1 ? "ies" : "y"}.`)
+      showToast(`"${result.name}" created as ${result.initialStatus}, mapped to ${result.bricks.length} GPC classification${result.bricks.length !== 1 ? "s" : ""}.`)
       onNavigateToProfile(profile.brickCode, profile.brickName, result.name, result.initialStatus)
       return
     }
@@ -874,7 +878,12 @@ export function Screen1AttributeProfiles({
           <thead>
             <tr style={{ borderBottom: "1px solid #E0E4E8", backgroundColor: "#F4F6F8" }}>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[26%]">Category</th>
-              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[24%]">GS1 Category</th>
+              <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[24%]">
+                <div className="flex items-center gap-1">
+                  GPC Classification
+                  <GpcInfoTooltip />
+                </div>
+              </th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[16%]">Requirements</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[10%]">Status</th>
               <th className="text-left px-4 py-3 font-medium text-[#6B7280] w-[10%]">Last Updated</th>

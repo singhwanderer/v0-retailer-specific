@@ -35,7 +35,7 @@ export function ProfileBrickSelector({ bricks, selectedCode, onSelect }: Profile
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border hover:bg-[#F4F6F8] transition-colors"
         style={{ borderColor: "#BFDBFE", color: "#0168B3", backgroundColor: "#EFF6FF" }}
       >
-        {selected ? selected.name : "Select a GS1 category"}
+        {selected ? selected.name : "Select a GPC classification"}
         <ChevronDown className="w-3 h-3" />
       </button>
 
