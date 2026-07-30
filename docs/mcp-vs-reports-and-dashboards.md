@@ -250,6 +250,246 @@ document.
 
 ---
 
+## 6. Design questions this raises
+
+Four questions came back on the first draft. Each turns out to have an answer in
+the code rather than a matter of taste — and three of the four resolve to the
+*same* missing primitive §2 already named. That's a useful result: it means the
+L1 recommendation absorbs them rather than competing with them.
+
+### 6.1 Do we have to generate data for trends?
+
+Yes, for the prototype. The question that actually matters is *where the
+generated data lives.*
+
+Today `buildTrend()` fabricates the series inside the React component. The data
+path is fake all the way down, so there is nothing for any tool to read — which
+is why L2 is blocked and no amount of MCP work unblocks it. The fix is to
+generate a **stored snapshot series**, following the seeding pattern the repo
+already uses (`scripts/generate-suppliers.ts`,
+`scripts/generate-golden-dataset.ts`), read through a real
+`getComplianceHistory()` and exposed by a real tool. Same synthetic numbers,
+flowing through the real path — so when actual monthly snapshots start being
+captured, nothing upstream changes.
+
+Two constraints are easy to miss and expensive to retrofit:
+
+- **Anchor the series to the live computation.** The most recent snapshot must
+  equal what `runRetailerReport()` returns today, or the connector contradicts
+  itself inside a single answer: "you're at 68%, down from 71% last month" is
+  incoherent if the live engine says 64%. `buildTrend()` already works backwards
+  from the current value; a stored series needs the same anchoring, frozen.
+- **Carry provenance in the payload.** Simulated history is more dangerous in
+  chat than on screen. The dashboard sits under a MOCK DATA watermark; a sentence
+  in someone's Claude window carries no such context. The tool result should
+  include `provenance: "simulated"` and the instructions should require relaying
+  it. Note this is a §7 "request", not an enforcement — which is exactly why it
+  needs an eval.
+
+### 6.2 Does MCP ask whether to produce a CSV or an artifact?
+
+It *can*, it probably shouldn't, and the better design is to always attach.
+
+**It can:** MCP has *elicitation* — the server asks the user a structured question
+mid-call. This prototype uses it nowhere (no elicitation, no sampling, anywhere in
+the codebase), and client support for it is uneven. That gap is not hypothetical
+here: `lib/mcp/pending.ts` exists precisely because of it. Its header comment
+makes the point better than a summary would — the in-portal Compliance Agent gets
+a human in the loop for free by rendering a proposal card, an external Claude or
+ChatGPT session has no such card, so the confirmation moved into the protocol
+instead of the UI.
+
+**It shouldn't, for CSV:** asking burns a conversational turn on a question whose
+answer is nearly always yes. Attach it every time; an unwanted attachment costs
+the user nothing. `reportToCsv()` already exists and already writes the run
+parameters into the CSV header block. It has nowhere to go — again, because no
+resources are registered.
+
+**One distinction worth being precise about:** *artifacts are a client feature.*
+The server cannot make ChatGPT render an artifact, and shouldn't be described in a
+leadership setting as if it could. What a server controls is returning a
+**resource**; each client renders it its own way. That asymmetry is the real
+argument for L4 — server-returned UI is the portable version of "give me
+something that looks like the scorecard."
+
+### 6.3 Can it advise the retailer on guiding suppliers, and serve help content?
+
+**Advice: half of it already ships.** `draft_vendor_outreach` builds a remediation
+message for one supplier from their actual open gaps, ranked worst-first, with
+attributes under an Active exception excluded, and returns it for a human to
+review — nothing sends.
+
+The missing half is the layer *above* per-vendor remediation. When four vendors
+are all failing the same attribute, that is usually not four vendor problems; it
+is one requirement-clarity problem. Everything needed to detect it is already
+computed — `runRetailerReport()` builds a `missingCounts` map across the whole
+vendor base. Nothing surfaces the interpretation, and the screen structurally
+can't: it is organised per vendor, and the insight is cross-vendor. This is the
+clearest example in the product of advice a conversational surface can give that
+a dashboard cannot.
+
+**Help content splits three ways, and only one part is genuinely missing:**
+
+| Kind | Status |
+|---|---|
+| Retailer-authored supplier guidance, per attribute | **Already live** — `guidance` fields on profile attributes, returned by `get_profile_detail`, and settable via `add_attribute_requirement` / `update_attribute_requirement` |
+| GS1 standard reference — the standard library, and valid code-list values in `gs1_extended_attribute_master_code_list.csv` | Exists as data, **not exposed** |
+| Product how-to / process documentation | **Doesn't exist** as anything a client could read |
+
+So "give the retailer access to help files" is mostly an exposure problem, and
+resources are the right primitive for it — a help document is the textbook case
+of something that exists and can be referred to again, rather than an answer that
+happened once.
+
+**One security note, worth raising before the work starts rather than in review.**
+Resources are a *new surface*. Every control in this codebase currently runs
+through `runGuarded()` on tool invocation — that is the choke point the whole
+authorization story depends on. Retailer-authored guidance is tenant-owned data:
+one retailer's phrasing of what it wants from suppliers is not neutral reference
+material. Serving it through an unguarded resource would walk straight around the
+control that tool calls go through. Resources need the same guard, from the first
+one registered.
+
+### 6.4 Can we ensure a citation on every response?
+
+Not over MCP. This one is worth stating plainly rather than softening, because it
+is a real boundary and it has a consequence.
+
+In the portal, citation is a code guarantee. `CopilotSource` in
+`lib/copilot/agent.ts` is derived from *which tools actually fired*, mapped
+through a fixed `TOOL_SOURCE_SCREENS` table and capped at two. The comment above
+it is explicit that the system prompt is never told to "cite a screen," because a
+model guessing at UI structure is exactly the hallucination the feature exists to
+prevent. That works because we own the renderer.
+
+Over MCP we own neither the renderer nor the final wording. The best available
+approach is three layers, none of which is enforcement:
+
+1. **Put the citation in the payload as structured data** — `run_id`, `as_of`,
+   source, filter used — so the model has something exact to relay rather than
+   something to characterise.
+2. **Ask for it in `instructions`**, alongside the grounding rules already there.
+3. **Measure it in evals**, because 1 and 2 are both requests.
+
+Which leads directly to the next section.
+
+---
+
+## 7. What MCP can enforce vs. what it can only request
+
+This is the most portable idea in the document, and it is already the distinction
+this codebase draws about itself. From the header comment in
+`app/api/[transport]/route.ts`, on tenancy: it "used to be a paragraph of English
+in `instructions`, i.e. a request that the model behave. It is now a property of
+the code."
+
+Every property we care about sits in one of three rows:
+
+| Property | In-portal | Over MCP |
+|---|---|---|
+| Tenant isolation | Enforced | **Enforced** — `runGuarded()`, re-checked per call |
+| Scope / authority | Enforced | **Enforced** — declared as data in the manifest, tool list filtered per caller |
+| No write on first call | Enforced by the proposal card | **Enforced** — `pending.ts` moved the guarantee into the protocol |
+| Citation of sources | Enforced — `CopilotSource`, derived from tool calls | **Requested only** |
+| Layout and rendering | Enforced — we own the panel | **Not ours** — client's choice (until L4) |
+| Relaying `provenance: "simulated"` | Enforceable in the renderer | **Requested only** |
+| Not restating figures from memory | Constrained by the rendered card | **Requested only** |
+
+Two conclusions follow, and both are actionable:
+
+1. **Every row in the "requested only" column needs an eval**, because a request
+   that is never measured is an assumption. That is what §5's bar is for.
+2. **This is a concrete argument for keeping the in-portal Compliance Agent**, not
+   a limitation to apologise for. The panel is not a lesser copy of the connector
+   — it is the surface where citation, provenance and layout are *guarantees*
+   rather than instructions. When the question is "why maintain both?", this table
+   is the answer.
+
+The pattern generalises past TGC: when a capability moves from a surface you
+render to a surface you don't, re-audit which of its guarantees were properties of
+the renderer. Some of them silently become hopes.
+
+---
+
+## Appendix — proposed tools
+
+Specified in the manifest's own vocabulary (`lib/mcp/manifest.ts`) so they can be
+lifted into a PRD or dropped into the registry without translation. All five are
+reads, so all require only `SCOPES.read` (`tgc.read`) — none needs a write,
+activate or destructive grant.
+
+**1. `get_compliance_trend`** — *blocked on §6.1*
+
+- Params: `filter` (profile name or System filter id), `from`, `to`, `grain`
+  (`month` | `quarter`)
+- `kind: "read"` · `RETAILER_ONLY` · `allowWorkload: true`
+- Returns the snapshot series plus `provenance`. Workload-callable because this is
+  what an L3 scheduled alert compares against.
+- Blocked until a snapshot store exists. Until then the correct behaviour is
+  documented refusal, not inference from one data point.
+
+**2. `diagnose_gap_pattern`** — *the cross-vendor insight from §6.3*
+
+- Params: `profileName` or `systemFilterId`, optional `minVendors` (default 3)
+- `kind: "read"` · `RETAILER_ONLY` · `allowWorkload: true`
+- Reuses `runRetailerReport()`'s `missingCounts` and per-vendor rows. Returns
+  attributes failed by many vendors at once, separating "these vendors are behind"
+  from "this requirement is unclear," with the retailer's own `guidance` text for
+  the attribute included so the answer can point at what to rewrite.
+
+**3. `list_report_runs` / `get_report_run`** — *the L1 pair*
+
+- Params: `list` takes optional `filter`, `since`, `limit`; `get` takes `runId`
+- `kind: "read"` · `RETAILER_ONLY` (mirrors `run_compliance_report`) ·
+  `allowWorkload: true`
+- Returns run metadata — parameters, requester, timestamp — plus a resource link
+  to the stored scorecard and the CSV from the existing `reportToCsv()`. Depends
+  on persisting runs; this is the work that makes a report citable.
+
+**4. `get_attribute_help`** — *the exposure fix from §6.3*
+
+- Params: `attributeName`, optional `brickCode`
+- `kind: "read"` · `BOTH_CLASSES` · `allowWorkload: true`
+- Assembles the retailer's authored `guidance`, the GS1 standard definition, and
+  the valid code-list values from
+  `gs1_extended_attribute_master_code_list.csv`. Serves both sides of the network
+  from one definition — a supplier asking "what does this field want?" and a
+  retailer asking "what did we tell them?" are the same lookup.
+- The tool that most needs §6.3's guard note: authored guidance is tenant-owned,
+  the standard reference is not, and the response mixes them.
+
+**5. `prioritise_my_gaps`** — *supplier-side, and the biggest gap in the product*
+
+- Params: optional `limit`
+- `kind: "read"` · `SUPPLIER_ONLY` · `allowWorkload: true`
+- Reuses `getMyOpenGaps()` and `listMyRetailPartners()` in
+  `lib/mcp/tools-supplier.ts`. Ranks outstanding attributes by **how many retail
+  partners each one unblocks**, so the answer to "what do I fix first?" is
+  network-aware rather than per-partner.
+- This is the payoff the README states as the supplier's whole reason to be on the
+  network — *fill a gap once, satisfy every retailer who requires it* — and
+  nothing in the product computes it today, on either surface.
+
+### Also worth naming
+
+- **Resource subscriptions.** §4 claims the dashboard becomes a subscription. MCP
+  has a primitive for exactly that — `resources/subscribe` plus update
+  notifications — which is the protocol-native form of L3 rather than a
+  bolted-on email job.
+- **Async job handles.** The UI already simulates a Running → Complete queue; MCP
+  is synchronous. A real vendor-base scan will not return inside one tool call, so
+  a `start_report` → `get_report_status` pair is needed. Same persistence work as
+  L1, so sequence them together.
+- **The supplier has no write path at all.** Read-only by design and correct for
+  now — but their most-wanted write, "request an exception," means leaving the
+  conversation entirely. Worth deciding deliberately rather than by omission.
+- **The audit trail is a product surface, not only a control.** Once runs persist,
+  `query_access_log` plus run history answers "who ran which report, against what
+  filter, when" conversationally. Neither screen offers that, and it is the kind
+  of thing a compliance team asks for by name.
+
+---
+
 ## Honest limits of this brief
 
 - Everything above is grounded in the prototype, which uses mock data, an
@@ -261,3 +501,10 @@ document.
 - The action-rate metric in §5 has not been instrumented. Until it is, §4's split
   between the alerting and forensic halves of the dashboard is a well-argued
   hypothesis, not a measured finding.
+- The appendix tools are specified, not estimated. Their guard metadata is valid
+  against the existing `ToolDefinition` shape, but none has been costed, and two
+  of them (`get_compliance_trend`, the report-run pair) depend on persistence
+  work that is itself unscoped.
+- §7's table describes MCP as this prototype uses it today. Elicitation and
+  server-returned UI both move rows between columns as client support matures,
+  so it is a snapshot of a moving boundary, not a fixed property of the protocol.
