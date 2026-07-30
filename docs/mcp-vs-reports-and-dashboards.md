@@ -259,18 +259,24 @@ L1 recommendation absorbs them rather than competing with them.
 
 ### 6.1 Do we have to generate data for trends?
 
-Yes, for the prototype. The question that actually matters is *where the
-generated data lives.*
+**Delivered — the shared-function half.** Yes, for the prototype — but the
+question that actually mattered was *where the generated data lives*, and that
+part is now fixed. `buildTrend()` no longer exists inside the dashboard
+component; the algorithm moved to `lib/compliance-history.ts`
+(`getSupplierTrend` / `getFilterTrend`), a single source of truth the Dashboard
+screen and a new `get_compliance_trend` MCP tool (`lib/mcp/tools.ts`,
+`lib/mcp/manifest.ts`) both call. The tool result carries a `provenance:
+"simulated"` field and a `demo_note` instructing the caller to relay it as
+such, and both consumers now anchor to the same live percentage
+(`runRetailerReport`'s `overallPct`), so a chat answer and the dashboard cannot
+disagree.
 
-Today `buildTrend()` fabricates the series inside the React component. The data
-path is fake all the way down, so there is nothing for any tool to read — which
-is why L2 is blocked and no amount of MCP work unblocks it. The fix is to
-generate a **stored snapshot series**, following the seeding pattern the repo
-already uses (`scripts/generate-suppliers.ts`,
-`scripts/generate-golden-dataset.ts`), read through a real
-`getComplianceHistory()` and exposed by a real tool. Same synthetic numbers,
-flowing through the real path — so when actual monthly snapshots start being
-captured, nothing upstream changes.
+What is **not** delivered, and remains exactly the caveat below: this is
+generated-and-anchored history, not captured history. No snapshot job exists
+yet, so every "month" before today is still fabricated — just fabricated once,
+in one place, instead of duplicated per surface. The distinction in the
+original paragraph below still holds for the *next* step (real snapshots);
+read it as describing the remaining gap, not the current one.
 
 Two constraints are easy to miss and expensive to retrofit:
 
@@ -418,15 +424,19 @@ lifted into a PRD or dropped into the registry without translation. All five are
 reads, so all require only `SCOPES.read` (`tgc.read`) — none needs a write,
 activate or destructive grant.
 
-**1. `get_compliance_trend`** — *blocked on §6.1*
+**1. `get_compliance_trend`** — **Delivered** (`lib/mcp/manifest.ts`,
+`lib/mcp/tools.ts`, `lib/compliance-history.ts`)
 
-- Params: `filter` (profile name or System filter id), `from`, `to`, `grain`
-  (`month` | `quarter`)
+- Params (as shipped): `systemFilterId` or `profileName` (mutually exclusive,
+  same resolution as `run_compliance_report`), optional `supplier`
 - `kind: "read"` · `RETAILER_ONLY` · `allowWorkload: true`
-- Returns the snapshot series plus `provenance`. Workload-callable because this is
-  what an L3 scheduled alert compares against.
-- Blocked until a snapshot store exists. Until then the correct behaviour is
-  documented refusal, not inference from one data point.
+- Returns a 6-month series anchored to the live percentage plus
+  `provenance: "simulated"` and a `demo_note`. Workload-callable because this is
+  what a future L3 scheduled alert would compare against.
+- Not yet shipped: `from`/`to`/`grain` flexibility and a real snapshot store —
+  today's series is generated-and-anchored on every call, not read from
+  captured history. That remains the gap described in §6.1 and §3 ("Trend over
+  time — Blocked").
 
 **2. `diagnose_gap_pattern`** — *the cross-vendor insight from §6.3*
 

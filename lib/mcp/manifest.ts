@@ -39,6 +39,7 @@ import {
   getSupplierCompliance,
   listAttributeProfiles,
   listMySuppliers,
+  getComplianceTrend,
   listSystemFilters,
   listVendorExceptions,
   queryAccessLog,
@@ -290,6 +291,27 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: true,
     handler: (ctx, args) => runComplianceReport(ctx, args),
+  },
+  {
+    name: "get_compliance_trend",
+    description:
+      "See a 6-month compliance trend for a filter or a single supplier. IMPORTANT: this prototype captures no real compliance history — the trend is generated and anchored to today's live number (the same number run_compliance_report would return right now for the same scope), not a captured historical record. Always relay this as simulated/illustrative, never as real history. Same filter arguments as run_compliance_report: a System filter id, one of your attribute profiles, or omit both for all active profiles; optionally scope to one supplier.",
+    schema: {
+      systemFilterId: z
+        .string()
+        .optional()
+        .describe("A System filter id from list_system_filters, e.g. 'gs1-core'. Mutually exclusive with profileName."),
+      profileName: z
+        .string()
+        .optional()
+        .describe("One of your attribute profile names, e.g. 'Footwear'. Omit (and omit systemFilterId) for all active profiles."),
+      supplier: z.string().optional().describe("Scope the trend to one supplier by name, e.g. 'J.Renée'. Omit for the aggregate."),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => getComplianceTrend(ctx, args),
   },
   {
     name: "list_vendor_exceptions",

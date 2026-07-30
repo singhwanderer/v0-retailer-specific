@@ -50,6 +50,7 @@ import {
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
+import { TREND_PROVENANCE, getFilterTrend, getSupplierTrend } from "@/lib/compliance-history"
 
 const DEMO_NOTE =
   "Demo prototype: this change is stored in the demo server's in-memory data (mock data only, resets periodically). In production this would persist to TGC."
@@ -216,6 +217,86 @@ export function runComplianceReport(ctx: CallerContext, args: {
     ...result,
     demo_note:
       "Computed on demand from mock demo data; nothing is persisted — the portal UI keeps its own report queue. Attributes waived by an Active vendor exception are not counted as gaps.",
+  }
+}
+
+/**
+ * Trend for a filter or a single supplier, anchored to the live percentage
+ * `runComplianceReport` would return right now for the same scope. See
+ * lib/compliance-history.ts for why this is simulated, not captured, history.
+ */
+export function getComplianceTrend(ctx: CallerContext, args: {
+  systemFilterId?: string
+  profileName?: string
+  supplier?: string
+}) {
+  const { systemFilterId, profileName, supplier } = args
+
+  if (systemFilterId && profileName) {
+    return { error: "Choose ONE filter mode: either systemFilterId (a global System filter) or profileName (one of your attribute profiles). Omit both to scan against all your active profiles." }
+  }
+
+  let filter: ReportFilterRef
+  let filterLabel: string
+  let resolvedProfile: string = "all-active"
+
+  if (systemFilterId) {
+    const sys = getSystemFilter(systemFilterId)
+    if (!sys) {
+      return { error: `Unknown system filter "${systemFilterId}". Valid ids: ${SYSTEM_FILTERS.map((f) => f.id).join(", ")}.` }
+    }
+    filter = { kind: "system", id: sys.id as SystemFilterId }
+    filterLabel = sys.name
+  } else {
+    const { profiles } = getStore(ctx.tenantId)
+    if (profileName) {
+      const match = profiles.find((p) => p.name.toLowerCase() === profileName.toLowerCase().trim())
+      if (!match) {
+        return { error: `No attribute profile named "${profileName}". Your profiles: ${profiles.map((p) => p.name).join(", ")}.` }
+      }
+      resolvedProfile = match.name
+    }
+    filter = { kind: "account", retailer: "Dillard's" }
+    filterLabel = profileName ? resolvedProfile : "All active profiles"
+  }
+
+  let vendorScope: string = "all"
+  if (supplier) {
+    const q = supplier.toLowerCase().trim()
+    const match = RETAILER_SUPPLIERS.find((s) => s.supplier.toLowerCase().includes(q))
+    if (!match) {
+      const known = knownSuppliers()
+      return {
+        knownSuppliers: known,
+        note: `No supplier matched "${supplier}". Suppliers trading under your retailer account: ${known.join(", ")}. (Other retail partners' data is not available through this connector.)`,
+      }
+    }
+    vendorScope = match.supplier
+  }
+
+  const result = runRetailerReport(
+    RETAILER_SUPPLIERS,
+    getStore(ctx.tenantId).profiles,
+    filter,
+    resolvedProfile,
+    vendorScope,
+    { maxAttributes: 10, ignoreDiscontinued: true, tenantId: ctx.tenantId }
+  )
+
+  const seedKey = vendorScope === "all" ? filterLabel : vendorScope
+  const months =
+    vendorScope === "all"
+      ? getFilterTrend(seedKey, result.overallPct)
+      : getSupplierTrend(seedKey, result.overallPct)
+
+  return {
+    filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
+    vendorScope: vendorScope === "all" ? "All vendors" : vendorScope,
+    months,
+    provenance: TREND_PROVENANCE,
+    asOf: new Date().toISOString().slice(0, 10),
+    demo_note:
+      "This prototype captures no compliance history — 'months' is generated and anchored to today's live number, not a real historical record. Say so if you relay it.",
   }
 }
 
