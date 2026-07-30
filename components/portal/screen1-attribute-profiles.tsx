@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import type { Gs1Brick } from "@/lib/gs1-standard-library"
+import { segmentExtendedAttributeNames, type Gs1Brick } from "@/lib/gs1-standard-library"
 import { getProfileBricks, type AttributeProfile } from "@/lib/retailer-requirements"
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
 import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
@@ -226,6 +226,7 @@ function CreateRequirementModal({
   const [removed, setRemoved] = useState<Record<string, string[]>>({})
   const [added, setAdded] = useState<Record<string, CustomAttrDraft[]>>({})
   const [addAttrBrick, setAddAttrBrick] = useState<string | null>(null)
+  const [addAttrOptions, setAddAttrOptions] = useState<string[]>([])
   const [pendingRemoval, setPendingRemoval] = useState<{ code: string; gs1Name: string; label: string } | null>(null)
 
   function reset() {
@@ -238,6 +239,7 @@ function CreateRequirementModal({
     setRemoved({})
     setAdded({})
     setAddAttrBrick(null)
+    setAddAttrOptions([])
     setPendingRemoval(null)
   }
 
@@ -445,7 +447,16 @@ function CreateRequirementModal({
                                 {total} attribute{total !== 1 ? "s" : ""} will be pre-loaded:
                               </p>
                               <button
-                                onClick={() => setAddAttrBrick(brick.brickCode)}
+                                onClick={() => {
+                                  setAddAttrBrick(brick.brickCode)
+                                  const existing = new Set([
+                                    ...standardRows.map((a) => a.name),
+                                    ...customRows.map((a) => a.name),
+                                  ])
+                                  setAddAttrOptions(
+                                    segmentExtendedAttributeNames(brick.segment).filter((n) => !existing.has(n))
+                                  )
+                                }}
                                 className="inline-flex items-center gap-1 text-xs font-medium hover:underline shrink-0"
                                 style={{ color: "#0168B3" }}
                               >
@@ -584,6 +595,7 @@ function CreateRequirementModal({
           open={addAttrBrick !== null}
           onClose={() => setAddAttrBrick(null)}
           onAdd={handleAddCustomAttr}
+          options={addAttrOptions}
         />
         <ConfirmDeleteAttributeModal
           open={pendingRemoval !== null}

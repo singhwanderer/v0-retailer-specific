@@ -18,7 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import type { AttributeProfile, ProfileBrick } from "@/lib/retailer-requirements"
-import { getBrickByCode, type Gs1Brick } from "@/lib/gs1-standard-library"
+import { getBrickByCode, segmentExtendedAttributeNames, type Gs1Brick } from "@/lib/gs1-standard-library"
 import { Gs1BrickPicker } from "@/components/portal/gs1-brick-picker"
 import { ProfileBrickSelector } from "@/components/portal/profile-brick-selector"
 import { ConfirmMixedCategoryModal, isDifferentSegment } from "@/components/portal/confirm-mixed-category-modal"
@@ -997,6 +997,14 @@ export function Screen2ProfileDetail({
   const extendedRows = attrs.extendedAttributes
   const imageRows = attrs.imageRequirements
 
+  // Pool for the Extended Attributes dropdown: every TGC attribute name
+  // defined anywhere in this category's GS1 segment, minus ones already here.
+  const existingExtendedNames = new Set(extendedRows.map((r) => r.gs1Name))
+  const brickSegment = selectedBrickCode ? getBrickByCode(selectedBrickCode)?.segment : undefined
+  const extendedAttributeOptions = brickSegment
+    ? segmentExtendedAttributeNames(brickSegment).filter((n) => !existingExtendedNames.has(n))
+    : []
+
   return (
     <div className="flex flex-col gap-0 p-8 max-w-[1200px]">
       {/* Breadcrumb */}
@@ -1170,6 +1178,7 @@ export function Screen2ProfileDetail({
         open={addAttrTarget !== null}
         onClose={() => setAddAttrTarget(null)}
         onAdd={handleAddAttr}
+        options={addAttrTarget === "extended" ? extendedAttributeOptions : undefined}
       />
       <AddImageRequirementDialog
         open={addImageOpen}
