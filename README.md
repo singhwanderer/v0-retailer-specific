@@ -94,6 +94,9 @@ creation). Setup and usage:
 
 - `docs/mcp-getting-started.md` — connect a client and try it
 - `docs/mcp-demo-quickstart.md`, `docs/mcp-faq.md` — walkthrough and FAQ
+- `docs/mcp-vs-reports-and-dashboards.md` — how far conversational access can go
+  toward replacing the Compliance Report and the Dashboard, and where it
+  shouldn't
 
 The retailer tool surface covers the full lifecycle — read, create, edit, and
 remove — with a human in the loop for every non-read action. **No mutating tool

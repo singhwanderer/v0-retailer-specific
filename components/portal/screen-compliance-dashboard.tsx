@@ -16,30 +16,7 @@ import {
   runRetailerReport,
   type ReportResult,
 } from "@/lib/compliance-report"
-
-// ── Static 6-month trend data (seeded per supplier) ─────────────────────────
-// Months: Feb → Jul 2026. Values represent % compliance for that month.
-// Derived deterministically from supplier names so they don't change between
-// renders.
-const MONTHS = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"]
-
-function supplierSeed(name: string): number {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 1000
-  return h
-}
-
-function buildTrend(supplier: string, currentPct: number): number[] {
-  const seed = supplierSeed(supplier)
-  // Work backwards from the current month: each prior month was ±3–8% lower
-  const trend: number[] = [currentPct]
-  for (let i = 1; i < 6; i++) {
-    const delta = ((seed * (i + 3)) % 12) - 4 // -4 to +7
-    const prev = Math.max(0, Math.min(100, trend[0] - delta))
-    trend.unshift(Math.round(prev))
-  }
-  return trend
-}
+import { MONTHS, getSupplierTrend } from "@/lib/compliance-history"
 
 // ── KPI summary ──────────────────────────────────────────────────────────────
 interface KpiCardProps {
@@ -169,7 +146,7 @@ export function ScreenComplianceDashboard() {
       .filter((r) => r.kind === "vendor")
       .map((r) => {
         if (r.kind !== "vendor") return null
-        const trend = buildTrend(r.supplier, r.pct)
+        const trend = getSupplierTrend(r.supplier, r.pct).map((p) => p.pct)
         return { ...r, trend }
       })
       .filter(Boolean) as Array<Extract<typeof report.rows[number], { kind: "vendor" }> & { trend: number[] }>
