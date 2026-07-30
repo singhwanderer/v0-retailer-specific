@@ -32,6 +32,7 @@ import {
 import { SCOPES, type CallerContext, type Scope } from "@/lib/mcp/context"
 import { getSupplierCapabilities } from "@/lib/mcp/tools-supplier"
 import {
+  getGlobalImageRequirements,
   getProfileExtras,
   getStore,
   type AttributeRequirement,
@@ -553,10 +554,32 @@ export function addAttributeRequirement(
   return { created: requirement, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
 }
 
+/** The shared/global row this name matches, if any (case-insensitive). */
+function findGlobalImageRequirement(requirementName: string, tenantId?: string) {
+  const wanted = requirementName.toLowerCase().trim()
+  return getGlobalImageRequirements(tenantId).find((r) => r.requirementName.toLowerCase() === wanted)
+}
+
+/**
+ * Add or edit an image requirement on a category. A name matching a
+ * shared/global requirement is recorded as a per-category override (the
+ * global row itself isn't stored per category — it's derived live from
+ * globalImageRequirements); any other name is a custom row local to this
+ * category, added or replaced in place.
+ */
 export function setImageRequirement(ctx: CallerContext, brickCode: string, requirement: ImageRequirement) {
   const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
   const extras = getProfileExtras(brickCode, ctx.tenantId)
+  const global = findGlobalImageRequirement(requirement.requirementName, ctx.tenantId)
+  if (global) {
+    const { requirementName: _requirementName, source: _source, ...updates } = requirement
+    extras.imageOverrides[global.requirementName] = updates
+    extras.excludedImageRequirementNames = extras.excludedImageRequirementNames.filter(
+      (n) => n !== global.requirementName
+    )
+    return { updated: requirement, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+  }
   const idx = extras.imageRequirements.findIndex(
     (r) => r.requirementName.toLowerCase() === requirement.requirementName.toLowerCase()
   )
@@ -568,6 +591,44 @@ export function setImageRequirement(ctx: CallerContext, brickCode: string, requi
     profileBrickCode: brickCode,
     demo_note: DEMO_NOTE,
   }
+}
+
+/**
+ * Add or replace a shared image requirement by name — visible to every
+ * category unless a category overrides or excludes it.
+ */
+export function setGlobalImageRequirement(ctx: CallerContext, requirement: ImageRequirement) {
+  const store = getStore(ctx.tenantId)
+  const idx = store.globalImageRequirements.findIndex(
+    (r) => r.requirementName.toLowerCase() === requirement.requirementName.toLowerCase()
+  )
+  const replaced = idx >= 0
+  if (replaced) store.globalImageRequirements[idx] = requirement
+  else store.globalImageRequirements.push(requirement)
+  return {
+    [replaced ? "updated" : "created"]: requirement,
+    demo_note: DEMO_NOTE,
+  }
+}
+
+/** Remove a shared image requirement from the global list (all categories). */
+export function removeGlobalImageRequirement(
+  ctx: CallerContext,
+  requirementName: string
+): { error: string } | { removed: ImageRequirement; demo_note: string } {
+  const store = getStore(ctx.tenantId)
+  const wanted = requirementName.toLowerCase().trim()
+  const idx = store.globalImageRequirements.findIndex((r) => r.requirementName.toLowerCase() === wanted)
+  if (idx < 0) {
+    const names = store.globalImageRequirements.map((r) => r.requirementName)
+    return {
+      error: `No shared image requirement named "${requirementName}". ${
+        names.length ? `Shared image requirements: ${names.join(", ")}.` : "There are no shared image requirements yet."
+      }`,
+    }
+  }
+  const [removed] = store.globalImageRequirements.splice(idx, 1)
+  return { removed, demo_note: DEMO_NOTE }
 }
 
 /**
@@ -629,23 +690,35 @@ export function removeAttributeRequirement(ctx: CallerContext, brickCode: string
   return { removed: { gs1Name: key }, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
 }
 
+/**
+ * Remove an image requirement from a category — a custom row is deleted
+ * outright; a shared/global row can't be deleted since it isn't itself
+ * stored per category, so it's recorded as an exclusion instead.
+ */
 export function removeImageRequirement(ctx: CallerContext, brickCode: string, requirementName: string) {
   const missing = requireProfile(ctx, brickCode)
   if (missing) return missing
   const extras = getProfileExtras(brickCode, ctx.tenantId)
-  const idx = extras.imageRequirements.findIndex(
-    (r) => r.requirementName.toLowerCase() === requirementName.toLowerCase().trim()
-  )
-  if (idx < 0) {
-    const names = extras.imageRequirements.map((r) => r.requirementName)
-    return {
-      error: `No image requirement named "${requirementName}" on GS1 category ${brickCode}. ${
-        names.length ? `Image requirements here: ${names.join(", ")}.` : "This profile has no image requirements."
-      }`,
-    }
+  const wanted = requirementName.toLowerCase().trim()
+  const idx = extras.imageRequirements.findIndex((r) => r.requirementName.toLowerCase() === wanted)
+  if (idx >= 0) {
+    const [removed] = extras.imageRequirements.splice(idx, 1)
+    return { removed, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
   }
-  const [removed] = extras.imageRequirements.splice(idx, 1)
-  return { removed, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+  const global = findGlobalImageRequirement(requirementName, ctx.tenantId)
+  if (global) {
+    if (!extras.excludedImageRequirementNames.includes(global.requirementName)) {
+      extras.excludedImageRequirementNames.push(global.requirementName)
+    }
+    delete extras.imageOverrides[global.requirementName]
+    return { removed: global, profileBrickCode: brickCode, demo_note: DEMO_NOTE }
+  }
+  const names = [...extras.imageRequirements.map((r) => r.requirementName), ...getGlobalImageRequirements(ctx.tenantId).map((r) => r.requirementName)]
+  return {
+    error: `No image requirement named "${requirementName}" on GS1 category ${brickCode}. ${
+      names.length ? `Image requirements here: ${names.join(", ")}.` : "This profile has no image requirements."
+    }`,
+  }
 }
 
 /** Activate, deactivate, or return a profile to Draft. */

@@ -31,10 +31,14 @@ export interface ImageRequirement {
   maxFileSize: string
   shapeCrop: string
   guidanceNote?: string
+  /** Assembled at read time only — never stored. "global" = inherited from
+   *  the shared list, "custom" = specific to this category. */
+  source?: "global" | "custom"
 }
 
 export interface ProfileExtras {
   customAttributes: AttributeRequirement[]
+  /** Image requirements specific to this category only (not shared). */
   imageRequirements: ImageRequirement[]
   /**
    * Edits to a standard (GS1-inherited or baseline) row — keyed by gs1Name.
@@ -49,6 +53,18 @@ export interface ProfileExtras {
    * is recorded as an exclusion rather than a deletion from an array.
    */
   excludedGs1Names: string[]
+  /**
+   * Edits to a shared/global image requirement — keyed by requirementName.
+   * Global rows aren't stored per category (they're derived live from
+   * globalImageRequirements), so an edit to one for this category only is
+   * recorded here instead.
+   */
+  imageOverrides: Record<string, Partial<ImageRequirement>>
+  /**
+   * Shared/global image requirements excluded from this category — keyed by
+   * requirementName. Mirrors excludedGs1Names.
+   */
+  excludedImageRequirementNames: string[]
 }
 
 /** A vendor exception, with the synthetic id the store uses to match a later update. */
@@ -61,6 +77,9 @@ export interface DemoStore {
   /** Keyed by GS1 category (brick) code */
   profileExtras: Record<string, ProfileExtras>
   vendorExceptions: VendorException[]
+  /** Image requirements shared across every category, unless a category
+   *  overrides or excludes one via ProfileExtras. */
+  globalImageRequirements: ImageRequirement[]
 }
 
 // The 8 baseline core attributes every profile shares, regardless of category
@@ -79,26 +98,20 @@ export const BASELINE_CORE_ATTRIBUTES: AttributeRequirement[] = [
 function seed(): DemoStore {
   return {
     profiles: ATTRIBUTE_PROFILES.map((p) => ({ ...p })),
-    profileExtras: {
-      // Footwear (Shoes - General Purpose, 10001077) ships with the Hero Shot
-      // image requirement Screen 2 displays.
-      "10001077": {
-        customAttributes: [],
-        imageRequirements: [
-          {
-            requirementName: "Hero Shot",
-            format: "JPEG",
-            background: "Pure white (#FFFFFF)",
-            minDimensions: "2000 × 2000 px",
-            maxFileSize: "10 MB",
-            shapeCrop: "Square, product centered",
-            guidanceNote: "No mannequin, no props.",
-          },
-        ],
-        overrides: {},
-        excludedGs1Names: [],
+    profileExtras: {},
+    // Hero Shot is shared across every category by default, rather than
+    // re-entered per brick — most image specs are uniform across categories.
+    globalImageRequirements: [
+      {
+        requirementName: "Hero Shot",
+        format: "JPEG",
+        background: "Pure white (#FFFFFF)",
+        minDimensions: "2000 × 2000 px",
+        maxFileSize: "10 MB",
+        shapeCrop: "Square, product centered",
+        guidanceNote: "No mannequin, no props.",
       },
-    },
+    ],
     vendorExceptions: VENDOR_EXCEPTIONS.map((e, i) => ({ ...e, id: `seed-${i}` })),
   }
 }
@@ -251,6 +264,8 @@ export function readProfileExtras(brickCode: string, tenantId: string = PORTAL_T
       imageRequirements: [],
       overrides: {},
       excludedGs1Names: [],
+      imageOverrides: {},
+      excludedImageRequirementNames: [],
     }
   )
 }
@@ -264,6 +279,13 @@ export function getProfileExtras(brickCode: string, tenantId: string = PORTAL_TE
     imageRequirements: [],
     overrides: {},
     excludedGs1Names: [],
+    imageOverrides: {},
+    excludedImageRequirementNames: [],
   }
   return store.profileExtras[brickCode]
+}
+
+/** Read-only view of the shared image requirements every category inherits. */
+export function getGlobalImageRequirements(tenantId: string = PORTAL_TENANT_ID): ImageRequirement[] {
+  return getStore(tenantId).globalImageRequirements
 }

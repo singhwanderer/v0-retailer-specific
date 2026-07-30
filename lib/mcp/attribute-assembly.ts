@@ -19,6 +19,7 @@ import {
 import { getProfileBricks, type AttributeProfile, type ProfileBrick } from "@/lib/retailer-requirements"
 import {
   BASELINE_CORE_ATTRIBUTES,
+  getGlobalImageRequirements,
   readProfileExtras,
   type AttributeRequirement,
   type ImageRequirement,
@@ -39,6 +40,14 @@ function applyOverride(
 ): AttributeRequirement {
   const o = overrides[attr.gs1Name]
   return o ? { ...attr, ...o } : attr
+}
+
+function applyImageOverride(
+  img: ImageRequirement,
+  overrides: Record<string, Partial<ImageRequirement>>
+): ImageRequirement {
+  const o = overrides[img.requirementName]
+  return o ? { ...img, ...o } : img
 }
 
 /**
@@ -67,13 +76,18 @@ export function assembleBrickAttributes(brickCode: string, tenantId?: string): B
         extras.overrides
       )
     )
+  const excludedImages = new Set(extras.excludedImageRequirementNames)
+  const globalImages: ImageRequirement[] = getGlobalImageRequirements(tenantId)
+    .filter((r) => !excludedImages.has(r.requirementName))
+    .map((r) => ({ ...applyImageOverride(r, extras.imageOverrides), source: "global" }))
+  const customImages: ImageRequirement[] = extras.imageRequirements.map((r) => ({ ...r, source: "custom" }))
   return {
     brickCode,
     brickName: brick?.brickName ?? brickCode,
     segment: brick?.segment,
     coreAttributes: [...baseline, ...extras.customAttributes.filter((a) => a.target === "core")],
     extendedAttributes: [...standardExtended, ...extras.customAttributes.filter((a) => a.target === "extended")],
-    imageRequirements: extras.imageRequirements,
+    imageRequirements: [...globalImages, ...customImages],
   }
 }
 

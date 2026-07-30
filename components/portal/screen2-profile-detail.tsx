@@ -370,7 +370,7 @@ function AttributeTable({
 }
 
 // ── Edit Image Requirement Dialog ─────────────────────────────────────────────
-function EditImageRequirementDialog({
+export function EditImageRequirementDialog({
   open,
   row,
   onClose,
@@ -467,12 +467,14 @@ function EditImageRequirementDialog({
 }
 
 // ── Image requirements table ──────────────────────────────────────────────────
-function ImageRequirementsTable({
+export function ImageRequirementsTable({
   rows,
   onEditRow,
+  onDeleteRow,
 }: {
   rows: ImageRequirement[]
   onEditRow: (row: ImageRequirement) => void
+  onDeleteRow?: (row: ImageRequirement) => void
 }) {
   return (
     <>
@@ -494,7 +496,20 @@ function ImageRequirementsTable({
                 style={{ borderBottom: idx < rows.length - 1 ? "1px solid #F3F4F6" : undefined }}
                 className="group hover:bg-[#F4F6F8]/40 transition-colors"
               >
-                <td className="px-4 py-2.5 font-medium text-[#111827]">{row.requirementName}</td>
+                <td className="px-4 py-2.5 font-medium text-[#111827]">
+                  <div className="flex items-center gap-1.5">
+                    {row.requirementName}
+                    {row.source === "global" && (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none"
+                        style={{ backgroundColor: "#EFF6FF", color: "#0168B3" }}
+                        title="Shared across every category unless customized here"
+                      >
+                        Shared
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.format}</td>
                 <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.background}</td>
                 <td className="px-4 py-2.5 text-[#6B7280] text-xs">{row.minDimensions}</td>
@@ -503,7 +518,7 @@ function ImageRequirementsTable({
                 <td className="px-4 py-2.5 text-[#6B7280] text-xs">
                   {row.guidanceNote || <span style={{ color: "#D1D5DB" }}>—</span>}
                 </td>
-                <td className="px-4 py-2.5 text-right">
+                <td className="px-4 py-2.5 text-right whitespace-nowrap">
                   <button
                     onClick={() => onEditRow(row)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#0168B3]"
@@ -511,6 +526,15 @@ function ImageRequirementsTable({
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
+                  {onDeleteRow && (
+                    <button
+                      onClick={() => onDeleteRow(row)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-[#9CA3AF] hover:text-[#DC2626] ml-2"
+                      title="Delete row"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -578,7 +602,7 @@ function AttributeGroup({
 }
 
 // ── Add Image Requirement Dialog ──────────────────────────────────────────────
-function AddImageRequirementDialog({
+export function AddImageRequirementDialog({
   open,
   onClose,
   onAdd,

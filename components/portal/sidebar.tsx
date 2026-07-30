@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Bot, ChevronDown, ChevronRight, FileChartColumn, LayoutDashboard, Tag } from "lucide-react"
+import { Bot, ChevronDown, ChevronRight, FileChartColumn, Image, LayoutDashboard, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type Perspective = "retailer" | "supplier"
@@ -26,6 +26,7 @@ interface SidebarProps {
 const retailerNavItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, wired: true },
   { id: "attribute-profiles", label: "Attributes & Images", icon: Tag, wired: true },
+  { id: "image-requirements", label: "Image Requirements", icon: Image, wired: true },
   { id: "compliance-reports", label: "Compliance Reports", icon: FileChartColumn, wired: true },
 ]
 
