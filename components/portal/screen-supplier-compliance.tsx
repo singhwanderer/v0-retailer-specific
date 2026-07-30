@@ -12,7 +12,7 @@ import {
 } from "@/lib/supplier-catalogue"
 import { PARTNERS } from "@/lib/partner-filters"
 import { RequirementsDrawer } from "@/components/portal/requirements-drawer"
-import type { RequirementTarget } from "@/lib/compliance-requirements"
+import { getRequirementMatrix, type RequirementTarget } from "@/lib/compliance-requirements"
 
 // ── Merged Compliance list ────────────────────────────────────────────────────
 // Evolved from the former Trading Partners screen: the same list of retailers
@@ -228,6 +228,9 @@ export function ScreenSupplierCompliance({
             {PARTNERS.map((partner, idx) => {
               const summary = getPartnerSummary(products, partner.name)
               const completion = getTargetCompletion(products, partner.name)
+              const matrix = getRequirementMatrix(products, { kind: "retailer", name: partner.name })
+              const totalGs1 = matrix.categories.reduce((sum, c) => sum + c.gs1Count, 0)
+              const totalExtra = matrix.categories.reduce((sum, c) => sum + c.extraCount, 0)
               return (
                 <tr
                   key={partner.id}
@@ -246,7 +249,8 @@ export function ScreenSupplierCompliance({
                         {partner.name}
                       </button>
                       <span className="text-[10px] font-light" style={{ color: "#9CA3AF" }}>
-                        GS1 baseline + {partner.extras} extra{partner.extras !== 1 ? "s" : ""}
+                        {totalGs1} GS1 + {totalExtra} extra{totalExtra !== 1 ? "s" : ""} across{" "}
+                        {matrix.categories.length} categories
                       </span>
                     </div>
                   </td>

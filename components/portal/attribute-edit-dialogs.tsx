@@ -8,6 +8,7 @@
 // with drifting copy.
 
 import { useState } from "react"
+import { Check, ChevronsUpDown } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { cn } from "@/lib/utils"
 
 // ── Source pill ───────────────────────────────────────────────────────────────
 export function SourcePill({ source }: { source: "standard" | "custom" }) {
@@ -84,27 +95,36 @@ export function ConfirmDeleteAttributeModal({
 }
 
 // ── Add Attribute Dialog ──────────────────────────────────────────────────────
-// A genuinely custom attribute — free-text name + optional guidance, mirroring
-// add_attribute_requirement's own parameters. Standard/GS1 attributes are
-// already present automatically (assembled from the brick), so this is for
-// requirements beyond the GS1 standard, not a picker over it.
+// Guidance is always free text. The name is not: when `options` is passed
+// (the Extended Attributes flow), the name can only be picked from that list
+// via the searchable dropdown below — never typed — so a retailer can only
+// add a real TGC attribute, not an invented label. `options` is the pool of
+// TGC attribute names not already on this category (see
+// segmentExtendedAttributeNames), so this is for requirements beyond what the
+// GS1 brick alone auto-assembles, not a picker over the whole GS1 standard.
+// When `options` is omitted (the Core Attributes flow, which has no
+// analogous browsable library), the legacy free-text input is used instead.
 export type AddAttrTarget = "core" | "extended" | null
 
 export function AddAttributeDialog({
   open,
   onClose,
   onAdd,
+  options,
 }: {
   open: boolean
   onClose: () => void
   onAdd: (input: { name: string; guidance: string }) => void
+  options?: string[]
 }) {
   const [name, setName] = useState("")
   const [guidance, setGuidance] = useState("")
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   function handleClose() {
     setName("")
     setGuidance("")
+    setPickerOpen(false)
     onClose()
   }
 
@@ -127,15 +147,66 @@ export function AddAttributeDialog({
             <label className="text-xs font-medium text-[#111827]">
               Attribute Name <span style={{ color: "#DC2626" }}>*</span>
             </label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd() }}
-              placeholder="e.g. Care Instructions"
-              className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
-              style={{ borderColor: "#E0E4E8" }}
-            />
+            {options !== undefined ? (
+              <>
+                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={options.length === 0}
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ borderColor: "#E0E4E8", color: name ? "#111827" : "#9CA3AF" }}
+                    >
+                      <span className="truncate">{name || "Search TGC attributes…"}</span>
+                      <ChevronsUpDown className="w-4 h-4 shrink-0" style={{ color: "#9CA3AF" }} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Search TGC attributes…" />
+                      <CommandList>
+                        <CommandEmpty>No matching TGC attribute.</CommandEmpty>
+                        <CommandGroup>
+                          {options.map((opt) => (
+                            <CommandItem
+                              key={opt}
+                              value={opt}
+                              onSelect={() => {
+                                setName(opt)
+                                setPickerOpen(false)
+                              }}
+                            >
+                              <Check
+                                className={cn("w-4 h-4", opt === name ? "opacity-100" : "opacity-0")}
+                              />
+                              {opt}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {options.length === 0 && (
+                  <p className="text-xs" style={{ color: "#9CA3AF" }}>
+                    No additional TGC attributes available for this category.
+                  </p>
+                )}
+              </>
+            ) : (
+              <input
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd() }}
+                placeholder="e.g. Care Instructions"
+                className="px-3 py-2 rounded-md text-sm border outline-none focus:ring-2 focus:ring-[#0168B3]/20 text-[#111827] placeholder:text-[#9CA3AF]"
+                style={{ borderColor: "#E0E4E8" }}
+              />
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#6B7280]">

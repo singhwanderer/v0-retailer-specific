@@ -706,6 +706,21 @@ export function getSegments(): string[] {
 }
 
 /**
+ * Every unique extended-attribute name defined anywhere in a segment's GS1
+ * bricks (e.g. all Footwear bricks), sorted. The pool a retailer searches
+ * when adding an attribute to one category beyond what that brick alone
+ * auto-assembles.
+ */
+export function segmentExtendedAttributeNames(segment: string): string[] {
+  const names = new Set<string>()
+  for (const b of GS1_BRICKS) {
+    if (b.segment !== segment) continue
+    for (const a of b.extendedAttributes) names.add(a.name)
+  }
+  return [...names].sort()
+}
+
+/**
  * Search bricks by name, code, or segment (case-insensitive).
  *
  * Deliberately literal. A `synonyms` field once mapped everyday retail
