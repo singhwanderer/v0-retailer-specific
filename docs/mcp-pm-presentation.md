@@ -414,7 +414,12 @@ AI" bet opens up:
 - **Proactive, not just reactive.** Beyond "answer when asked," an
   event-triggered agent could flag a supplier falling behind on compliance the
   moment a report goes red, running under a scoped service identity tied to
-  the affected tenant.
+  the affected tenant. This is also the rung where conversational access stops
+  merely matching the Compliance Report and Dashboard screens and starts
+  beating them — see
+  [how far MCP can go toward replacing those screens](./mcp-vs-reports-and-dashboards.md),
+  including the one thing that genuinely blocks it (we store no compliance
+  history, so nothing can answer "is this improving?").
 - **Embedded, not just external chat.** The same tool contract can power an
   in-portal copilot, not only a user's external Claude/ChatGPT session —
   same backend, different front door.
