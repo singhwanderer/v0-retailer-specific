@@ -682,7 +682,7 @@ export function ScreenSupplierProducts({
           {target.kind === "gs1"
             ? "GS1 baseline requirements are defined per category, so this view filters by category where a retailer view filters by selection code. Requirements are maintained by GS1 and cannot be modified."
             : target.kind === "code"
-            ? "This selection code groups every product assigned to this GS1 category, account-wide. Compliance covers every target — the GS1 baseline plus each retailer that requires the product. Click a pill with gaps to see exactly which attributes and images are missing for that target."
+            ? "This selection code groups every product assigned to this GPC classification, account-wide. Compliance covers every target — the GS1 baseline plus each retailer that requires the product. Click a pill with gaps to see exactly which attributes and images are missing for that target."
             : "You keep one product. Each retailer's requirements are checked against it — filling a gap once satisfies every retailer who requires it. A product must have a category before its requirements can be checked."}
         </p>
       </div>

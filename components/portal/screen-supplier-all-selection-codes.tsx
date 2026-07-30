@@ -32,7 +32,7 @@ export function ScreenSupplierAllSelectionCodes({
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold text-[#111827]">Selection Code List</h1>
         <p className="text-sm font-light text-[#6B7280]">
-          Your account-wide selection codes, grouped by GS1 category — independent of which
+          Your account-wide selection codes, grouped by GPC classification — independent of which
           retailer(s) require them.
         </p>
       </div>
@@ -69,7 +69,7 @@ export function ScreenSupplierAllSelectionCodes({
                     style={{ color: "#991B1B" }}
                   >
                     <AlertCircle className="w-3.5 h-3.5" />
-                    Uncategorised — assign a GS1 category
+                    Uncategorised — assign a GPC classification
                   </button>
                 </td>
                 <td className="px-4 py-3 font-medium align-middle tabular-nums" style={{ color: "#991B1B" }}>

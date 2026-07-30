@@ -199,7 +199,7 @@ function buildHandler(ctx: CallerContext) {
           "Guided flow to create requirements for a new product category.",
           async () =>
             prompt(
-              "Help me set up requirements for a new product category in TGC. First ask me which category, then search the GS1 library for the right GS1 category, create the attribute profile, and walk me through adding key attributes and an image requirement — confirming each change before you write it."
+              "Help me set up requirements for a new product category in TGC. First ask me which category, then search the GS1 library for the right GPC classification, create the attribute profile, and walk me through adding key attributes and an image requirement — confirming each change before you write it."
             )
         )
       }

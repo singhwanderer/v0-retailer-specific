@@ -13,7 +13,7 @@ import type { Gs1Brick } from "@/lib/gs1-standard-library"
 // A requirement is ideally one category (GS1 segment). Adding a brick from a
 // different segment is allowed, but flagged so it's a deliberate choice.
 // Shared between the create wizard (Screen 1) and the detail screen's "Add
-// GS1 Category" flow (Screen 2), so both use one gate instead of two copies.
+// GPC Classification" flow (Screen 2), so both use one gate instead of two copies.
 
 /** Whether a candidate brick's segment differs from the requirement's established one. */
 export function isDifferentSegment(candidateSegment: string, establishedSegment: string | undefined): boolean {

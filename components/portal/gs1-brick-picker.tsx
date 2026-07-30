@@ -6,10 +6,10 @@ import { getSegments, searchBricks, type Gs1Brick } from "@/lib/gs1-standard-lib
 
 // ── Shared GS1 brick picker ───────────────────────────────────────────────────
 // The searchable, segment-filterable brick list used both in the Create
-// Requirement wizard (Screen 1) and the "Add GS1 Category" flow on a profile
-// (Screen 2). Two modes:
+// Requirement wizard (Screen 1) and the "Add GPC Classification" flow on a
+// profile (Screen 2). Two modes:
 //  - Single-select (default): `selected`/`onSelect` — used by Screen 2's
-//    "Add GS1 Category" dialog, one brick at a time.
+//    "Add GPC Classification" dialog, one brick at a time.
 //  - Multi-select (`multiSelect`): `selectedCodes`/`onToggle` — used by Screen
 //    1's create wizard, letting a new requirement map to several bricks at
 //    creation.
