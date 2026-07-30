@@ -6,6 +6,7 @@ import { WelcomeOverlay } from "@/components/portal/welcome-overlay"
 import { Sidebar } from "@/components/portal/sidebar"
 import { Screen1AttributeProfiles } from "@/components/portal/screen1-attribute-profiles"
 import { Screen2ProfileDetail } from "@/components/portal/screen2-profile-detail"
+import { ScreenImageRequirements } from "@/components/portal/screen-image-requirements"
 import { Screen3VendorExceptions } from "@/components/portal/screen3-vendor-exceptions"
 import { ScreenSupplierCompliance } from "@/components/portal/screen-supplier-compliance"
 import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-catalogue"
@@ -56,6 +57,7 @@ type Perspective = "retailer" | "supplier"
 type RetailerScreen =
   | "dashboard"
   | "attribute-profiles"
+  | "image-requirements"
   | "vendor-exceptions"
   | "profile-detail"
   | "compliance-reports"
@@ -331,6 +333,7 @@ export default function RetailerPortal() {
     if (
       id === "dashboard" ||
       id === "attribute-profiles" ||
+      id === "image-requirements" ||
       id === "vendor-exceptions" ||
       id === "compliance-reports"
     ) {
@@ -689,6 +692,7 @@ export default function RetailerPortal() {
                   }}
                 />
               )}
+              {retailerScreen === "image-requirements" && <ScreenImageRequirements />}
               {retailerScreen === "profile-detail" && (
                 <Screen2ProfileDetail
                   onBack={() => {

@@ -54,7 +54,12 @@ import {
   updateAttributeRequirement,
 } from "@/lib/mcp/tools"
 import { getStore, readProfileExtras } from "@/lib/mcp/store"
-import { describeAvailableCategories, findProfileForBrick, resolveGs1Name } from "@/lib/mcp/attribute-assembly"
+import {
+  assembleBrickAttributes,
+  describeAvailableCategories,
+  findProfileForBrick,
+  resolveGs1Name,
+} from "@/lib/mcp/attribute-assembly"
 import {
   createPendingChange,
   discardPendingChange,
@@ -444,7 +449,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     ) => {
       const missing = profileMissing(ctx, a.brickCode)
       if (missing) return missing
-      const existing = readProfileExtras(a.brickCode, ctx.tenantId).imageRequirements.some(
+      const existing = assembleBrickAttributes(a.brickCode, ctx.tenantId).imageRequirements.some(
         (r) => r.requirementName.toLowerCase() === a.requirementName.toLowerCase().trim()
       )
       return {
@@ -659,12 +664,10 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     preview: (ctx, a: { brickCode: string; requirementName: string }) => {
       const missing = profileMissing(ctx, a.brickCode)
       if (missing) return missing
-      const extras = readProfileExtras(a.brickCode, ctx.tenantId)
-      const match = extras.imageRequirements.find(
-        (r) => r.requirementName.toLowerCase() === a.requirementName.toLowerCase().trim()
-      )
+      const rows = assembleBrickAttributes(a.brickCode, ctx.tenantId).imageRequirements
+      const match = rows.find((r) => r.requirementName.toLowerCase() === a.requirementName.toLowerCase().trim())
       if (!match) {
-        const names = extras.imageRequirements.map((r) => r.requirementName)
+        const names = rows.map((r) => r.requirementName)
         return {
           error: `No image requirement named "${a.requirementName}" on ${profileLabel(ctx, a.brickCode)}. ${
             names.length ? `Image requirements here: ${names.join(", ")}.` : "This profile has no image requirements."
@@ -675,7 +678,9 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
         summary: `Remove the "${match.requirementName}" image requirement from ${profileLabel(ctx, a.brickCode)}.`,
         effect: [
           `Suppliers will no longer be asked for a ${match.format} image at ${match.minDimensions} on a ${match.background.toLowerCase()} background.`,
-          "Images already supplied are not deleted — only the requirement to supply them.",
+          match.source === "global"
+            ? "This is a shared requirement used by other categories too — this only excludes it from this category; it stays in place everywhere else."
+            : "Images already supplied are not deleted — only the requirement to supply them.",
         ],
       }
     },
