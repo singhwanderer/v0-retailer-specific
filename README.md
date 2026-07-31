@@ -101,6 +101,9 @@ creation). Setup and usage:
   use cases, and the answer to "our customers won't accept Claude/ChatGPT"
 - `docs/enterprise-safe-remote-mcp.md` — decision memo proposing a gated,
   read-only pilot, for a security and architecture audience
+- `docs/embedded-agent-first-remote-mcp-selectively.md` — where the boundary
+  between the in-portal agent and the external connector sits, and why both
+  surfaces earn their place
 - `docs/mcp-implementation-plan.md` — phased sequencing for everything above,
   including which gaps are pilot-blocking
 
