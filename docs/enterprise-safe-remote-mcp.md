@@ -9,7 +9,7 @@
 >
 > This is a **forward-looking decision memo**, not a description of the current
 > prototype. It is the security and governance framing that
-> [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) lacked, and Part 8 of
+> [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) lacked, and §5 of
 > that document now summarises its argument for a PM audience.
 >
 > Six places where the memo and the running code differ. None invalidates the

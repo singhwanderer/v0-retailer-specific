@@ -1,8 +1,9 @@
 # Enterprise auth for the TGC MCP server — technical requirements
 
 **Status:** requirements + working reference implementation in this prototype
-**Companion doc:** [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) §4A, which lists the eleven
-things an enterprise-ready, external-facing MCP server needs. This document turns
+**Companion doc:** [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) Appendix C
+(cited as §4A throughout this document and the codebase), which lists the things
+an enterprise-ready, external-facing MCP server needs. This document turns
 that list into numbered, testable requirements and records which of them are
 demonstrable here.
 

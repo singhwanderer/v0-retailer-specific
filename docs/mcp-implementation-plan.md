@@ -1,9 +1,10 @@
 # TGC MCP — implementation plan
 
 > Sequencing for the capabilities named across
-> [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) Part 4B/Part 7 and
-> [`mcp-vs-reports-and-dashboards.md`](./mcp-vs-reports-and-dashboards.md)
-> (the L1–L4 ladder and its Appendix).
+> [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) — §6 of its long-form
+> read, and the L1–L4 ladder in
+> [Appendix B](./mcp-pm-presentation.md#appendix-b--the-l0-l4-capability-ladder)
+> with its proposed tools in Appendix E.
 >
 > Nothing here is costed. Sizes are relative (S/M/L) and deliberately not
 > converted into dates — the dependency order is the useful part, not the
@@ -227,15 +228,15 @@ an impression. The harness exists (`lib/copilot/run-eval.ts`, see
 | Trend abstention | Correct refusal on history questions the data cannot answer |
 | Tenant isolation | Zero cross-tenant leakage — enforced by `runGuarded()`, but asserted in evals too, because enforcement and evidence of enforcement are different deliverables |
 
-Everything in the "requested only" column of the §7 table in
-[`mcp-vs-reports-and-dashboards.md`](./mcp-vs-reports-and-dashboards.md) needs
-an eval, because a request that is never measured is an assumption.
+Everything in the "requested only" column of the enforce-vs-request table in
+[`mcp-pm-presentation.md`](./mcp-pm-presentation.md) §3.4 needs an eval,
+because a request that is never measured is an assumption.
 
 ### B. Deployment topology — answering "our customers won't accept ChatGPT"
 
 This is a **work item, not just a talking point**, and it is the one most
 likely to gate an actual customer conversation. Argument in
-[`mcp-pm-presentation.md`](./mcp-pm-presentation.md) Part 8; full memo in
+[`mcp-pm-presentation.md`](./mcp-pm-presentation.md) §5; full memo in
 [`enterprise-safe-remote-mcp.md`](./enterprise-safe-remote-mcp.md). The
 engineering deliverables:
 
@@ -248,7 +249,7 @@ engineering deliverables:
 - **Bounded retrieval per call**, which stops being only a cost control and
   becomes a data-minimisation control: the less a tool returns, the less
   leaves the customer's boundary. Already the stated discipline in the PM
-  presentation's Part 4B; it needs actual caps. Note `list_my_suppliers` is
+  presentation's §6 (§4B); it needs actual caps. Note `list_my_suppliers` is
   *intentionally uncapped* today for eval purposes — that is exactly the kind
   of tool a pilot must cap.
 - A **data-flow description per topology** — what leaves the customer's
