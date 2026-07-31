@@ -31,9 +31,20 @@ export interface ToolGuardSpec {
   allowWorkload: boolean
 }
 
-export type GuardOutcome<T> =
+/**
+ * Every outcome carries the id of the audit line it produced.
+ *
+ * The audit trail was previously write-only from the caller's side: the guard
+ * recorded who did what, and the caller was never told which record that was.
+ * Returning the id closes the loop — a user can quote it, and support can
+ * retrieve the exact line rather than guessing from a timestamp. Refusals carry
+ * one too, which is the case that matters most: "why was I refused?" is only
+ * answerable against a specific record.
+ */
+export type GuardOutcome<T> = { auditId: string } & (
   | { ok: true; result: T }
   | { ok: false; error: { error: string; code: "forbidden_tenant_class" | "insufficient_scope" | "tool_error" } }
+)
 
 /**
  * Authorize and run one tool invocation.
@@ -52,31 +63,31 @@ export function runGuarded<T>(
 
   if (!spec.allowedTenantClasses.includes(ctx.tenantClass)) {
     const reason = `Tool "${spec.name}" is not available to ${ctx.tenantClass} tenants.`
-    auditFor(ctx, spec.name, spec.requiredScope, "denied", Date.now() - started, reason)
-    return { ok: false, error: { error: reason, code: "forbidden_tenant_class" } }
+    const entry = auditFor(ctx, spec.name, spec.requiredScope, "denied", Date.now() - started, reason)
+    return { ok: false, auditId: entry.id, error: { error: reason, code: "forbidden_tenant_class" } }
   }
 
   const needed = [spec.requiredScope, ...(spec.additionalScopes ?? [])]
   const absent = needed.filter((s) => !ctx.scopes.has(s))
   if (absent.length > 0) {
     const reason = `Missing required scope${absent.length > 1 ? "s" : ""} ${absent.map((s) => `"${s}"`).join(", ")}. This tool requires ${needed.join(" + ")}. This connection was granted: ${[...ctx.scopes].join(", ") || "(none)"}.`
-    auditFor(ctx, spec.name, spec.requiredScope, "denied", Date.now() - started, reason)
-    return { ok: false, error: { error: reason, code: "insufficient_scope" } }
+    const entry = auditFor(ctx, spec.name, spec.requiredScope, "denied", Date.now() - started, reason)
+    return { ok: false, auditId: entry.id, error: { error: reason, code: "insufficient_scope" } }
   }
 
   if (ctx.subjectType === "workload" && !spec.allowWorkload) {
     const reason = `Tool "${spec.name}" requires a human-delegated session. This caller is an autonomous workload identity with no user to act on behalf of.`
-    auditFor(ctx, spec.name, spec.requiredScope, "denied", Date.now() - started, reason)
-    return { ok: false, error: { error: reason, code: "forbidden_tenant_class" } }
+    const entry = auditFor(ctx, spec.name, spec.requiredScope, "denied", Date.now() - started, reason)
+    return { ok: false, auditId: entry.id, error: { error: reason, code: "forbidden_tenant_class" } }
   }
 
   try {
     const result = invoke()
-    auditFor(ctx, spec.name, spec.requiredScope, "allowed", Date.now() - started)
-    return { ok: true, result }
+    const entry = auditFor(ctx, spec.name, spec.requiredScope, "allowed", Date.now() - started)
+    return { ok: true, auditId: entry.id, result }
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
-    auditFor(ctx, spec.name, spec.requiredScope, "error", Date.now() - started, reason)
-    return { ok: false, error: { error: `Tool "${spec.name}" failed: ${reason}`, code: "tool_error" } }
+    const entry = auditFor(ctx, spec.name, spec.requiredScope, "error", Date.now() - started, reason)
+    return { ok: false, auditId: entry.id, error: { error: `Tool "${spec.name}" failed: ${reason}`, code: "tool_error" } }
   }
 }

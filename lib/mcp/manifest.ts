@@ -41,6 +41,8 @@ import {
   listAttributeProfiles,
   listMySuppliers,
   getComplianceTrend,
+  getReportRunDetail,
+  listReportRunHistory,
   listSystemFilters,
   listVendorExceptions,
   queryAccessLog,
@@ -297,6 +299,38 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: true,
     handler: (ctx, args) => runComplianceReport(ctx, args),
+  },
+  {
+    name: "list_report_runs",
+    description:
+      "List compliance reports previously run through this connection for your organisation, newest first — the 'pull up the Belk scan from Tuesday' lookup. Each run carries its run id, who ran it, when, the exact parameters used, headline figures, and a resource_uri whose MCP resource holds the full CSV (every vendor row, not just the ranked summary). Use this to re-open, compare, or re-share an earlier report instead of re-running it, since a re-run would score against today's data rather than the data the original scan saw.",
+    schema: {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe("Maximum runs to return, newest first. Default 20."),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => listReportRunHistory(ctx, args),
+  },
+  {
+    name: "get_report_run",
+    description:
+      "Re-open one retained compliance report by its run id (from run_compliance_report or list_report_runs). Returns the parameters it was run with, its headline figures, ranked missing attributes, and per-category breakdown, exactly as that scan produced them — not re-computed against today's data. The full CSV including every detail row is attached as the MCP resource named in resource_uri.",
+    schema: {
+      runId: z.string().describe("A run id, e.g. 'run-20260731-4f2a'. From run_compliance_report or list_report_runs."),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => getReportRunDetail(ctx, args),
   },
   {
     name: "get_compliance_trend",

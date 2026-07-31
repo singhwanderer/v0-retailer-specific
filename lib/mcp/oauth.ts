@@ -135,6 +135,20 @@ async function createKeys(): Promise<KeyMaterial> {
   // per-instance key would reintroduce the exact bug this exists to prevent.
   if (configured) return keysFromJwk(configured)
 
+  // An unset value can't throw — local development has no reason to pin a key,
+  // and refusing to boot would be worse than the failure it prevents. But on a
+  // multi-instance deployment this is the single most likely way a live demo
+  // breaks, and it breaks *intermittently*, which is the hardest kind of fault
+  // to diagnose from the symptom ("it asked me to sign in again"). So it is
+  // logged loudly, once per instance, naming the fix.
+  console.warn(
+    `[tgc/oauth] ${PRIVATE_JWK_ENV} is not set — generating a per-instance signing key. ` +
+      `On a single process this is fine. On any multi-instance deployment (e.g. serverless), ` +
+      `a token minted by one instance will FAIL verification on another, surfacing as a ` +
+      `spurious "Refused before sign-in" and a forced re-authentication mid-session. ` +
+      `Generate a value with \`pnpm gen:oauth-key\` and set ${PRIVATE_JWK_ENV} in the deploy environment.`
+  )
+
   const { privateKey, publicKey } = await generateKeyPair(JWT_ALG, { extractable: true })
   const publicJwk = await exportJWK(publicKey)
   const kid = randomBytes(8).toString("hex")
