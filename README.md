@@ -94,11 +94,11 @@ creation). Setup and usage:
 
 - `docs/mcp-getting-started.md` — connect a client and try it
 - `docs/mcp-demo-quickstart.md`, `docs/mcp-faq.md` — walkthrough and FAQ
-- `docs/mcp-vs-reports-and-dashboards.md` — how far conversational access can go
-  toward replacing the Compliance Report and the Dashboard, and where it
-  shouldn't
-- `docs/mcp-pm-presentation.md` — the concepts-first walkthrough, retail/CPG
-  use cases, and the answer to "our customers won't accept Claude/ChatGPT"
+- `docs/mcp-pm-presentation.md` — a 45-minute deck, the long-form read behind
+  it, and an appendix. Covers the concepts, the security model, how far
+  conversational access can go toward replacing the Compliance Report and the
+  Dashboard, retail/CPG use cases, and the answer to "our customers won't
+  accept Claude/ChatGPT"
 - `docs/enterprise-safe-remote-mcp.md` — decision memo proposing a gated,
   read-only pilot, for a security and architecture audience
 - `docs/embedded-agent-first-remote-mcp-selectively.md` — where the boundary

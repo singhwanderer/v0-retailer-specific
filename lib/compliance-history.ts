@@ -14,7 +14,8 @@
 // synthetic. That is a materially stronger claim than "simulated", which is
 // why the provenance tag below changed too — but it is still not captured
 // history, and every consumer must relay that distinction. See
-// docs/mcp-vs-reports-and-dashboards.md §6.1 and §3 ("Trend over time").
+// docs/mcp-pm-presentation.md §4 ("The trend finding, stated plainly") and
+// Appendix D.1.
 //
 // The one rule that keeps a conversational answer honest: reconstruction
 // never invents "today". Month 0 (this month) is always the live
