@@ -14,6 +14,11 @@
 > claim) was verified against `38b57cf`. Line numbers are the first thing to
 > rot — treat a mismatch as drift in the doc, not in the code, and re-verify
 > before quoting any of this into a customer or leadership conversation.
+>
+> This document sequences by dependency, which answers *what must come first*.
+> For what each item does as a user flow, whether it is built today, and whether
+> a **prototype** needs it at all — a filter that disagrees with this ordering in
+> places — see [`mcp-prototype-status.md`](./mcp-prototype-status.md).
 
 ## Why this document exists
 
