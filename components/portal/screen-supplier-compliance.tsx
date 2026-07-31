@@ -229,8 +229,6 @@ export function ScreenSupplierCompliance({
               const summary = getPartnerSummary(products, partner.name)
               const completion = getTargetCompletion(products, partner.name)
               const matrix = getRequirementMatrix(products, { kind: "retailer", name: partner.name })
-              const totalGs1 = matrix.categories.reduce((sum, c) => sum + c.gs1Count, 0)
-              const totalExtra = matrix.categories.reduce((sum, c) => sum + c.extraCount, 0)
               return (
                 <tr
                   key={partner.id}
@@ -249,8 +247,7 @@ export function ScreenSupplierCompliance({
                         {partner.name}
                       </button>
                       <span className="text-[10px] font-light" style={{ color: "#9CA3AF" }}>
-                        {totalGs1} GS1 + {totalExtra} extra{totalExtra !== 1 ? "s" : ""} across{" "}
-                        {matrix.categories.length} categories
+                        {matrix.hasOwnRequirements ? "GS1 + custom" : "GS1 baseline"}
                       </span>
                     </div>
                   </td>
