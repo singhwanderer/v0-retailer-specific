@@ -58,7 +58,7 @@ separately and the answer stops being a matter of taste.
 | Trend over time | **Blocked — not by MCP** | See §3. This is the single most important finding in the doc. |
 | One canonical number a team argues from | **MCP-hostile, mitigable** | Two people asking differently get differently framed answers. Mitigation is an engineering rule, not a prompt (see §5). |
 | Dense multi-vendor comparison | **MCP-hostile** | ~180 vendor rows × N attributes reads faster as a table your eye scans than as tokens that stream. This is a genuine, permanent property of the medium, not a limitation to engineer away. |
-| Drill-down | **MCP-superior** | The screen's drill-down is a fixed hierarchy someone designed in advance. "Why is Belk at 61%?" doesn't have to match a path the designer anticipated. |
+| Drill-down | **MCP-superior** | The screen's drill-down is a fixed hierarchy someone designed in advance. "Why is Blackwood Collective at 61% in Footwear?" doesn't have to match a path the designer anticipated. |
 
 Read the two tables together and the pattern is clear: **MCP wins the beginning
 and the end of the workflow — framing the question and acting on the answer —
@@ -107,28 +107,47 @@ Question #1 in [`feature-compliance-reports.md`](./feature-compliance-reports.md
 when it was written. It is now the question that decides whether the connector
 can stand in for the screen.
 
-### L2 — Trend (the blocker, and it isn't MCP's fault)
+### L2 — Trend (partially addressed; still not MCP's to fix)
 
 **TGC has no compliance history.** `runRetailerReport()` computes from live
 state; re-run it after a supplier fixes their data and the number moves, but
-nothing anywhere records what the number *was*. The dashboard's six-month trend
-line is not real data — `buildTrend()` in `screen-compliance-dashboard.tsx`
-seeds it from a string hash of the supplier's name, deliberately, so the
-prototype renders something stable.
+nothing anywhere *captures* what the number was at the time. That has not
+changed. What changed is how the missing months are produced.
 
-The consequence is worth stating precisely, because it is easy to misdiagnose as
-a model problem:
+The previous version hashed a supplier's name into a percentage curve —
+numbers with no relationship to the compliance engine at all. `getFilterTrend`
+/ `getSupplierTrend` / `getSupplierCategoryTrend` (`lib/compliance-history.ts`)
+now instead **reconstruct a plausible past catalogue state** for each month —
+rolling `productsWithGaps`/`openGaps`/`productsComplete` backward along a
+seeded, deterministic per-supplier-per-category trajectory — and score each
+reconstructed state with the same `runRetailerReport()` that produces today's
+live number. Every point on the line is now genuine engine output over *some*
+catalogue state; only the five past states themselves are synthetic. The
+provenance tag changed accordingly, from `"simulated"` to `"reconstructed"`.
 
-> No amount of MCP tooling, prompt engineering or model capability can answer
-> "is Belk improving?" There is nothing to read. The correct behaviour for the
-> connector today is to **say so and refuse**, not to infer a direction from a
-> single snapshot.
+That is a materially stronger claim, and it is still not captured history —
+the distinction the passage below draws still holds, just against a better
+baseline:
 
-Fixing it is a scheduled snapshot job plus a `get_compliance_trend(filter, from,
-to, grain)` tool — a data-model change, not an AI change. Until it lands, the
-dashboard's trend chart is the only surface claiming to show history, and in the
-prototype it is claiming that falsely. **That is a finding about the dashboard,
-not about MCP.**
+> No amount of MCP tooling, prompt engineering or model capability can turn a
+> reconstructed catalogue state into an observed one. The correct behaviour for
+> the connector is to relay `provenance: "reconstructed"` on every trend
+> answer, not to present it as read from a record.
+
+**The category gap is closed.** `get_compliance_trend` now takes an optional
+`category` (requires `supplier`), which is what actually unblocks "is Belk
+improving?" — properly restated as "is *Blackwood Collective* improving in
+*Footwear*?", since Belk is a peer retailer tenant
+(`lib/mcp/tenants.ts`), not a supplier, and Dillard's asking about Belk's
+number is exactly what tenant isolation exists to refuse. That correction
+matters beyond phrasing: the doc's own trend example was, unnoticed, an
+example of the isolation model failing.
+
+**Still not delivered:** a scheduled snapshot job and a real `from`/`to`/`grain`
+range — a data-model change, not an AI change. Until a snapshot job exists, no
+"month" before today was ever actually observed; it was rolled backward from
+today's number on a deterministic curve. **That remains a finding about the
+absence of a datastore, not about MCP.**
 
 ### L3 — Proactive (where MCP stops matching and starts beating)
 
@@ -428,24 +447,44 @@ activate or destructive grant.
 `lib/mcp/tools.ts`, `lib/compliance-history.ts`)
 
 - Params (as shipped): `systemFilterId` or `profileName` (mutually exclusive,
-  same resolution as `run_compliance_report`), optional `supplier`
+  same resolution as `run_compliance_report`), optional `supplier`, optional
+  `category` (requires `supplier`) — added specifically to answer "is this
+  vendor improving in this category?" without the aggregate-only version
+  averaging the answer away.
 - `kind: "read"` · `RETAILER_ONLY` · `allowWorkload: true`
 - Returns a 6-month series anchored to the live percentage plus
-  `provenance: "simulated"` and a `demo_note`. Workload-callable because this is
-  what a future L3 scheduled alert would compare against.
-- Not yet shipped: `from`/`to`/`grain` flexibility and a real snapshot store —
-  today's series is generated-and-anchored on every call, not read from
-  captured history. That remains the gap described in §6.1 and §3 ("Trend over
-  time — Blocked").
+  `provenance: "reconstructed"` and a `demo_note`. Workload-callable because
+  this is what a future L3 scheduled alert would compare against.
+- Upgraded since the first version of this doc: past months are no longer a
+  hash of a name. They are reconstructed catalogue states (seeded, per
+  supplier+category trajectory) scored by the real `runRetailerReport()`
+  engine — every point is genuine engine output over *some* state. Not yet
+  shipped: `from`/`to`/`grain` flexibility and a real snapshot store — no
+  month before today was ever actually observed. That remains the gap
+  described in §6.1 and §3 ("Trend over time").
 
-**2. `diagnose_gap_pattern`** — *the cross-vendor insight from §6.3*
+**2. `diagnose_gap_pattern`** — **Delivered** (`lib/mcp/manifest.ts`,
+`lib/mcp/tools.ts`, `lib/compliance-report.ts`) — *the cross-vendor insight
+from §6.3*
 
 - Params: `profileName` or `systemFilterId`, optional `minVendors` (default 3)
 - `kind: "read"` · `RETAILER_ONLY` · `allowWorkload: true`
-- Reuses `runRetailerReport()`'s `missingCounts` and per-vendor rows. Returns
-  attributes failed by many vendors at once, separating "these vendors are behind"
-  from "this requirement is unclear," with the retailer's own `guidance` text for
-  the attribute included so the answer can point at what to rewrite.
+- **Correction to how this was originally specified:** it does not reuse
+  `missingCounts` as first written above — that map sums gap *shares* (each
+  vendor's open-gap count distributed across their attribute pool), not
+  distinct vendors, so it answers a different question. `ReportResult` gained
+  an additive `attributeVendorCounts` field instead — a per-attribute tally of
+  distinct vendors with at least one gap on it, built in the same per-vendor
+  loop `missingCounts` already runs. The tool returns attributes failed by many
+  vendors at once, separating "these vendors are behind" from "this
+  requirement is unclear" at a `shareOfVendors >= 30%` threshold, with the
+  retailer's own `guidance` text included in account/profile mode so the
+  answer can point at what to rewrite (System filters carry no authored
+  guidance, and the response says so rather than returning a blank field).
+- Every response states the distinction from `missingAttributes` explicitly —
+  see the honesty note in §5's spirit: an unlabelled "47 vendors are missing
+  X" that was actually an allocation artifact would not survive a technical
+  review.
 
 **3. `list_report_runs` / `get_report_run`** — *the L1 pair*
 

@@ -133,7 +133,7 @@ their rules correctly and enforce them.
 
 | Category | Tools |
 | --- | --- |
-| **Read (13)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, list global System filters, run a compliance report across the vendor base, list vendor exceptions on file, **simulate a requirement change without applying it**, **draft vendor outreach from a supplier's real gaps**, **search this organisation's own AI access log** (administrators only), list proposals awaiting confirmation, and a `get_capabilities` "what can you do" helper |
+| **Read (15)** | search GS1 categories, list/inspect requirement profiles, list/inspect supplier compliance, list global System filters, run a compliance report across the vendor base, **see a 6-month compliance trend, down to one supplier's one category**, **find which attributes many different vendors are failing at once, with the retailer's own authored guidance for each**, list vendor exceptions on file, **simulate a requirement change without applying it**, **draft vendor outreach from a supplier's real gaps**, **search this organisation's own AI access log** (administrators only), list proposals awaiting confirmation, and a `get_capabilities` "what can you do" helper |
 | **Write (6)** | create a requirement profile, add an attribute requirement, change an attribute's label or guidance, set an image requirement, activate or deactivate a profile, grant or update a vendor exception |
 | **Remove (4)** | drop an attribute requirement, drop an image requirement, delete a whole profile, revoke a vendor exception. Each needs `tgc.destructive` **on top of** the relevant write scope |
 
@@ -385,10 +385,10 @@ is checked.
 
 ### 4B — Beyond the prototype: what else becomes possible
 
-Today's server is intentionally narrow — 6 read tools, 3 write tools, one
-retailer's-eye view, no persistence. None of that is a ceiling. Once the
-enterprise-readiness checklist above is in place, the same "one server, any
-AI" bet opens up:
+Today's server is still deliberately narrow — 15 retailer read tools, 6
+retailer write tools, 4 retailer removal tools, 4 supplier read tools, no
+persistence. None of that is a ceiling. Once the enterprise-readiness
+checklist above is in place, the same "one server, any AI" bet opens up:
 
 - **Real integration with TG Aviator MT.** Per direct guidance from our
   platform stakeholder, TGC has been named the first implementation of
@@ -416,10 +416,14 @@ AI" bet opens up:
   moment a report goes red, running under a scoped service identity tied to
   the affected tenant. This is also the rung where conversational access stops
   merely matching the Compliance Report and Dashboard screens and starts
-  beating them — see
-  [how far MCP can go toward replacing those screens](./mcp-vs-reports-and-dashboards.md),
-  including the one thing that genuinely blocks it (we store no compliance
-  history, so nothing can answer "is this improving?").
+  beating them — see Part 5 below and
+  [the full analysis](./mcp-vs-reports-and-dashboards.md). The blocker named
+  there — no captured compliance history, so nothing could answer "is this
+  improving?" — is now half-addressed: `get_compliance_trend` reconstructs
+  past catalogue states and re-scores them with the live engine, down to one
+  supplier's one category, and states its own provenance
+  (`"reconstructed"`, not `"simulated"`) on every answer. What's still missing
+  is a real snapshot job — no month before today was ever actually observed.
 - **Embedded, not just external chat.** The same tool contract can power an
   in-portal copilot, not only a user's external Claude/ChatGPT session —
   same backend, different front door.
@@ -431,6 +435,205 @@ AI" bet opens up:
 None of this requires re-architecting the core idea — it's the same "AI reads
 our rulebook live" model from Part 1, extended to more tools, more identities,
 and more callers.
+
+---
+
+## Part 5 — Does this replace the Compliance Report and the Dashboard?
+
+Short answer: partially, and unevenly. The long version is its own document —
+[`mcp-vs-reports-and-dashboards.md`](./mcp-vs-reports-and-dashboards.md) — but
+the argument is worth presenting directly, because "does the chatbot kill the
+screen" is exactly the question a leadership room asks the moment a
+conversational interface starts overlapping one they already paid for.
+
+**Stop scoring surfaces. Score jobs.** A report and a dashboard are each five
+or six jobs wearing one name — score them separately and the answer stops
+being a matter of taste.
+
+- **The Compliance Report is mostly replaceable.** Not because the model is
+  clever, but because the request wizard is a parameter-collection form, and
+  natural language collects parameters better than a form does — "run a GS1
+  Core scorecard on Levi's, all attributes" replaces a 3-step wizard with one
+  sentence. What blocks *full* replacement isn't intelligence — a chat answer
+  evaporates and a report is supposed to be an artifact you can name, re-open,
+  and hand to an auditor.
+- **The Dashboard is half replaceable.** MCP can take over the alerting half —
+  and take it over *decisively* — but shouldn't take the forensic half. ~180
+  vendor rows × N attributes reads faster as a table your eye scans than as
+  tokens that stream; that's a permanent property of the medium, not a gap to
+  engineer away.
+
+**The pattern, stated once:** MCP wins the beginning of the workflow (framing
+the question — natural language beats a dropdown wizard) and the end (acting
+on the answer — `draft_vendor_outreach` and `set_vendor_exception` live in the
+same conversation as the finding, behind the same two-phase confirmation as
+every other write). It loses the middle: displaying a lot of numbers at once.
+
+**The recommendation is inversion, not replacement:**
+
+- **Chat becomes the entry point and the action layer.** Framing the question,
+  interrogating the result off-script, and doing something about it — finding
+  a problem and fixing it stop being two different applications.
+- **The scorecard becomes the artifact the conversation produces and links
+  to**, not a destination you navigate to first.
+- **The dashboard becomes a subscription.** Its alerting job moves to a
+  push-based agent (the proactive pattern in Part 4B); its forensic job stays
+  on screen, for the days someone genuinely needs to compare 180 vendors at
+  once.
+
+**What we should not try to replace**, because each of these is a genuine,
+permanent property rather than a prompt-engineering gap: the zero-intent
+glance (a dashboard is a tab you check by presence; chat requires deciding to
+ask), one canonical number a team can argue from (mitigated by an
+architectural rule — the model never does arithmetic, every figure is quoted
+verbatim from the deterministic engine, though a stable `run_id` to cite
+alongside it isn't wired up yet — that's the artifact-layer gap named below),
+audit-grade evidence (a chat transcript isn't a citable artifact with a
+timestamp and a named requester), and dense multi-vendor comparison.
+
+**Where we actually are today, against that recommendation:** `run_compliance_report`
+already replaces the ad hoc "I want to know X right now" reason for opening the
+screen. `get_compliance_trend` and `diagnose_gap_pattern` extend the case —
+the trend tool now answers a real per-category question instead of only an
+aggregate one, and the diagnosis tool is the clearest example in the product of
+advice a conversational surface can give that the dashboard structurally
+cannot: it's organised per vendor, and "four vendors are failing the same
+field" is a cross-vendor insight. What's still missing is the artifact
+layer — no report run persists yet, so nothing is citable — and the
+proactive/subscription half of the dashboard replacement, which has no
+schedule or delivery channel wired up yet.
+
+---
+
+## Part 6 — Enterprise use cases: retail and CPG
+
+Part 4A's sources are generic enterprise-security material — real, but they
+don't answer "is anyone actually doing this in retail?" This section does,
+with citations, and it's honest about the difference between what's shipping
+and what TGC is specifically betting on.
+
+### Three different things all get called "MCP" — separate them before citing examples
+
+| Pattern | Who owns the chat surface | Example | TGC's analogue |
+| --- | --- | --- | --- |
+| **A — Embedded agent.** MCP is internal plumbing connecting the vendor's own agent to the vendor's own systems. Nobody pastes a URL. | The vendor | Walmart's supplier-facing agent **Marty** (and customer-facing Sparky) — both run on MCP internally; Akeneo's **Agentic Ziggy**, "embedded directly in the Akeneo Product Cloud" | The in-portal Compliance Agent |
+| **B — Vendor experience hosted inside someone else's assistant.** The vendor controls login, rendering, and payment, but inside a third-party client. | Shared | Walmart's Sparky **inside ChatGPT** — a Walmart-managed environment with Walmart's own login and payment, not OpenAI's | Not built (this is what "L4 — rendered UI" would be) |
+| **C — External connector.** A customer points *their own* Claude or ChatGPT at your endpoint and gets your tools. | The customer's AI | Shopify's Storefront MCP (auto-provisioned on every store, zero merchant setup); Microsoft Dynamics 365 Commerce MCP; SAP Commerce Cloud Storefront MCP | **This is TGC's bet** |
+
+**The honest read.** Category C is real and shipping — but almost entirely
+from *commerce platforms and data aggregators*, companies whose product **is**
+the data interface. Individual retailers are choosing A and B instead: Walmart
+built Marty as an in-product supplier agent, not a supplier-facing connector
+anyone can point their own Claude at. TGC's specific bet — a customer pasting
+one URL into their own AI to reach a bilateral, authenticated
+retailer↔supplier **compliance** network — has no direct precedent I could
+find in the retail/CPG space. That's genuinely differentiating, and it's less
+validated than "everyone's doing MCP" would suggest. Worth saying exactly that
+in the room, because peer PMs will trust the framing more for the honesty.
+
+One nuance that makes Shopify the most useful Category C comparison rather
+than a clean match: Storefront MCP is consumer-facing catalog search, where
+TGC is B2B and authenticated — but the "one URL, auto-provisioned, zero setup"
+property is the same one this demo leans on.
+
+### The evidence that carries the room
+
+- **A retailer is already building the supplier-facing agent TGC's thesis
+  describes — on MCP, at the largest scale in the industry.** Walmart is
+  consolidating its AI into four "super agents" connected via MCP: **Marty**
+  is the supplier/seller-facing one — onboarding, order management,
+  analytics, ad campaigns. That's the single strongest validation slide in
+  this deck, with the caveat above: Marty is Category A (embedded), not C.
+- **Retail's own numbers say MCP is exposing a data-quality problem, not
+  solving one on its own.** Stacklok surveyed 100 technical leaders at
+  leading retailers: more than 40% run MCP in production, top use cases are
+  supply chain and pricing optimization, and — the line worth building a
+  slide around — *"MCP usage is exposing concerns about data quality and
+  availability."* The industry is discovering that agents are only as good as
+  the product data underneath. That's precisely the layer TGC governs. Frame
+  TGC not as another agent, but as the thing the other agents are failing for
+  want of.
+- **The PIM category has already made the same bet TGC has.** Akeneo shipped
+  Agentic Ziggy (8 July 2026): specialist agents including schema mapping for
+  **retailer specification compliance** and quality checks, with governance
+  and approval built into every step — TGC's problem space and TGC's
+  two-phase confirm pattern, in an adjacent product. The approach is
+  validated; the window to be early is not indefinite.
+- **Platform vendors are shipping retail MCP servers**, which is the concrete
+  version of Part 3's "forward-compatible bet" claim: Microsoft's Dynamics
+  365 Commerce MCP server (NRF 2026) and SAP's Commerce Cloud Storefront MCP
+  server (Q2 2026 GA).
+
+**One finding to present as a challenge, not just a win.** Logicbroker — a
+retailer↔supplier dropship network running $10bn+ GMV for Samsung, Walgreens,
+and Home Depot — already exposes over MCP what this doc's own Part 4B calls
+future work: **resources** (orders, products, inventory, events) alongside
+tools, and **event subscriptions that trigger corrective tools** ("notify
+suppliers," reprocess a failed document). TGC registers no resources and has
+no subscription mechanism today. Its posture spans Category B and C rather
+than being a clean comparison, so don't cite it as a like-for-like
+competitor — but the pattern is shipped, in a network shape close to TGC's
+own. Worth naming in the room rather than having someone else raise it in
+review.
+
+**A regulatory driver worth one slide.** EU ESPR delegated acts for textiles
+are expected in 2027 with an ~18-month transition period. The Trace4Value
+pilot converged on roughly 126 data points per textile product, **tiered by
+audience** — some visible to brands only, some to suppliers, some to
+recyclers. TGC's categories are apparel and footwear, and the tenant-class
+isolation plus the "rows about me" rule already documented in this doc (the
+security-model section, and the supplier exception example) is the shape that
+kind of tiered visibility requires. This is the clearest available answer to
+"why would a retailer pay for this beyond a nicer UI?"
+
+### Sources for the retail & CPG landscape
+
+- [Walmart consolidating AI agents into 4 super agents — Modern Distribution Management](https://www.mdm.com/news/technology/ai/walmart-consolidating-ai-agents-into-4-super-agents/)
+- [Meet Sparky and Marty — TechInformed](https://techinformed.com/meet-sparky-and-marty-walmarts-ai-super-agents/)
+- [Walmart's Marty for retail media advertisers — Digital Commerce 360](https://www.digitalcommerce360.com/2026/01/09/walmart-marty-agent-ai-retail-media-network-advertisers/)
+- [Walmart Global Tech — All in on Agents](https://tech.walmart.com/content/walmart-global-tech/en_us/blog/post/all-in-on-agents.html)
+- [Walmart brings Sparky to ChatGPT as OpenAI rethinks Instant Checkout — Grocery Dive](https://www.grocerydive.com/news/walmart-sparky-chatgpt-instant-checkout/815961/)
+- [Stacklok — State of MCP in Retail 2026](https://stacklok.com/resources/state-of-mcp-in-retail-2026/) ([PDF](https://stacklok.com/wp-content/uploads/2026/01/State-of-MCP-in-Retail-2026_FINAL.pdf))
+- [Akeneo — first truly agentic Product Experience Platform (Agentic Ziggy)](https://www.akeneo.com/press-release/akeneo-introduces-the-first-truly-agentic-product-experience-platform/)
+- [Microsoft — Dynamics 365 Commerce MCP server](https://www.microsoft.com/en-us/dynamics-365/blog/it-professional/2026/06/29/dynamics-365-commerce-introduces-agentic-capabilities-with-model-context-protocol-mcp/)
+- [Logicbroker — agentic integrations via MCP](https://logicbroker.com/features/agentic-integrations-via-mcp/)
+- [Shopify — Storefront MCP server (developer docs)](https://shopify.dev/docs/apps/build/storefront-mcp/servers/storefront)
+- [TrusTrace — preparing for the EU Digital Product Passport](https://trustrace.com/knowledge-hub/how-fashion-brands-can-prepare-for-the-eu-digital-product-passport-a-practical-guide-1)
+
+> **Verify before presenting.** Several primary sources above (the Stacklok
+> PDF, Walmart's own tech blog, Akeneo's press release) blocked automated
+> fetching, so figures like ">40% of retailers in production" and specific
+> launch dates come from search-result summaries and secondary coverage, not
+> a direct read of the source document. Pull the exact numbers from the
+> primary source before they go on a slide. Everything stated above about
+> *this codebase* — tool counts, what's delivered, what isn't — is verified
+> directly against the code and needs no such check.
+
+---
+
+## Part 7 — The roadmap, ranked two ways
+
+Leverage order and demo-wow order are genuinely different lists, and saying so
+plainly is more useful to a PM audience than pretending there's one ranking.
+
+| | Leverage (long-term value) | Wow (live-demo impact) |
+| --- | --- | --- |
+| Cross-vendor gap diagnosis (`diagnose_gap_pattern`) | High, and already shipped | **Highest** — no screen can produce this view at all |
+| Per-category vendor trend (`get_compliance_trend`) | High — the piece that actually unblocks "is this improving?" | High — answers the exact question a dashboard trend line implies but can't honestly answer |
+| Proactive push (Part 4B, L3) | **Highest long-term** — this is the rung where MCP stops matching the dashboard and starts beating it | High, *if* a real delivery channel exists — the scanning logic already runs under a workload identity today |
+| Report-as-artifact (Part 5, L1) | **Highest structurally** — resources are the missing MCP primitive behind three separate gaps at once | Medium — a citable link appearing is real progress, but reads quieter live than a diagnosis or a trend |
+| Persistence / a real datastore | Prerequisite for nearly everything above it | Zero on its own, but its absence is the single biggest live-demo risk (see below) |
+
+**The one risk worth naming before a live session, regardless of ranking.**
+Every piece of this server's state — OAuth signing keys, registered clients,
+pending-change confirmation tokens, the audit log, and all demo writes — lives
+in process memory, not a database. On serverless hosting, a token minted by
+one instance can be unknown to the next, so a two-phase confirm can fail
+mid-conversation. The cheap mitigation, unrelated to any feature work above:
+pin a single signing key via environment configuration so every instance
+verifies the same tokens. The complete fix — a real shared store — is the
+prerequisite row in the table above, and is intentionally scoped as its own
+piece of work rather than folded into this pass.
 
 ---
 
@@ -484,3 +687,20 @@ and more callers.
 - **The tool surface is a floor, not a ceiling** — supplier-side tools,
   agent-to-agent access, proactive alerts, and an in-portal copilot are all
   the same underlying model, just with more callers and more identities.
+- **This isn't "replace the dashboard" — it's inversion.** Chat wins framing
+  the question and acting on the answer; the screen wins dense comparison.
+  The report becomes the artifact chat produces; the dashboard becomes a
+  subscription. Two new tools ship the first half of that argument today:
+  `get_compliance_trend` (down to one supplier, one category) and
+  `diagnose_gap_pattern` (the cross-vendor insight no per-vendor screen can
+  show).
+- **Retail is already validating this bet — mostly not our version of it.**
+  Walmart's supplier-facing agent Marty runs on MCP, and Stacklok's retail
+  survey shows MCP already exposing data-quality problems industry-wide. But
+  most of that is agents embedded in a vendor's own product (Category A), not
+  a customer pasting a URL into their own Claude (Category C, TGC's bet).
+  Say that distinction out loud — it's more credible than pretending the
+  whole industry already proved the idea.
+- **The regulatory case, not just the AI case:** EU ESPR's Digital Product
+  Passport for textiles ties data to a product with tiered, audience-scoped
+  visibility — exactly the shape TGC's tenant isolation already enforces.

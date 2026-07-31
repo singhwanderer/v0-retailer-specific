@@ -102,6 +102,20 @@ export interface ReportResult {
   distinctMissingTotal: number
   byCategory: { category: string; total: number; complete: number; pct: number; gaps: number }[]
   rows: ReportRow[]
+  /**
+   * How many DISTINCT vendors have at least one gap allocated to each
+   * attribute — not the same thing as missingAttributes' counts, which sum
+   * gap SHARES (the per-vendor gap total distributed over that vendor's pool
+   * attributes, see the allocation loop below). "47 vendors are missing
+   * Sustainable Materials" is a vendor tally; "134 gap-shares landed on
+   * Sustainable Materials" is what missingAttributes reports. Added for
+   * diagnose_gap_pattern (lib/mcp/tools.ts), which asks "how many vendors are
+   * failing this one requirement" — a distinct-vendor question, not a
+   * gap-volume question. Sorted desc by vendor count. Retailer-report only:
+   * a supplier's own runSupplierReport scans one supplier's products, not a
+   * vendor base, so "how many vendors" doesn't apply and the field is absent.
+   */
+  attributeVendorCounts?: { name: string; vendors: number }[]
 }
 
 export interface ReportRequest {
@@ -356,6 +370,7 @@ export function runRetailerReport(
   }
 
   const missingCounts = new Map<string, number>()
+  const attributeVendors = new Map<string, Set<string>>()
   const byCat = new Map<string, { total: number; complete: number; gaps: number }>()
   const rows: ReportRow[] = []
 
@@ -412,6 +427,9 @@ export function runRetailerReport(
     for (let i = 0; i < k; i++) {
       const share = Math.floor(gaps / k) + (i < gaps % k ? 1 : 0)
       missingCounts.set(pool[i].name, (missingCounts.get(pool[i].name) ?? 0) + share)
+      const vendorSet = attributeVendors.get(pool[i].name) ?? new Set<string>()
+      vendorSet.add(s.supplier)
+      attributeVendors.set(pool[i].name, vendorSet)
     }
 
     productsTotal += s.productsTotal
@@ -437,6 +455,9 @@ export function runRetailerReport(
 
   rows.sort((a, b) => (a.kind === "vendor" && b.kind === "vendor" ? a.pct - b.pct : 0))
   const { ranked, distinct } = rankMissing(missingCounts, options.maxAttributes)
+  const attributeVendorCounts = [...attributeVendors.entries()]
+    .map(([name, vendors]) => ({ name, vendors: vendors.size }))
+    .sort((a, b) => b.vendors - a.vendors)
 
   return {
     overallPct: pct(productsComplete, productsTotal),
@@ -450,6 +471,7 @@ export function runRetailerReport(
       .map(([category, c]) => ({ category, ...c, pct: pct(c.complete, c.total) }))
       .sort((a, b) => a.category.localeCompare(b.category)),
     rows,
+    attributeVendorCounts,
   }
 }
 

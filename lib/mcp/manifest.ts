@@ -33,6 +33,7 @@ import {
   addAttributeRequirement,
   createAttributeProfile,
   deleteAttributeProfile,
+  diagnoseGapPattern,
   draftVendorOutreach,
   getCapabilities,
   getProfileDetail,
@@ -300,7 +301,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "get_compliance_trend",
     description:
-      "See a 6-month compliance trend for a filter or a single supplier. IMPORTANT: this prototype captures no real compliance history — the trend is generated and anchored to today's live number (the same number run_compliance_report would return right now for the same scope), not a captured historical record. Always relay this as simulated/illustrative, never as real history. Same filter arguments as run_compliance_report: a System filter id, one of your attribute profiles, or omit both for all active profiles; optionally scope to one supplier.",
+      "See a 6-month compliance trend for a filter, a single supplier, or one supplier within one of their categories (e.g. 'is Blackwood Collective improving in Footwear?'). IMPORTANT: this prototype captures no real compliance history — past months are reconstructed by rolling catalogue state backward on a deterministic, seeded trajectory and re-scoring it, anchored so today's point always equals the live number run_compliance_report would return right now for the same scope. Always relay this as reconstructed/illustrative, never as a captured historical record. Same filter arguments as run_compliance_report: a System filter id, one of your attribute profiles, or omit both for all active profiles; optionally scope to one supplier, and optionally further to one of that supplier's categories (category requires supplier).",
     schema: {
       systemFilterId: z
         .string()
@@ -311,12 +312,40 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
         .optional()
         .describe("One of your attribute profile names, e.g. 'Footwear'. Omit (and omit systemFilterId) for all active profiles."),
       supplier: z.string().optional().describe("Scope the trend to one supplier by name, e.g. 'J.Renée'. Omit for the aggregate."),
+      category: z
+        .string()
+        .optional()
+        .describe("Further scope to one of that supplier's GS1 categories, e.g. 'Footwear'. Requires supplier to be set."),
     },
     kind: "read",
     requiredScope: SCOPES.read,
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: true,
     handler: (ctx, args) => getComplianceTrend(ctx, args),
+  },
+  {
+    name: "diagnose_gap_pattern",
+    description:
+      "Find requirements that many DIFFERENT vendors are failing at once — the cross-vendor pattern a per-vendor screen can't show. When several vendors all miss the same attribute, that is usually one requirement-clarity problem (the field is ambiguous) rather than several unrelated vendor problems, and the response includes the retailer's own authored guidance for that attribute (account/profile mode only) so you can see what to rewrite. IMPORTANT: the vendor count here is DISTINCT vendors with a gap on that attribute — a different number from run_compliance_report's missingAttributes, which sums gap shares (an allocation-order artifact, not an observed per-attribute count). Same filter arguments as run_compliance_report: a System filter id, one of your attribute profiles, or omit both for all active profiles.",
+    schema: {
+      systemFilterId: z
+        .string()
+        .optional()
+        .describe("A System filter id from list_system_filters, e.g. 'gs1-core'. Mutually exclusive with profileName. System filters carry no authored guidance."),
+      profileName: z
+        .string()
+        .optional()
+        .describe("One of your attribute profile names, e.g. 'Footwear'. Omit (and omit systemFilterId) for all active profiles."),
+      minVendors: z
+        .number()
+        .optional()
+        .describe("Minimum distinct vendors failing an attribute for it to be reported. Default 3."),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: RETAILER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => diagnoseGapPattern(ctx, args),
   },
   {
     name: "list_vendor_exceptions",

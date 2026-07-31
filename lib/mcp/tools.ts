@@ -25,6 +25,7 @@ import { getBrickByCode, getSegments } from "@/lib/gs1-standard-library"
 import { SUPPLIER_PERSONA, SUPPLIER_PRODUCTS_SEED } from "@/lib/supplier-catalogue"
 import {
   RETAILER_SUPPLIERS,
+  getProfileBricks,
   type AttributeProfile,
   type ProfileBrick,
   type ProfileStatus,
@@ -51,7 +52,7 @@ import {
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
 import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
-import { TREND_PROVENANCE, getFilterTrend, getSupplierTrend } from "@/lib/compliance-history"
+import { TREND_PROVENANCE, getFilterTrend, getSupplierTrend, getSupplierCategoryTrend } from "@/lib/compliance-history"
 
 const DEMO_NOTE =
   "Demo prototype: this change is stored in the demo server's in-memory data (mock data only, resets periodically). In production this would persist to TGC."
@@ -222,16 +223,22 @@ export function runComplianceReport(ctx: CallerContext, args: {
 }
 
 /**
- * Trend for a filter or a single supplier, anchored to the live percentage
- * `runComplianceReport` would return right now for the same scope. See
- * lib/compliance-history.ts for why this is simulated, not captured, history.
+ * Trend for a filter, a single supplier, or one supplier within one of their
+ * categories, anchored to the live percentage `runComplianceReport` would
+ * return right now for the same scope. See lib/compliance-history.ts for why
+ * this is reconstructed, not captured, history.
  */
 export function getComplianceTrend(ctx: CallerContext, args: {
   systemFilterId?: string
   profileName?: string
   supplier?: string
+  category?: string
 }) {
-  const { systemFilterId, profileName, supplier } = args
+  const { systemFilterId, profileName, supplier, category } = args
+
+  if (category && !supplier) {
+    return { error: "category requires supplier — trend can be scoped to one supplier's category, but not to a category across all vendors. Omit category for the account-wide trend, or add supplier." }
+  }
 
   if (systemFilterId && profileName) {
     return { error: "Choose ONE filter mode: either systemFilterId (a global System filter) or profileName (one of your attribute profiles). Omit both to scan against all your active profiles." }
@@ -262,17 +269,45 @@ export function getComplianceTrend(ctx: CallerContext, args: {
   }
 
   let vendorScope: string = "all"
+  let matchedRows: typeof RETAILER_SUPPLIERS = []
   if (supplier) {
     const q = supplier.toLowerCase().trim()
-    const match = RETAILER_SUPPLIERS.find((s) => s.supplier.toLowerCase().includes(q))
-    if (!match) {
+    matchedRows = RETAILER_SUPPLIERS.filter((s) => s.supplier.toLowerCase().includes(q))
+    if (matchedRows.length === 0) {
       const known = knownSuppliers()
       return {
         knownSuppliers: known,
         note: `No supplier matched "${supplier}". Suppliers trading under your retailer account: ${known.join(", ")}. (Other retail partners' data is not available through this connector.)`,
       }
     }
-    vendorScope = match.supplier
+    vendorScope = matchedRows[0].supplier
+  }
+
+  // Category-scoped: answer "is X vendor improving in Y category?" directly
+  // off that supplier's own row(s) in that category, rather than the
+  // vendor's cross-category aggregate.
+  if (category) {
+    const categoryRows = matchedRows.filter((r) => r.category.toLowerCase() === category.toLowerCase().trim())
+    if (categoryRows.length === 0) {
+      const vendorCategories = [...new Set(matchedRows.map((r) => r.category))]
+      return {
+        error: `${vendorScope} has no data in category "${category}". Categories they trade in: ${vendorCategories.join(", ")}.`,
+      }
+    }
+    const total = categoryRows.reduce((s, r) => s + r.productsTotal, 0)
+    const complete = categoryRows.reduce((s, r) => s + r.productsComplete, 0)
+    const currentPct = total > 0 ? Math.round((complete / total) * 100) : 0
+    const months = getSupplierCategoryTrend(vendorScope, categoryRows[0].category, currentPct)
+
+    return {
+      filter: { label: categoryRows[0].category, type: "Category" as const },
+      vendorScope,
+      months,
+      provenance: TREND_PROVENANCE,
+      asOf: new Date().toISOString().slice(0, 10),
+      demo_note:
+        "This prototype captures no compliance history — past months are reconstructed by rolling this vendor's catalogue state in this category backward on a deterministic trajectory and re-scoring it, not read from a captured historical record. This category view reads raw data-completion (productsComplete/productsTotal) for the category, not run_compliance_report's attribute-pool logic. Say so if you relay it.",
+    }
   }
 
   const result = runRetailerReport(
@@ -284,11 +319,10 @@ export function getComplianceTrend(ctx: CallerContext, args: {
     { maxAttributes: 10, ignoreDiscontinued: true, tenantId: ctx.tenantId }
   )
 
-  const seedKey = vendorScope === "all" ? filterLabel : vendorScope
   const months =
     vendorScope === "all"
-      ? getFilterTrend(seedKey, result.overallPct)
-      : getSupplierTrend(seedKey, result.overallPct)
+      ? getFilterTrend(result.overallPct, filter, resolvedProfile, vendorScope, getStore(ctx.tenantId).profiles, ctx.tenantId)
+      : getSupplierTrend(vendorScope, result.overallPct)
 
   return {
     filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
@@ -297,7 +331,119 @@ export function getComplianceTrend(ctx: CallerContext, args: {
     provenance: TREND_PROVENANCE,
     asOf: new Date().toISOString().slice(0, 10),
     demo_note:
-      "This prototype captures no compliance history — 'months' is generated and anchored to today's live number, not a real historical record. Say so if you relay it.",
+      "This prototype captures no compliance history — past months are reconstructed by rolling catalogue state backward on a deterministic trajectory and re-scoring it with the same engine as today's number, not read from a captured historical record. Say so if you relay it.",
+  }
+}
+
+/**
+ * The cross-vendor insight a per-vendor screen can't show: when many vendors
+ * fail the SAME attribute, that's usually one requirement-clarity problem,
+ * not many separate vendor problems. Reuses runRetailerReport's
+ * attributeVendorCounts (lib/compliance-report.ts) — a tally of DISTINCT
+ * vendors with a gap on each attribute, which is deliberately not the same
+ * number as run_compliance_report's missingAttributes (that one sums gap
+ * SHARES, an allocation-order artifact — see the field's own doc comment).
+ */
+export function diagnoseGapPattern(ctx: CallerContext, args: {
+  systemFilterId?: string
+  profileName?: string
+  minVendors?: number
+}) {
+  const { systemFilterId, profileName, minVendors = 3 } = args
+
+  if (systemFilterId && profileName) {
+    return { error: "Choose ONE filter mode: either systemFilterId (a global System filter) or profileName (one of your attribute profiles). Omit both to scan against all your active profiles." }
+  }
+
+  let filter: ReportFilterRef
+  let filterLabel: string
+  let resolvedProfile: string = "all-active"
+
+  if (systemFilterId) {
+    const sys = getSystemFilter(systemFilterId)
+    if (!sys) {
+      return { error: `Unknown system filter "${systemFilterId}". Valid ids: ${SYSTEM_FILTERS.map((f) => f.id).join(", ")}.` }
+    }
+    filter = { kind: "system", id: sys.id as SystemFilterId }
+    filterLabel = sys.name
+  } else {
+    const { profiles } = getStore(ctx.tenantId)
+    if (profileName) {
+      const match = profiles.find((p) => p.name.toLowerCase() === profileName.toLowerCase().trim())
+      if (!match) {
+        return { error: `No attribute profile named "${profileName}". Your profiles: ${profiles.map((p) => p.name).join(", ")}.` }
+      }
+      resolvedProfile = match.name
+    }
+    filter = { kind: "account", retailer: "Dillard's" }
+    filterLabel = profileName ? resolvedProfile : "All active profiles"
+  }
+
+  const result = runRetailerReport(
+    RETAILER_SUPPLIERS,
+    getStore(ctx.tenantId).profiles,
+    filter,
+    resolvedProfile,
+    "all",
+    { maxAttributes: 999, ignoreDiscontinued: true, tenantId: ctx.tenantId }
+  )
+
+  const vendorsInScope = new Set(
+    result.rows.filter((r) => r.kind === "vendor").map((r) => (r as { supplier: string }).supplier)
+  ).size
+
+  // Guidance is only authored per-attribute in account mode (profiles carry
+  // it; System filters don't), so build the lookup by scanning every brick
+  // this filter's profiles cover. Account mode only — a System filter (GS1
+  // Core, GS1 Extended, NRF Audit) has no retailer-authored guidance to find.
+  const guidanceByName = new Map<string, string>()
+  if (filter.kind === "account") {
+    const { profiles } = getStore(ctx.tenantId)
+    const inScope = resolvedProfile === "all-active" ? profiles.filter((p) => p.status === "Active") : profiles.filter((p) => p.name === resolvedProfile)
+    for (const p of inScope) {
+      for (const brick of getProfileBricks(p)) {
+        const set = assembleBrickAttributes(brick.code, ctx.tenantId)
+        for (const a of [...set.coreAttributes, ...set.extendedAttributes]) {
+          if (a.guidance && !guidanceByName.has(a.name)) guidanceByName.set(a.name, a.guidance)
+        }
+      }
+    }
+  }
+
+  const patterns = (result.attributeVendorCounts ?? [])
+    .filter((a) => a.vendors >= minVendors)
+    .map((a) => {
+      const shareOfVendors = vendorsInScope > 0 ? a.vendors / vendorsInScope : 0
+      const guidance = guidanceByName.get(a.name)
+      return {
+        attribute: a.name,
+        vendorsAffected: a.vendors,
+        vendorsInScope,
+        shareOfVendors: Math.round(shareOfVendors * 100),
+        // A third or more of the whole vendor base failing one attribute
+        // reads as a requirement-clarity problem rather than N unrelated
+        // vendor problems — the retailer's own wording is more likely the
+        // fix than another round of individual vendor outreach. Below that,
+        // treat it as vendor-specific.
+        interpretation:
+          shareOfVendors >= 0.3
+            ? "Likely a requirement-clarity problem, not a vendor problem — this many vendors failing the same field usually means the field itself is ambiguous."
+            : "Vendor-specific gaps — a smaller, more contained group of vendors.",
+        currentGuidance: guidance ?? null,
+        guidanceStatus: filter.kind !== "account" ? "not_applicable" : guidance ? "present" : "missing",
+      }
+    })
+
+  return {
+    filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
+    minVendors,
+    vendorsInScope,
+    patterns,
+    demo_note:
+      "vendorsAffected counts DISTINCT vendors with at least one gap on that attribute. It is not the same number run_compliance_report's missingAttributes shows for the same attribute — that figure sums gap SHARES, an artifact of how each vendor's total open-gap count is distributed across their attribute pool (first-k allocation), not an observed per-attribute count. Relay vendorsAffected as 'N vendors', not as a gap count." +
+      (filter.kind !== "account"
+        ? " System filters carry no retailer-authored guidance, so currentGuidance is unavailable for this scope — switch to one of your attribute profiles to see and fix guidance text."
+        : ""),
   }
 }
 
