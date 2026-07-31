@@ -637,6 +637,112 @@ piece of work rather than folded into this pass.
 
 ---
 
+## Part 8 — "Our customers will never accept Claude or ChatGPT"
+
+This is the objection most likely to come back from the room, and it deserves
+a direct answer rather than a reassurance. The full version is a companion
+decision memo —
+[`enterprise-safe-remote-mcp.md`](./enterprise-safe-remote-mcp.md) — written
+for a security and architecture audience. This is the PM-length version.
+
+### The reframe that does most of the work
+
+**MCP expands the user interface, not the data perimeter.** An external
+endpoint is public only in *network reachability*. The data and the tools stay
+private behind authentication and authorization — the same authorization this
+prototype already enforces on every single call.
+
+The objection usually contains a hidden assumption: that "connecting an AI"
+means handing a model access to a database. It doesn't. What is exposed is a
+short allowlist of named tools with typed inputs, policy validation on every
+request, and minimized outputs. No raw catalogue, no schemas, no queries.
+
+### The alternatives are worse, and that is the strongest argument
+
+| Option | What it enables | The problem |
+| --- | --- | --- |
+| CSV export / direct data feed | Bulk consumption | **Copies data outside our control boundary permanently.** No real-time policy enforcement, no revocation, no audit of what was read. |
+| A per-client chatbot integration | One tailored experience | Rebuilds integration *and security logic* for every AI client. Every rebuild is a new place to get authorization wrong. |
+| Governed remote MCP | A small reusable set of live capabilities across approved clients | Requires disciplined identity, tool design, and monitoring — which is the work, and it is done once |
+
+A governed MCP server can be **safer than the broad API access many customers
+already grant**, precisely because it exposes fewer capabilities. That is a
+better argument than "MCP is secure," which is not a claim anyone should make.
+
+### If Claude isn't acceptable, don't use Claude — nothing about our server changes
+
+This is the "USB-C for AI assistants" point from Part 1 finally paying off in
+a procurement conversation rather than an architecture one. The same endpoint,
+the same compliance engine, the same entitlement checks, and the same audit
+trail serve every one of these:
+
+| Client | Identity path | Whose governance |
+| --- | --- | --- |
+| **Microsoft 365 Copilot** | Entra SSO; tenant-governed declarative agent calling our MCP tools | The customer's own Microsoft tenant — usually already approved |
+| **Claude / ChatGPT, enterprise agreements** | OAuth after the customer's own OIDC/SSO | The customer's own vendor contract and DPA |
+| **TG Aviator Gateway + Catalogue Domain Agent** | Platform-issued, per the Gateway | Ours, under the existing customer relationship |
+| **The in-portal Compliance Agent** | In-process, no external client at all | Entirely ours — no third-party model in the path |
+
+**Which client a customer permits is a procurement decision, not an
+architectural one.** We do not build a compliance engine per assistant; the
+governed service stays one, and integration adapters stay thin. A customer
+that forbids consumer AI can still have this — through Copilot in their own
+tenant, or through the Gateway.
+
+### Why this doesn't leak by design — and what already runs
+
+The server returns data only when *all* of these hold: the user authenticated
+through an approved authorization server; the token is valid, unexpired, and
+issued **for this resource**; the caller holds the required read scope; the
+tenant is derived from verified claims; the requested scope is entitled; the
+tool is on the read-only allowlist; and the response is minimized.
+
+Four of those are demonstrable in the prototype today — audience-bound tokens,
+per-call tenant checks across both tenant classes, progressive scopes, and a
+full audit log. **The AI client is never the authorization decision-maker.** A
+user can type "show me Belk's supplier gaps" and the server refuses, because
+the verified caller is not entitled to that tenant. Natural-language phrasing
+never overrides server-side policy — which is exactly why the tenant is
+derived from identity and can never be chosen.
+
+### What we should not claim
+
+Worth saying out loud in the room, because it is what makes the rest credible:
+
+- **Not** "MCP is inherently secure." Security depends on implementation and
+  governance.
+- **Not** "Claude or Copilot can access our data safely by default." They must
+  be explicitly authorized and constrained.
+- **Not** "read-only means zero risk." Read tools still disclose data —
+  entitlement checks and output minimization are mandatory, not optional.
+- **Not** "the model decides access." It does not. Our platform and gateway do.
+
+### The ask
+
+A **gated, read-only pilot**: 5–15 named users or one design-partner tenant,
+synthetic or pre-approved data first, no writes, 6–8 weeks, with cross-tenant
+/ wrong-audience / invalid-token / missing-scope / unauthorized-supplier tests
+all required to **fail closed**, and a prompt-injection suite showing no
+bypass of the tool allowlist.
+
+Note the deliberate difference from what the prototype demonstrates: the
+prototype *shows* the two-phase write path (Part 2), because proving a human
+approves every mutation is the point. The pilot proposes not *enabling* writes
+externally at first. Scopes already make that a configuration rather than a
+rebuild — grant read-only and the AI is never even shown the write tools.
+
+> **Where the memo is ahead of the code.** It assumes versioned, approved,
+> published requirement sets ("Fall 2026 / v3.2"), a correlation ID on every
+> response, a portal deep link, and a per-call retailer→supplier entitlement
+> check. The prototype has profile *status* but no versioning, an audit id
+> that is never returned to the caller, no portal links, and a supplier
+> fixture shared across retailer tenants. Those are tracked as work items in
+> [`mcp-implementation-plan.md`](./mcp-implementation-plan.md) — and the
+> reconciliation table at the top of the memo names each one, so nobody
+> discovers them in security review instead.
+
+---
+
 ### Sources for the practices above
 
 - [MCP Authorization specification](https://modelcontextprotocol.io/specification/draft/basic/authorization)
@@ -646,6 +752,16 @@ piece of work rather than folded into this pass.
 - [How to Architect a Multi-Tenant MCP Server for Enterprise B2B SaaS — Truto](https://truto.one/blog/how-to-architect-a-multi-tenant-mcp-server-for-enterprise-b2b-saas/)
 - [MCP Security for Multi-Tenant AI Agents: Isolation Patterns — Prefactor](https://prefactor.tech/blog/mcp-security-multi-tenant-ai-agents-explained)
 - [OAuth for MCP — Emerging Enterprise Patterns for Agent Authorization — GitGuardian](https://blog.gitguardian.com/oauth-for-mcp-emerging-enterprise-patterns-for-agent-authorization/)
+
+**Governance and standards sources** (from the companion memo — these carry
+more weight with a security or architecture audience than vendor blog posts,
+because they are frameworks a customer's own reviewers already recognise):
+
+- [OWASP AI Agent Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html) — least privilege, per-tool scopes, separating tool sets by trust level, human approval for high-impact actions
+- [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework) and its Generative AI Profile
+- [Microsoft Learn — Secure access to MCP servers in Azure API Management](https://learn.microsoft.com/en-us/azure/api-management/secure-mcp-servers) — gateway token validation, managed credential handling
+- [GS1 US National Data Quality Playbook](https://www.gs1us.org/industries-and-insights/by-industry/retail-grocery/data-quality-playbook) — trading-partner data quality as complete, accurate, standards-based, timestamped
+- [GS1 Data Quality Framework](https://gs1.org/standards/data-quality-framework) — the standards basis for retailer/supplier master-data integrity
 
 ---
 
@@ -704,3 +820,12 @@ piece of work rather than folded into this pass.
 - **The regulatory case, not just the AI case:** EU ESPR's Digital Product
   Passport for textiles ties data to a product with tiered, audience-scoped
   visibility — exactly the shape TGC's tenant isolation already enforces.
+- **"Our customers won't accept Claude/ChatGPT" is a procurement question, not
+  an architecture one.** MCP expands the user interface, not the data
+  perimeter — the endpoint is public only in network reachability. If a
+  customer forbids consumer AI, they use Copilot in their own Entra tenant or
+  the Aviator Gateway, and *nothing about our server changes*. That's the
+  USB-C argument finally paying off somewhere it costs real money. The honest
+  counterpart: the alternative most customers already permit — a CSV export or
+  a data feed — copies data outside our control boundary permanently, with no
+  revocation and no audit of what was read.

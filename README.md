@@ -97,6 +97,12 @@ creation). Setup and usage:
 - `docs/mcp-vs-reports-and-dashboards.md` — how far conversational access can go
   toward replacing the Compliance Report and the Dashboard, and where it
   shouldn't
+- `docs/mcp-pm-presentation.md` — the concepts-first walkthrough, retail/CPG
+  use cases, and the answer to "our customers won't accept Claude/ChatGPT"
+- `docs/enterprise-safe-remote-mcp.md` — decision memo proposing a gated,
+  read-only pilot, for a security and architecture audience
+- `docs/mcp-implementation-plan.md` — phased sequencing for everything above,
+  including which gaps are pilot-blocking
 
 The retailer tool surface covers the full lifecycle — read, create, edit, and
 remove — with a human in the loop for every non-read action. **No mutating tool
