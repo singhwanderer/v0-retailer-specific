@@ -7,7 +7,7 @@ One file, three zones, meant to be read in different ways by different people.
 
 | Zone | What it is | Who it's for |
 | --- | --- | --- |
-| **Part One** | A 45-minute presentation, ~28 slides. Every `###` heading is one slide: a title, at most six bullets or one table, and a bolded **line to say**. Copy-paste it straight into a deck. | The presenter, and the room |
+| **Part One** | The presentation — 27 slides, ~40 minutes, sized for a 45-minute slot with room for questions. Every `###` heading is one slide: a title, at most six bullets or one table, and a bolded **line to say**. Copy-paste it straight into a deck. | The presenter, and the room |
 | **Part Two** | The long-form version of the same six sections, in the same order. This is what the slides compressed. | Anyone who saw the talk and wants the argument in full, or who is reading cold |
 | **Appendix** | Reference material — tool inventory, the capability ladder, the enterprise-readiness checklist, design questions, proposed tools, sources, and the honest limits. | Engineering, security, and anyone checking a claim |
 
@@ -15,94 +15,148 @@ Every slide in Part One is written in complete sentences, so the deck also reads
 correctly as prose. No slide depends on anything above it, so sections can be
 cut or reordered for a shorter session.
 
-**A note on scope.** Everything stated here about *this codebase* — tool counts,
-what is delivered, what is not — is verified against the code. Claims about the
+**The deck opens on the customer's problem and stays out of protocol vocabulary
+for as long as it can.** Terms like *tool*, *scope*, and *resource* are the
+appendix's job, not the room's — Part One introduces the standard by name only
+once the API framing has earned it.
+
+**A note on scope.** Everything stated here about *this codebase* — what is
+delivered and what is not — is verified against the code. Claims about the
 outside world carry their sources in Appendix F, with a caveat about which ones
-could not be fetched directly.
+could not be fetched directly. Read the presenter notes at the top of the
+appendix before a live session.
 
 ---
 ---
 
-# Part One — The 45-minute presentation
+# Part One — The presentation
 
 ---
 
-## Section 1 — The concept (~7 min)
+## Section 1 — The problem, and the idea (~10 min)
 
-### 1.1 The problem this solves
+### 1.1 Fourteen days to the intake freeze
 
-- If someone wants an AI assistant to answer questions using *our* data —
-  "which of my suppliers are behind on compliance?" — the AI has no way to
-  reach it.
-- It knows only its training data and whatever the user pastes into the chat.
-- Historically, every company built that bridge differently: a custom plugin
-  for this AI, a different integration for that one, none of them reusable.
+A category operations manager at a retailer, two weeks out from a seasonal
+intake freeze:
 
-**The line to say:** *Every AI integration used to be bespoke, which is why
-almost nobody had one.*
+- Every retailer sets its own data requirements per category — attributes,
+  taxonomy, images, regulatory fields, pack details.
+- Their suppliers have sent thousands of items against those requirements.
+- Nobody can review thousands of items by hand, so incompleteness surfaces late
+  — usually when something fails to activate.
+- What follows is the spreadsheet-and-email loop: chase the supplier, wait, get
+  a partial fix, re-check manually.
 
-### 1.2 What MCP is
+**The line to say:** *The problem is not that the data is missing. It's that
+nobody finds out in time to do anything about it.*
 
-**MCP (Model Context Protocol)** is an open standard — think "USB-C for AI
-assistants." Build **one** MCP server, and *any* MCP-compatible assistant
-(Claude, ChatGPT, Microsoft Copilot Studio, and a growing list) plugs into it
-the same way.
+### 1.2 The question they actually want answered
 
-A server exposes two things:
+> *"Which of my suppliers will make the date, and what do I chase first?"*
 
-- **Tools** — specific actions the AI may take, each with a strict,
-  machine-readable description of what it needs and what it returns.
-- **Prompts** (optional) — ready-made suggested questions the client surfaces
-  as clickable starting points.
+That question has three properties worth noticing:
 
-**The line to say:** *One integration, every AI — that is the whole bet.*
+- It is **urgent and one-off** — asked because a deadline is close, not on a
+  reporting schedule.
+- It **crosses things** — suppliers, categories, attributes, deadlines — so no
+  single screen was designed to answer exactly it.
+- It arrives **somewhere else**: in a planning meeting, a Teams thread, a
+  leadership brief being written that afternoon.
 
-### 1.3 The single most important idea: the AI reads the rulebook itself
+Today, answering it means someone opens screens, exports, and reassembles.
 
-When an assistant connects, it asks the server *"what can I do here, and what
-do you need from me?"* The server answers with a precise contract per tool:
-which fields are **mandatory**, and where a field has fixed choices, exactly
-**which values are allowed**.
+**The line to say:** *The work is not the analysis — it's the fetching, and the
+fetching happens because the answer lives somewhere the question isn't.*
 
-- No special training. No prompt engineering.
-- If a form requires `format` and allows only JPEG/PNG/TIFF/WebP, the AI reads
-  that live and offers exactly those choices.
-- **Change the rule on the server, and every connected AI picks it up
-  immediately, with no retraining.**
+### 1.3 They already have an assistant. It just can't see any of this.
 
-**The line to say:** *We publish the rules; the AI obeys them because it read
-them thirty seconds ago, not because someone described them in a prompt.*
+Almost everyone in that manager's org already has Claude, ChatGPT, or Microsoft
+Copilot open — paid for, approved, in daily use.
 
-### 1.4 Why do this instead of building a chatbot?
+- It can draft their supplier email and summarise their meeting.
+- It cannot answer a single question about their actual catalogue, because it
+  has no way to reach it. It knows its training data and whatever gets pasted
+  into the chat.
+- So the most capable tool on their desk is the one tool that can't help with
+  the thing that's urgent.
 
-- **One integration, every AI.** Including assistants we don't control — a
-  customer's own Claude or ChatGPT — with the user's own AI subscription doing
-  the reasoning.
-- **The AI never invents our rules.** Mandatory fields and valid values come
-  from a machine-readable contract, not a paragraph a model might misread.
-- **Safety is layered, not hoped for.** The server enforces every rule again
-  when the tool is actually called, so invalid data cannot get written even if
-  something went wrong upstream.
+**The line to say:** *The assistant isn't missing intelligence — it's missing
+access.*
 
-**The line to say:** *We are not in the chatbot business — we publish
-capabilities and enforce them.*
+### 1.4 What we built is an API. With two differences.
+
+You already know this shape: we expose a capability, something calls it. What's
+different is who calls it and how much work that takes.
+
+| | A normal API | This |
+|---|---|---|
+| Who calls it | A client someone has to build | An assistant the customer **already owns and pays for** |
+| How the caller learns to use it | A developer reads docs and writes integration code | The API **describes itself** — the caller reads its own required fields and valid values at connect time |
+| Cost to add a second consumer | Another integration | Zero. Same endpoint |
+
+The open standard that makes the self-describing part work is called **MCP**,
+and it matters for one commercial reason: every major assistant already speaks
+it, so we implement it once rather than once per vendor.
+
+**The line to say:** *This is an API whose client already exists, already has a
+subscription, and reads the manual before it calls.*
+
+### 1.5 The self-describing part, concretely
+
+When an assistant connects, it asks what's available and gets a precise contract
+back: which fields are **mandatory**, and where a field has fixed choices,
+exactly **which values are allowed**.
+
+Take granting a vendor exception. The contract says `exceptionType` must be
+exactly one of:
+
+> **Attribute Waiver** · **Extended Deadline** · **Reduced Scope**
+
+So the assistant asks *"which type — a waiver, a deadline extension, or a
+reduced scope?"* and will not accept anything else. Nobody wrote a prompt
+describing exception types. It read them at connect time.
+
+- **Change the rule on our side, and every connected assistant picks it up
+  immediately** — no retraining, no redeployment, no version negotiation.
+- The same applies to values inside an attribute: where GS1 defines a fixed code
+  list, those are the only values it will offer.
+
+**The line to say:** *We publish the rules; the assistant follows them because
+it read them thirty seconds ago, not because someone described them in a
+prompt.*
+
+### 1.6 Why not just build our own chatbot?
+
+- **We'd be building the wrong half.** The conversation — understanding a vague
+  question, asking a follow-up — is the part the customer's assistant already
+  does well, and already pays for.
+- **One integration, every assistant.** Including ones we don't control. A
+  bespoke chatbot serves one front door.
+- **It never invents our rules.** Mandatory fields and valid values come from a
+  machine-readable contract, not a paragraph a model might misread — and our
+  side validates again when the call actually arrives.
+
+**The line to say:** *We are not in the chatbot business. We publish
+capabilities and enforce them — and let the customer bring their own
+conversation.*
 
 ---
 
-## Section 2 — What we built (~10 min)
+## Section 2 — What we built (~8 min)
 
 ### 2.1 The pitch in one line
 
-We stood up a small **MCP server** exposing our (currently mock) retailer
-requirement and supplier-compliance data as a set of tools — so anyone can
-point their own Claude or ChatGPT at it and *just talk* to our data.
+We stood this up against our retailer requirement and supplier-compliance data
+(currently mock), so that category manager can point their own Claude or ChatGPT
+at it and *just ask*.
 
 - No custom chatbot.
 - No API key of their own to manage.
 - Nothing to install.
 - They sign in with their own work account and choose how much access to grant.
 
-**The line to say:** *The user's setup is pasting one URL and signing in.*
+**The line to say:** *Their entire setup is pasting one URL and signing in.*
 
 ### 2.2 What happens when someone connects
 
@@ -116,48 +170,37 @@ point their own Claude or ChatGPT at it and *just talk* to our data.
    WHO THEY ARE — never a choice, and there is no account picker.
         │
         ▼
-   Their AI asks: "what tools do you have, and what does each need?"
-   Server answers with a precise contract per tool
+   Their assistant asks what's available, and gets the contract back
         │
         ▼
    User asks in plain English: "Which of my suppliers are furthest
-   behind on compliance?"  or  "Add a lifestyle image requirement
-   to Footwear."
+   behind on compliance?"  or  "Give Levi's a 60-day extension on
+   sustainable-materials fields."
         │
         ▼
-   Their AI picks the tool, fills the required fields (asking the
-   user for anything missing, offering only valid choices), calls it
+   Their assistant fills in the required fields — asking the user
+   for anything missing, offering only valid choices — and calls
         │
         ▼
-   Our server runs the real logic, VALIDATES again — rejecting
+   Our side runs the real logic, VALIDATES again — rejecting
    anything invalid and naming the exact bad field — and returns
-   a real answer, which their AI turns into natural language
+   a real answer, which their assistant turns into natural language
 ```
 
-**The line to say:** *We wrote no conversational logic at all — understanding
-the user is the connecting AI's job; ours is publishing correct tools and
-enforcing them.*
+We publish about thirty capabilities today, split across reading, authoring, and
+removing, on both the retailer and supplier sides. The full inventory is
+Appendix A — what matters on this slide is the shape of the flow, not the count.
 
-### 2.3 The tool surface today
+**The line to say:** *We wrote no conversational logic at all — understanding the
+user is the assistant's job; ours is publishing the capability correctly and
+enforcing it.*
 
-| Category | Count | Examples |
-| --- | --- | --- |
-| **Retailer reads** | 15 | Compliance reports across the vendor base, 6-month trend down to one supplier's one category, cross-vendor gap diagnosis, simulate a requirement change, draft vendor outreach, search the AI access log |
-| **Retailer writes** | 6 | Create a profile, add/change an attribute requirement, set an image requirement, activate a profile, grant a vendor exception |
-| **Retailer removals** | 4 | Drop an attribute or image requirement, delete a profile, revoke an exception — each needs `tgc.destructive` **on top of** the relevant write scope |
-| **Supplier reads** | 4 | Own compliance per retail partner, own retail partners, own outstanding attributes and images, exceptions granted to them |
+### 2.3 Nothing writes on the first call
 
-Full inventory in Appendix A.
-
-**The line to say:** *Twenty-nine tools, and the split between them is where the
-security model lives.*
-
-### 2.4 Nothing writes on the first call
-
-Every write and removal tool is two-phase. Called once it does **not** act — it
-returns a preview of exactly what would change, what that does to compliance
-numbers, and a short-lived confirmation token. A separate `confirm_pending_change`
-call is the only path that mutates.
+Every authoring and removal capability is two-phase. Called once it does **not**
+act — it returns a preview of exactly what would change, what that does to
+compliance numbers, and a short-lived confirmation token. A separate confirm step
+is the only path that mutates.
 
 Why it lives in the protocol rather than a UI card:
 
@@ -169,30 +212,31 @@ Why it lives in the protocol rather than a UI card:
 its Apply button; an external ChatGPT session doesn't, so we put the
 confirmation in the protocol instead.*
 
-### 2.5 One connector, two audiences
+### 2.4 One connector, two audiences
 
-A supplier and a retailer paste the **identical** URL. Which tools they get is
+A supplier and a retailer paste the **identical** URL. What they can do is
 decided by *who signed in* — not a different deployment, a different URL, or a
 setting anyone can flip.
 
-- A supplier's assistant is never even shown the retailer tools, and would be
-  refused if it somehow called one.
+- A supplier's assistant is never even shown the retailer capabilities, and
+  would be refused if it somehow called one.
 - A supplier **can** see the waivers a retailer granted *them* — a shared fact
   they are party to — and **cannot** see anything else that retailer holds.
-- "Rows about me" is a different thing from "their data," and the server
-  enforces the difference on every call.
+- "Rows about me" is a different thing from "their data," and we enforce the
+  difference on every call.
 
 **The line to say:** *TGC is bilateral, so a one-sided connector was always half
 a product.*
 
-### 2.6 Two things built for real use, not a scripted demo
+### 2.5 Built for real use, not a scripted demo
 
-- **"What can you help me with?" always works.** A `get_capabilities` tool
-  returns a plain-English list of what's possible *plus* a live snapshot of what
-  data actually exists — built from the store, so it cannot drift from reality.
+- **"What can you help me with?" always works.** Asking that returns a
+  plain-English list of what's possible *plus* a live snapshot of what data
+  actually exists — assembled from the data itself, so it cannot drift into
+  describing something that isn't there.
 - **Empty results redirect instead of dead-ending.** Ask about a supplier that
-  doesn't exist and the tool returns a note naming the suppliers that *do*, so
-  the conversation keeps moving instead of hitting a wall.
+  doesn't exist and the answer names the suppliers that *do*, so the
+  conversation keeps moving instead of hitting a wall.
 
 **The line to say:** *A demo survives its script; a product survives someone
 ignoring it.*
@@ -254,54 +298,46 @@ customer's audit log with a forgery.
 **The line to say:** *Refusals are logged too, which is what makes this evidence
 rather than a feature list.*
 
-### 3.4 What MCP can enforce vs. what it can only request
+### 3.4 What we can enforce vs. what we can only request
 
-| Property | In-portal agent | Over MCP |
+| Property | In our own portal | Through someone else's assistant |
 |---|---|---|
 | Tenant isolation | Enforced | **Enforced** — re-checked per call |
-| Scope / authority | Enforced | **Enforced** — declared as data, tool list filtered per caller |
+| Authority / what they may do | Enforced | **Enforced** — declared as data, filtered per caller |
 | No write on first call | Enforced by the proposal card | **Enforced** — moved into the protocol |
-| Citation of sources | Enforced — derived from which tools fired | **Requested only** |
+| Citation of sources | Enforced — derived from which calls fired | **Requested only** |
 | Layout and rendering | Enforced — we own the panel | **Not ours** — the client's choice |
-| Relaying `provenance` | Enforceable in the renderer | **Requested only** |
+| Relaying that history is reconstructed | Enforceable in the renderer | **Requested only** |
 | Not restating figures from memory | Constrained by the rendered card | **Requested only** |
 
 **The line to say:** *Every "requested only" row needs an eval, because a request
 that is never measured is an assumption — and this table is also the clearest
-argument for keeping the in-portal agent.*
+argument for keeping our own in-portal agent.*
 
-### 3.5 "Enterprise-ready" is a checklist, not a vague future
+### 3.5 Why this is enterprise-ready by design, not by audit
 
-Twelve requirements, documented industry practice, not security theatre: real
-OAuth 2.1, tokens scoped to this server only, delegated identity, separate
-workload identity for agent-initiated actions, tenant checked on every call
-across both tenant classes, progressive scopes, a human approving every
-mutation, no token passthrough, rate limits, container isolation, full audit
-logging, and a curated tool registry.
+Four properties, each a design decision rather than a feature someone remembered
+to add:
 
-**Where we stand:** eight of the twelve are implemented and demonstrable
-end-to-end. One is half done, two belong to the Gateway, and the identity
-provider is still a local stand-in. Full table with acceptance criteria and
-owners in Appendix C.
+- **The tenant is derived from identity, never chosen.** No prompt, no client,
+  and no autonomous agent can assert whose data it is acting on.
+- **Authorization is re-evaluated on every call**, not settled once when the
+  connection was made. Isolation enforced at login but not re-checked per call is
+  the single most-cited multi-tenant failure mode.
+- **Authority is split, not pooled.** Consenting to *author* a requirement is not
+  consenting to *enforce* it across the vendor base, or to delete it — those are
+  separate grants, and a read-only grant means the write capabilities are never
+  even listed.
+- **Nothing mutates on a first call.** Preview, then confirm, so an abandoned
+  conversation changes nothing.
 
-**The line to say:** *A working demo and a safe one are different claims, and we
-already know exactly which boxes are unchecked.*
+None of this is our invention — it is the documented enterprise checklist, and
+Appendix C has all thirteen rows with acceptance criteria, owners, and where this
+prototype sits against each.
 
-### 3.6 Honest current limits
-
-- **Auth is real; the identity provider is not.** OAuth 2.1 sign-in, per-call
-  tenant isolation, progressive scopes, and audit logging all run. What is a
-  stand-in is *where the people come from* — a local demo sign-in rather than a
-  customer's Entra ID or Okta federated through TG Aviator.
-- **Writes don't persist.** Chat-made changes live in server memory and reset on
-  restart. Chat-created requirements don't yet appear in the portal screens,
-  because those screens don't read from this store.
-- **This is a directional preview**, not a committed V1 feature. It exists to
-  prove the experience is real before committing engineering time to
-  production-harden it.
-
-**The line to say:** *Saying this out loud is what makes the rest of the deck
-credible.*
+**The line to say:** *These are properties of the code, not promises in a
+paragraph — which is the difference between a demo that works and one that's
+safe.*
 
 ---
 
@@ -434,7 +470,7 @@ being specific about what we are not claiming.*
 
 ---
 
-## Section 6 — Roadmap and the ask (~7 min)
+## Section 6 — Roadmap and where the market is (~6 min)
 
 ### 6.1 The roadmap, ranked two ways
 
@@ -472,39 +508,22 @@ no direct precedent I could find in retail/CPG.
 "everyone's doing MCP" would suggest — say so, because peer PMs trust the framing
 more for the honesty.*
 
-### 6.3 The one risk worth naming before a live session
+### 6.3 What I want from this room
 
-Every piece of this server's state — OAuth signing keys, registered clients,
-pending-change tokens, the audit log, and all demo writes — lives in process
-memory, not a database.
+Not approval — questions. Three I'd genuinely like answered:
 
-- On serverless hosting, a token minted by one instance can be unknown to the
-  next, so a two-phase confirm can fail mid-conversation.
-- **Cheap mitigation**, unrelated to any feature work: pin a single signing key
-  via environment configuration so every instance verifies the same tokens.
-- **Complete fix:** a real shared store — the prerequisite row in 6.1.
+- **Does "just ask" actually beat clicking through screens** for the customers
+  you cover? I believe it does for the urgent, one-off question. I'd like to be
+  argued with.
+- **Where would you *not* trust it?** Which answer would you want to see on a
+  screen, with a timestamp and a requester on it, before you acted on it?
+- **Which of your customers would refuse a third-party assistant outright** — and
+  does "use Copilot inside your own Microsoft tenant" actually change that
+  answer, or just move the objection?
 
-**The line to say:** *This is the failure that ruins a live demo, and it is
-twenty minutes of configuration to avoid.*
-
-### 6.4 The ask
-
-A **gated, read-only pilot**:
-
-- 5–15 named users, or one design-partner tenant.
-- Synthetic or pre-approved data first. No writes.
-- 6–8 weeks.
-- Cross-tenant, wrong-audience, invalid-token, missing-scope, and
-  unauthorized-supplier tests all required to **fail closed**.
-- A prompt-injection suite showing no bypass of the tool allowlist.
-
-Note the deliberate difference from what the prototype demonstrates: the
-prototype *shows* the two-phase write path, because proving a human approves
-every mutation is the point. The pilot proposes not *enabling* writes externally
-at first — and scopes already make that a configuration rather than a rebuild.
-
-**The line to say:** *Grant read-only and the AI is never even shown the write
-tools — that is a switch, not a roadmap item.*
+**The line to say:** *The cheapest thing we can do next is find out whether
+anyone wants this, and that's a question for the people in this room rather than
+for engineering.*
 
 ---
 
@@ -578,10 +597,25 @@ contract as JSON Schema. Two parts do the work:
 - **`enum`** — the fixed set of allowed values, which is a drop-down as far as
   the model is concerned.
 
-This is why the demo's create flows work without prompt engineering. The AI knows
-that `set_image_requirement` needs a `format`, and that `format` must be exactly
-one of JPEG, PNG, TIFF, or WebP, because the server said so at connection time.
-The connection guide (`mcp-faq.md`) shows the published schema in full.
+That is why the create flows work without prompt engineering. Three examples
+worth having ready, because each answers a different sceptical question:
+
+| Question | The example |
+|---|---|
+| *"How does it know our vocabulary?"* | Granting an exception requires `exceptionType`, and the schema says it is exactly one of **Attribute Waiver**, **Extended Deadline**, **Reduced Scope**. The assistant offers those three and nothing else |
+| *"Does it know what's mandatory vs optional?"* | Adding an attribute requirement needs a category code, an attribute name, and whether it is **core** or **extended** — while supplier `guidance` text is optional, so it won't block on it |
+| *"What about the values inside an attribute?"* | Where GS1 defines a fixed code list, those are the only values in play — an attribute like *Adjustable Strap* resolves to *Fully Adjustable*, *Partially Adjustable*, or *Non-Adjustable*, from the master code list shipped with this repo |
+
+The connection guide ([`mcp-faq.md`](./mcp-faq.md) §3) shows a published schema in
+full, using the image-requirement tool — useful if someone wants to see the raw
+JSON rather than the business framing.
+
+**One nuance that matters commercially.** The exception types are not
+interchangeable, and the contract does not tell the assistant that — our engine
+does. Only an Active *Attribute Waiver* actually reduces a reported gap count; an
+*Extended Deadline* changes which attribute gets named but deliberately does not
+reduce the number, because a deadline extension delays a requirement rather than
+erasing it. The schema constrains the vocabulary; the engine holds the meaning.
 
 ### The layered-safety point, stated precisely
 
@@ -951,6 +985,31 @@ beyond a nicer UI?"**
 ---
 
 # Appendix
+
+---
+
+## Before you present this
+
+Two things to do before the session, neither of which belongs on a slide.
+
+**1. Pin the signing key, or the live demo can break mid-conversation.** Every
+piece of this server's state — OAuth signing keys, registered clients,
+pending-change confirmation tokens, the audit log, and all demo writes — lives in
+process memory, not a database. On serverless hosting a token minted by one
+instance can be unknown to the next, so a two-phase confirm can fail halfway
+through. Run `pnpm gen:oauth-key` and set the printed value as
+`TGC_OAUTH_PRIVATE_JWK` in the hosting project (Production **and** Preview), then
+redeploy. The complete fix is a real shared store — the prerequisite row in §6.1.
+
+**2. Check the outside-world numbers.** Several sources in Appendix F blocked
+automated fetching, so a few figures come from secondary coverage. See the caveat
+at the end of that appendix before any of them goes on a slide.
+
+**If your audience is security or architecture rather than PM peers**, the deck
+ends without an ask by design. The gated-pilot proposal written for that room —
+5–15 named users, a fail-closed test matrix, and a prompt-injection suite — is
+[`enterprise-safe-remote-mcp.md`](./enterprise-safe-remote-mcp.md) §"Pilot
+proposal". Present §5 of this deck, then hand them that memo.
 
 ---
 
