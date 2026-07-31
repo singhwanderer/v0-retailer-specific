@@ -9,6 +9,11 @@
 > Nothing here is costed. Sizes are relative (S/M/L) and deliberately not
 > converted into dates — the dependency order is the useful part, not the
 > arithmetic.
+>
+> Every code reference below (file, symbol, line, and "nothing does X yet"
+> claim) was verified against `38b57cf`. Line numbers are the first thing to
+> rot — treat a mismatch as drift in the doc, not in the code, and re-verify
+> before quoting any of this into a customer or leadership conversation.
 
 ## Why this document exists
 
@@ -58,7 +63,7 @@ Not a feature. Removes the failure modes that can break a live session.
 
 | Item | Detail |
 | --- | --- |
-| Pin the OAuth signing key | Set `TGC_OAUTH_PRIVATE_JWK` in the deploy environment (`scripts/generate-oauth-key.mjs` generates it). Without it, `createKeys()` (`lib/mcp/oauth.ts:148`) mints a **per-instance** key, so a token signed by one serverless instance fails verification on another. |
+| Pin the OAuth signing key | Set `TGC_OAUTH_PRIVATE_JWK` in the deploy environment (`pnpm gen:oauth-key` → `scripts/generate-oauth-key.mjs` generates it). Without it, `createKeys()` (`lib/mcp/oauth.ts:132`) mints a **per-instance** key, so a token signed by one serverless instance fails verification on another. |
 | Know the residual risk | Registered clients and auth codes (`oauth.ts:181`) and pending-change tokens (`pending.ts:58`) are still per-instance. A two-phase confirm can therefore fail between preview and confirm. Phase 1 fixes it properly; until then, run demos in one sitting. |
 
 **Acceptance:** sign in, connect, propose a write, confirm it — repeatedly,
@@ -85,13 +90,19 @@ Phase 1 and Phase 3 together rather than separately.
 - Migrate, in this order (riskiest-to-demo first):
   1. `lib/mcp/pending.ts` — confirmation tokens
   2. `lib/mcp/oauth.ts` — registered clients, auth codes
-  3. `lib/mcp/audit.ts` — the access log
+  3. `lib/mcp/audit.ts` — the access log. Note this one is *more* volatile than
+     the other three: they pin their state to `globalThis`, the audit log is a
+     plain module-scoped array (`entries`), so it does not even survive a module
+     re-evaluation within one instance.
   4. `lib/mcp/store.ts` — profiles, profile extras, vendor exceptions
 - Keep tenant as the key prefix throughout. The existing comment in
   `store.ts` is explicit that per-tenant isolation is not properly testable
   against module state — this is where that becomes testable.
-- Update the `demo_note` strings that currently say writes "reset
-  periodically" / on cold start. They will no longer be true.
+- Update the two strings that currently say writes "reset periodically" — the
+  shared `DEMO_NOTE` constant returned by every write tool (`lib/mcp/tools.ts:57`)
+  and `get_capabilities`' own `note` (`tools.ts:686`) — plus the cold-start
+  caveats in the header comments of `oauth.ts`, `store.ts`, and `audit.ts`. They
+  will no longer be true.
 
 **Acceptance:** a write made in chat is still there after a redeploy; a
 confirm token minted by one instance is honoured by another; two tenants'
@@ -151,8 +162,11 @@ tenant cannot read it; the read appears in the audit log.
 Today `lib/compliance-history.ts` reconstructs past catalogue states and
 scores each with the real engine — every point is genuine engine output, but
 no month before today was ever *observed*. That distinction is currently
-carried honestly in `provenance: "reconstructed"` and in every tool
-`demo_note`.
+carried honestly in `provenance: TREND_PROVENANCE` (`= "reconstructed"`,
+`lib/compliance-history.ts:34`) and in the `demo_note` on both of
+`get_compliance_trend`'s return paths — the per-category one and the
+filter/vendor one, which spell out different reconstructions and so cannot be
+collapsed into one string.
 
 **Work items**
 
@@ -205,7 +219,7 @@ no human in the session, attributed to a workload identity in the audit log.
 
 | Item | Size | Notes |
 | --- | --- | --- |
-| **`get_attribute_help`** | S | Assemble authored `guidance` + GS1 standard definition + valid code-list values from `gs1_extended_attribute_master_code_list.csv`. Mostly an *exposure* problem — the data exists, nothing serves it. `BOTH_CLASSES`: a supplier asking "what does this field want?" and a retailer asking "what did we tell them?" are the same lookup. **Most in need of Phase 2's guard rule** — it mixes tenant-owned guidance with neutral standard reference in one response. |
+| **`get_attribute_help`** | S | Assemble authored `guidance` + GS1 standard definition + valid code-list values from `gs1_extended_attribute_master_code_list.csv`. Mostly an *exposure* problem, but be precise about what is exposed today: `assembleBrickAttributes()` (`lib/mcp/attribute-assembly.ts`) already merges authored guidance with the GS1 library, and retailers read it via `get_profile_detail` and `diagnose_gap_pattern`'s `currentGuidance`. What no tool serves is the **allowed-value lists** — `getAllowedValues()` (`lib/gs1-attribute-values.ts`) has only portal consumers (`screen-supplier-gap-detail`, `screen-supplier-product-attributes`, `lib/supplier-catalogue.ts`) — and the **whole lookup supplier-side**. `BOTH_CLASSES`: a supplier asking "what does this field want?" and a retailer asking "what did we tell them?" are the same lookup. **Most in need of Phase 2's guard rule** — it mixes tenant-owned guidance with neutral standard reference in one response. |
 | **`prioritise_my_gaps`** (supplier) | S | Ranks a supplier's outstanding attributes by **how many retail partners each one unblocks**, reusing `getMyOpenGaps()` / `listMyRetailPartners()` (`lib/mcp/tools-supplier.ts`). This is the payoff the README states as the supplier's whole reason to be on the network — fill a gap once, satisfy every retailer requiring it — and nothing computes it today on either surface. |
 | **Supplier-side report tool** | M | `run_compliance_report` is `RETAILER_ONLY`; the engine (`runSupplierReport`) already exists. The supplier's "am I ready for Retailer B before they pull my data?" scan is arguably the most MCP-native workflow TGC has. |
 | **Supplier write path** | — | Currently read-only by design, and correct for now. Their most-wanted write — "request an exception" — means leaving the conversation entirely. Worth deciding deliberately rather than by omission. |
@@ -251,7 +265,15 @@ engineering deliverables:
   leaves the customer's boundary. Already the stated discipline in the PM
   presentation's §6 (§4B); it needs actual caps. Note `list_my_suppliers` is
   *intentionally uncapped* today for eval purposes — that is exactly the kind
-  of tool a pilot must cap.
+  of tool a pilot must cap. **This is a live contradiction, not an oversight:**
+  the comment above `listMySuppliers()` (`lib/mcp/tools.ts:111`) says in as many
+  words "a permanent product decision, not a bug — don't add a limit here",
+  because the ~1000-row payload is the fixture for testing whether the agent
+  counts a large tool output instead of hallucinating over it. Both positions
+  are right for their own purpose, which means the resolution is a *pilot
+  deployment profile* that caps it while the eval environment does not — not an
+  edit to that function. Whoever picks this up should expect the code to argue
+  back.
 - A **data-flow description per topology** — what leaves the customer's
   control boundary in each, so security review has something to review.
 
@@ -268,7 +290,7 @@ security reviewer will look for them by name.
 | **Portal deep links** | Every result should end with a link back to the system of record ("Open Supplier Compliance in the portal"). Cheap version of the artifact handoff in Phase 2. | **S** |
 | **Retailer→supplier entitlement check** | Tenant isolation is enforced per call, but `RETAILER_SUPPLIERS` is shared across retailer tenants (caveat documented in `lib/mcp/tools.ts`). The memo's "unauthorized supplier visibility" control is therefore not modelled. Needs per-tenant vendor entitlement, not just per-tenant storage. | **M** |
 | **Prompt-injection test suite** | The memo requires evidence of no allowlist bypass. Evals exist (`lib/copilot/run-eval.ts`) but cover accuracy, not adversarial input. Add injection cases to the golden set: prompts attempting cross-tenant access, tool-allowlist escape, and instruction override via retrieved text. | **M** |
-| **Rate limits, quotas, response-size caps** | 4A rows 8–9 mark these as Gateway-owned and unimplemented. The pilot makes them **blocking rather than deferred** — "unbounded cost or scraping" is a named risk with required evidence. | **M** |
+| **Rate limits, quotas, response-size caps** | §4A row 8 (ENT-08) is the row, and it reads **Shared** ownership and **⚠️ Partial — bounded retrieval only** (`maxAttributes` on `run_compliance_report`), not Gateway-owned and unimplemented. So the deferred half is specifically the **quotas**, which the TRD puts at the gateway. The pilot makes them **blocking rather than deferred** — "unbounded cost or scraping" is a named risk with required evidence. (Row 9 is ENT-09, container isolation, Aviator-owned — a different problem; don't cite it here.) | **M** |
 | **Read-only pilot profile** | A deployment configuration that grants only `tgc.read`, so no write tool is even listed. Mostly exists — scopes already filter the tool list in `buildHandler()`. Needs to be an explicit, documented, testable mode rather than an emergent property. | **S** |
 
 **Sequencing note.** These are largely independent of Phases 1–5 and gate a
