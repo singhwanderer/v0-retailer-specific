@@ -26,7 +26,6 @@ import { resolveAccountFilterAttributes } from "@/lib/partner-filters"
 import {
   GUIDANCE_CORE_ATTRIBUTES,
   NRF_AUDIT_ATTRIBUTES,
-  getSystemFilter,
   type SystemFilterId,
 } from "@/lib/system-filters"
 import {
@@ -484,11 +483,6 @@ export function buildReportFileName(requestedBy: string, filterLabel: string): s
   const p = (n: number) => String(n).padStart(2, "0")
   const stamp = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`
   return `${clean(requestedBy)}_${clean(filterLabel)}_${stamp}.csv`
-}
-
-export function describeFilter(filter: ReportFilterRef): string {
-  if (filter.kind === "system") return getSystemFilter(filter.id)?.name ?? filter.id
-  return filter.retailer
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────

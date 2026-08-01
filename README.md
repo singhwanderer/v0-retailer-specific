@@ -141,9 +141,13 @@ example prompts above:
 > federated through the TG Aviator Gateway.
 >
 > **Deploying it:** run `pnpm gen:oauth-key` and set the printed value as
-> `TGC_OAUTH_PRIVATE_JWK` in the hosting project. Without it every serverless
-> instance signs tokens with its own key, so a token minted by one is rejected
-> by the next and callers are forced to re-authenticate mid-session. The audit
+> `TGC_OAUTH_PRIVATE_JWK` in the hosting project (Production **and** Preview).
+> This variable is required, not an optimisation. Without it every serverless
+> instance derives its own key material, which breaks the connector two ways:
+> a token minted by one instance is rejected by the next (re-authentication
+> mid-session), and a client registration issued by one instance is rejected by
+> the next as `Unknown client_id` — which shows up as a connector that worked
+> when it was added and fails on every reconnect after a redeploy. The audit
 > log remains per instance, so an empty Access log is not proof that nothing
 > happened.
 

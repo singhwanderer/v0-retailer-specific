@@ -40,7 +40,7 @@ const MAX_ENTRIES = 200
 const entries: AuditEntry[] = []
 let seq = 0
 
-export function recordAudit(entry: Omit<AuditEntry, "id" | "timestamp">): AuditEntry {
+function recordAudit(entry: Omit<AuditEntry, "id" | "timestamp">): AuditEntry {
   const full: AuditEntry = {
     ...entry,
     id: `audit-${Date.now()}-${seq++}`,

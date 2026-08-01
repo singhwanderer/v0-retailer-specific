@@ -78,11 +78,6 @@ export function isScope(value: string): value is Scope {
   return (ALL_SCOPES as string[]).includes(value)
 }
 
-export function parseScopes(scopeParam: string | null | undefined): Scope[] {
-  if (!scopeParam) return []
-  return scopeParam.split(/[\s+]+/).filter(isScope)
-}
-
 export interface CallerContext {
   /** Derived from the authenticated identity's realm. Never from user input. */
   tenantId: string
@@ -105,10 +100,6 @@ export interface CallerContext {
   /** Which agent/client is calling — a separate claim from tenant. */
   agentId: string
   scopes: Set<Scope>
-}
-
-export function hasScope(ctx: CallerContext, scope: Scope): boolean {
-  return ctx.scopes.has(scope)
 }
 
 /**

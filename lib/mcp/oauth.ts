@@ -16,12 +16,29 @@
 //   - Workload (client-credentials) identities are provisioned per tenant, so
 //     an autonomous agent cannot choose which tenant it acts for either.
 //
-// What is not: client registrations and issued codes live in process memory and
-// reset on cold start (a client simply re-runs the flow). Signing keys used to
-// as well, which broke tokens across serverless instances — set
-// TGC_OAUTH_PRIVATE_JWK to pin one key across the whole deployment.
+// What is not: this is a demo IdP with hard-coded users and passwords.
+//
+// ── Why nothing in the flow is stored in memory ──────────────────────────────
+// Client registrations and authorization codes USED to live in a Map pinned to
+// globalThis. On a single long-lived process that reads as a reasonable
+// shortcut. On serverless it is a defect with a delayed fuse, because an MCP
+// client PERSISTS the client_id it got from dynamic registration and re-sends
+// it on every later connection, while the server forgets the whole Map on
+// every cold start and every redeploy. So the connector works when first added
+// and then fails days later with "Unknown client_id" — and the flow can fail
+// even within one sign-in, when register/authorize/token land on three
+// different instances.
+//
+// Client ids and authorization codes are therefore SELF-CONTAINED and signed:
+// the registration travels inside the client_id, the grant travels inside the
+// code, and any instance can verify either with the shared key. There is no
+// server-side registry to lose. See signEnvelope/openEnvelope below.
+//
+// Everything now hangs off one deployment-wide key, so TGC_OAUTH_PRIVATE_JWK
+// goes from "fixes an intermittent re-auth" to load-bearing: unset, each
+// instance derives its own secret and the same class of failure returns.
 
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto"
 import {
   SignJWT,
   calculateJwkThumbprint,
@@ -34,7 +51,7 @@ import {
 import { DEFAULT_SCOPES, isScope, type Scope } from "@/lib/mcp/context"
 import type { TenantRole } from "@/lib/mcp/tenants"
 
-export const JWT_ALG = "RS256"
+const JWT_ALG = "RS256"
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000
 
@@ -71,11 +88,35 @@ interface KeyMaterial {
   publicKey: CryptoKey
   publicJwk: JWK
   kid: string
+  /**
+   * Symmetric secret for the two things that are NOT access tokens: client ids
+   * and authorization codes.
+   *
+   * Derived from the same private key so that pinning TGC_OAUTH_PRIVATE_JWK
+   * pins the entire flow — one variable, not three, and no way to configure a
+   * deployment that verifies tokens consistently but forgets its clients.
+   *
+   * Deliberately a *different* algorithm from token signing (HMAC vs RS256)
+   * rather than reusing the RSA key directly: an authorization code and an
+   * access token are then not merely distinguished by a claim someone has to
+   * remember to check — a code presented as a bearer token fails at the key
+   * type, before any claim is read.
+   */
+  symmetricSecret: Buffer
+}
+
+/**
+ * Domain-separated derivation, so the symmetric secret cannot be confused with
+ * the signing key it comes from even if one of them leaks into a log.
+ */
+function deriveSymmetricSecret(privateJwk: JWK): Buffer {
+  return createHash("sha256").update(`tgc-oauth-envelope-v1|${privateJwk.d ?? ""}`).digest()
 }
 
 const globalScope = globalThis as typeof globalThis & {
   __tgcOAuthKeys?: Promise<KeyMaterial>
-  __tgcOAuthState?: OAuthState
+  /** Code fingerprint → expiry. Best-effort replay guard; see consumeAuthCode. */
+  __tgcRedeemedCodes?: Map<string, number>
 }
 
 /**
@@ -84,7 +125,8 @@ const globalScope = globalThis as typeof globalThis & {
  * Without it each serverless instance generates its own key pair, so a token
  * minted by one instance fails signature verification on the next — surfacing
  * as a spurious "Refused before sign-in" line in the audit log and, for the
- * caller, a full re-authentication mid-session (there is no refresh token).
+ * caller, a full re-authentication mid-session that even the refresh grant
+ * cannot rescue, since the refresh token is signed with the same material.
  * Generate a value with `pnpm gen:oauth-key`.
  */
 const PRIVATE_JWK_ENV = "TGC_OAUTH_PRIVATE_JWK"
@@ -126,6 +168,7 @@ async function keysFromJwk(encoded: string): Promise<KeyMaterial> {
     publicKey: (await importJWK(publicJwk, JWT_ALG)) as CryptoKey,
     publicJwk,
     kid,
+    symmetricSecret: deriveSymmetricSecret(privateJwk),
   }
 }
 
@@ -142,10 +185,12 @@ async function createKeys(): Promise<KeyMaterial> {
   // to diagnose from the symptom ("it asked me to sign in again"). So it is
   // logged loudly, once per instance, naming the fix.
   console.warn(
-    `[tgc/oauth] ${PRIVATE_JWK_ENV} is not set — generating a per-instance signing key. ` +
+    `[tgc/oauth] ${PRIVATE_JWK_ENV} is not set — generating a per-instance key. ` +
       `On a single process this is fine. On any multi-instance deployment (e.g. serverless), ` +
-      `a token minted by one instance will FAIL verification on another, surfacing as a ` +
-      `spurious "Refused before sign-in" and a forced re-authentication mid-session. ` +
+      `every instance derives DIFFERENT key material, so: a token minted by one instance FAILS ` +
+      `verification on another (forced re-authentication mid-session), and a client_id issued by ` +
+      `one instance is rejected by another as "Unknown client_id" — including on every reconnect ` +
+      `after a redeploy, because MCP clients persist their registration and the server does not. ` +
       `Generate a value with \`pnpm gen:oauth-key\` and set ${PRIVATE_JWK_ENV} in the deploy environment.`
   )
 
@@ -155,7 +200,13 @@ async function createKeys(): Promise<KeyMaterial> {
   publicJwk.kid = kid
   publicJwk.alg = JWT_ALG
   publicJwk.use = "sig"
-  return { privateKey, publicKey, publicJwk, kid }
+  return {
+    privateKey,
+    publicKey,
+    publicJwk,
+    kid,
+    symmetricSecret: deriveSymmetricSecret(await exportJWK(privateKey)),
+  }
 }
 
 export function getKeys(): Promise<KeyMaterial> {
@@ -163,7 +214,40 @@ export function getKeys(): Promise<KeyMaterial> {
   return globalScope.__tgcOAuthKeys
 }
 
-// ── In-memory authorization state ────────────────────────────────────────────
+// ── Signed envelopes ─────────────────────────────────────────────────────────
+//
+// `<base64url(payload)>.<base64url(HMAC-SHA256(payload))>` — the minimum needed
+// to hand a caller a value it cannot forge or tamper with and that any instance
+// can verify without shared storage. Neither half can contain a "." so the
+// split is unambiguous.
+
+async function signEnvelope(payload: unknown): Promise<string> {
+  const { symmetricSecret } = await getKeys()
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")
+  const mac = createHmac("sha256", symmetricSecret).update(body).digest("base64url")
+  return `${body}.${mac}`
+}
+
+async function openEnvelope<T>(envelope: string): Promise<T | undefined> {
+  const [body, mac] = envelope.split(".")
+  if (!body || !mac) return undefined
+
+  const { symmetricSecret } = await getKeys()
+  const expected = createHmac("sha256", symmetricSecret).update(body).digest("base64url")
+  const presented = Buffer.from(mac)
+  const computed = Buffer.from(expected)
+  // Length check first: timingSafeEqual throws on a mismatch rather than
+  // returning false, and the length of a MAC is not a secret.
+  if (presented.length !== computed.length || !timingSafeEqual(presented, computed)) return undefined
+
+  try {
+    return JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T
+  } catch {
+    return undefined
+  }
+}
+
+// ── Client registration (stateless) ──────────────────────────────────────────
 
 export interface RegisteredClient {
   client_id: string
@@ -171,6 +255,18 @@ export interface RegisteredClient {
   redirect_uris: string[]
   created_at: number
 }
+
+/** The registration as it travels inside the client_id. Short keys: this ends up in a URL. */
+interface ClientIdPayload {
+  /** client_name */
+  n?: string
+  /** redirect_uris — the field that must be tamper-proof, since it gates the redirect. */
+  r: string[]
+  /** issued-at, seconds */
+  t: number
+}
+
+const CLIENT_ID_PREFIX = "tgc-client-"
 
 export interface AuthCode {
   code: string
@@ -186,51 +282,199 @@ export interface AuthCode {
   expiresAt: number
 }
 
-interface OAuthState {
-  clients: Map<string, RegisteredClient>
-  codes: Map<string, AuthCode>
-}
-
-function state(): OAuthState {
-  globalScope.__tgcOAuthState ??= { clients: new Map(), codes: new Map() }
-  return globalScope.__tgcOAuthState
-}
-
-export function registerClient(input: {
+/**
+ * Register a public client. There is nothing to store: the registration IS the
+ * client_id, signed, so it stays valid across cold starts, redeploys, and every
+ * other instance of this deployment.
+ */
+export async function registerClient(input: {
   client_name?: string
   redirect_uris: string[]
-}): RegisteredClient {
-  const client: RegisteredClient = {
-    client_id: `tgc-client-${randomBytes(12).toString("hex")}`,
+}): Promise<RegisteredClient> {
+  const created_at = Date.now()
+  const payload: ClientIdPayload = {
+    ...(input.client_name ? { n: input.client_name } : {}),
+    r: input.redirect_uris,
+    t: Math.floor(created_at / 1000),
+  }
+  return {
+    client_id: `${CLIENT_ID_PREFIX}${await signEnvelope(payload)}`,
     client_name: input.client_name,
     redirect_uris: input.redirect_uris,
-    created_at: Date.now(),
+    created_at,
   }
-  state().clients.set(client.client_id, client)
-  return client
 }
 
-export function getClient(clientId: string): RegisteredClient | undefined {
-  return state().clients.get(clientId)
-}
+/**
+ * Recover a registration from its client_id, or undefined if the value was not
+ * issued by this deployment.
+ *
+ * Registrations do not expire. A client that registered months ago and kept its
+ * client_id is exactly the case that used to break, and it is the normal case:
+ * MCP clients register once and reuse the id for the life of the connector.
+ */
+export async function getClient(clientId: string): Promise<RegisteredClient | undefined> {
+  if (!clientId.startsWith(CLIENT_ID_PREFIX)) return undefined
 
-export function issueAuthCode(input: Omit<AuthCode, "code" | "expiresAt">): AuthCode {
-  const code: AuthCode = {
-    ...input,
-    code: randomBytes(24).toString("base64url"),
-    expiresAt: Date.now() + AUTH_CODE_TTL_MS,
+  const payload = await openEnvelope<ClientIdPayload>(clientId.slice(CLIENT_ID_PREFIX.length))
+  if (!payload || !Array.isArray(payload.r)) return undefined
+  const redirectUris = payload.r.filter((u): u is string => typeof u === "string")
+  if (redirectUris.length === 0) return undefined
+
+  return {
+    client_id: clientId,
+    client_name: typeof payload.n === "string" ? payload.n : undefined,
+    redirect_uris: redirectUris,
+    created_at: (payload.t ?? 0) * 1000,
   }
-  state().codes.set(code.code, code)
-  return code
 }
 
-/** Authorization codes are single-use: consumed on first redemption. */
-export function consumeAuthCode(code: string): AuthCode | undefined {
-  const entry = state().codes.get(code)
-  if (!entry) return undefined
-  state().codes.delete(code)
-  if (entry.expiresAt < Date.now()) return undefined
-  return entry
+// ── Authorization codes (stateless) ──────────────────────────────────────────
+
+/** The grant as it travels inside the code. Short keys keep the redirect URL small. */
+interface AuthCodePayload {
+  c: string
+  u: string
+  h: string
+  s: Scope[]
+  tn: string
+  sub: string
+  r: TenantRole
+  /** expiry, ms since epoch */
+  x: number
+  /** salt — makes two identical grants produce different codes, so the replay guard keys are distinct */
+  z: string
+}
+
+/**
+ * Best-effort single-use enforcement.
+ *
+ * Being honest about what this is: with no shared store, a code redeemed on
+ * instance A cannot be marked used on instance B, so single-use holds per
+ * instance rather than globally. Three things carry the weight instead — the
+ * five-minute expiry, the PKCE binding (a stolen code is useless without the
+ * verifier), and the redirect_uri check. Replacing this with a real guarantee
+ * means a shared store (Redis, Postgres), which is the production answer and is
+ * recorded as such in docs/mcp-prototype-status.md rather than pretended away
+ * here.
+ */
+function redeemedCodes(): Map<string, number> {
+  globalScope.__tgcRedeemedCodes ??= new Map()
+  return globalScope.__tgcRedeemedCodes
+}
+
+export async function issueAuthCode(input: Omit<AuthCode, "code" | "expiresAt">): Promise<AuthCode> {
+  const expiresAt = Date.now() + AUTH_CODE_TTL_MS
+  const payload: AuthCodePayload = {
+    c: input.clientId,
+    u: input.redirectUri,
+    h: input.codeChallenge,
+    s: input.scopes,
+    tn: input.tenantId,
+    sub: input.subjectId,
+    r: input.role,
+    x: expiresAt,
+    z: randomBytes(9).toString("base64url"),
+  }
+  return { ...input, code: await signEnvelope(payload), expiresAt }
+}
+
+/** Verify and redeem a code. Returns undefined if forged, expired, or already redeemed here. */
+export async function consumeAuthCode(code: string): Promise<AuthCode | undefined> {
+  const payload = await openEnvelope<AuthCodePayload>(code)
+  if (!payload) return undefined
+  if (typeof payload.x !== "number" || payload.x < Date.now()) return undefined
+
+  const seen = redeemedCodes()
+  // Prune on the way in — entries are only useful until the code expires anyway,
+  // so the map stays the size of one expiry window's traffic.
+  const now = Date.now()
+  for (const [key, expiry] of seen) if (expiry < now) seen.delete(key)
+
+  const fingerprint = createHash("sha256").update(code).digest("base64url")
+  if (seen.has(fingerprint)) return undefined
+  seen.set(fingerprint, payload.x)
+
+  return {
+    code,
+    clientId: payload.c,
+    redirectUri: payload.u,
+    codeChallenge: payload.h,
+    scopes: payload.s,
+    tenantId: payload.tn,
+    subjectId: payload.sub,
+    role: payload.r,
+    expiresAt: payload.x,
+  }
+}
+
+// ── Refresh tokens (stateless) ───────────────────────────────────────────────
+//
+// Access tokens last an hour and there was previously nothing to renew them
+// with. That is not a cosmetic gap: when the token expires the next MCP call
+// gets a 401 before buildHandler is ever reached, and a client with no tool
+// catalogue to show renders the connector as EMPTY rather than as an expired
+// session. "It lost all its tools" and "you need to sign in again" look
+// identical from the outside, and only one of them is true.
+//
+// Same signed-envelope shape as everything else here, so renewal works on
+// whichever instance answers — the whole point of this file.
+
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+export interface RefreshGrant {
+  clientId: string
+  tenantId: string
+  subjectId: string
+  role: TenantRole
+  scopes: Scope[]
+}
+
+/** The grant as it travels inside the refresh token. Short keys, as above. */
+interface RefreshPayload {
+  c: string
+  tn: string
+  sub: string
+  r: TenantRole
+  s: Scope[]
+  /** expiry, ms since epoch */
+  x: number
+  /** salt, so a rotation always yields a different token */
+  z: string
+}
+
+export async function issueRefreshToken(grant: RefreshGrant): Promise<string> {
+  const payload: RefreshPayload = {
+    c: grant.clientId,
+    tn: grant.tenantId,
+    sub: grant.subjectId,
+    r: grant.role,
+    s: grant.scopes,
+    x: Date.now() + REFRESH_TOKEN_TTL_MS,
+    z: randomBytes(9).toString("base64url"),
+  }
+  return signEnvelope(payload)
+}
+
+/**
+ * Verify a refresh token and recover the grant it carries.
+ *
+ * Note what is NOT re-read from the request at renewal time: tenant, subject
+ * and role all travel inside the token, exactly as they travel inside an
+ * authorization code. Renewal is the same session an hour later, not a second
+ * consent screen and not an opportunity to become someone else.
+ */
+export async function verifyRefreshToken(token: string): Promise<RefreshGrant | undefined> {
+  const payload = await openEnvelope<RefreshPayload>(token)
+  if (!payload) return undefined
+  if (typeof payload.x !== "number" || payload.x < Date.now()) return undefined
+  return {
+    clientId: payload.c,
+    tenantId: payload.tn,
+    subjectId: payload.sub,
+    role: payload.r,
+    scopes: Array.isArray(payload.s) ? payload.s.filter(isScope) : [],
+  }
 }
 
 // ── PKCE ─────────────────────────────────────────────────────────────────────

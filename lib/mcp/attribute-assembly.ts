@@ -142,7 +142,7 @@ export function findProfileForBrick(
  * mapping-conflict error quote from this list — the alternative is an agent
  * that can discover a category is free only by proposing it and being refused.
  */
-export function unmappedBricks(profiles: AttributeProfile[]): Gs1Brick[] {
+function unmappedBricks(profiles: AttributeProfile[]): Gs1Brick[] {
   return GS1_BRICKS.filter((b) => !findProfileForBrick(profiles, b.brickCode))
 }
 

@@ -19,7 +19,7 @@
 // thing separating destructive from the write scopes was meant to prevent.
 
 import { CONSENT_DEFAULT_SCOPES, DEFAULT_SCOPES, SCOPES, isScope, type Scope } from "@/lib/mcp/context"
-import { getClient, issueAuthCode } from "@/lib/mcp/oauth"
+import { getClient, issueAuthCode, type RegisteredClient } from "@/lib/mcp/oauth"
 import { findDemoUser, getTenant, resolveTenantByRealm } from "@/lib/mcp/tenants"
 
 interface AuthorizeParams {
@@ -150,14 +150,30 @@ function consentForm(p: AuthorizeParams, clientName: string, error?: string): st
 </form>`)
 }
 
-function validate(p: AuthorizeParams, params: URLSearchParams): string | null {
+/**
+ * The message a client_id this deployment cannot verify gets.
+ *
+ * Worth the length. A client_id is unverifiable in exactly one situation that
+ * matters in practice: it was issued by the older build that kept registrations
+ * in memory, and the AI client — which persists its registration and re-sends
+ * it forever — is still presenting it. The person reading this cannot tell that
+ * from "the server is broken", and the fix is entirely on their side and takes
+ * about thirty seconds, so the page says what it is rather than reciting the
+ * spec at them.
+ */
+const UNKNOWN_CLIENT =
+  "This connector's registration was not issued by this deployment, so sign-in cannot continue. " +
+  "If the connector used to work, its registration predates a fix to how registrations are stored — " +
+  "remove the connector in your AI client and add it again. The new registration survives restarts, " +
+  "so this is a one-time step."
+
+function validate(p: AuthorizeParams, params: URLSearchParams, client: RegisteredClient | undefined): string | null {
   if (params.get("response_type") !== "code") return "Only response_type=code is supported."
   if (!p.clientId) return "Missing client_id."
   if (!p.redirectUri) return "Missing redirect_uri."
   if (!p.codeChallenge) return "Missing code_challenge — PKCE is required."
   if (p.codeChallengeMethod !== "S256") return "Only code_challenge_method=S256 is supported."
-  const client = getClient(p.clientId)
-  if (!client) return "Unknown client_id. Register the client first (dynamic client registration)."
+  if (!client) return UNKNOWN_CLIENT
   if (!client.redirect_uris.includes(p.redirectUri)) {
     return "redirect_uri does not match this client's registration."
   }
@@ -167,9 +183,10 @@ function validate(p: AuthorizeParams, params: URLSearchParams): string | null {
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams
   const p = readParams(params)
-  const problem = validate(p, params)
+  const client = await getClient(p.clientId)
+  const problem = validate(p, params, client)
   if (problem) return errorPage(problem)
-  return new Response(consentForm(p, getClient(p.clientId)?.client_name ?? "An MCP client"), {
+  return new Response(consentForm(p, client?.client_name ?? "An MCP client"), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   })
 }
@@ -189,10 +206,11 @@ export async function POST(req: Request) {
   const checked = form.getAll("scope").filter((v): v is string => typeof v === "string").filter(isScope)
   p.scopes = checked.length > 0 ? checked : DEFAULT_SCOPES
 
-  const problem = validate(p, params)
+  const client = await getClient(p.clientId)
+  const problem = validate(p, params, client)
   if (problem) return errorPage(problem)
 
-  const clientName = getClient(p.clientId)?.client_name ?? "An MCP client"
+  const clientName = client?.client_name ?? "An MCP client"
   const email = String(form.get("email") ?? "").trim()
   const password = String(form.get("password") ?? "")
 
@@ -216,7 +234,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const code = issueAuthCode({
+  const code = await issueAuthCode({
     clientId: p.clientId,
     redirectUri: p.redirectUri,
     codeChallenge: p.codeChallenge,

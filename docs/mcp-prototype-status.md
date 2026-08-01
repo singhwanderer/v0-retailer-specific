@@ -384,6 +384,17 @@ the portal renders.
 
 1. **Pin `TGC_OAUTH_PRIVATE_JWK`** in the deploy environment — the warning now
    tells you when it's missing, but only setting it fixes the failure. Minutes.
+   This got more load-bearing, not less: client registrations and authorization
+   codes are now signed with material derived from the same key, so an unset
+   variable no longer costs only a mid-session re-auth — it means every
+   reconnect fails with `Unknown client_id`, because the client kept the
+   registration and the server derived a different secret.
+2. **Single-use authorization codes across instances** — codes are signed and
+   self-contained, so any instance can verify one, but the redemption record is
+   still per-instance memory. Single-use therefore holds per instance; what
+   carries the weight globally is the five-minute expiry, the PKCE binding, and
+   the `redirect_uri` check. A shared store (Redis) is the real fix and is the
+   same piece of work as item 4 below.
 2. **`get_attribute_help`, GS1-only** (supplier) — standard definitions plus the
    allowed-value lists (`getAllowedValues`, currently portal-only). Neutral
    reference data, crosses no boundary. The retailer-guidance half waits on the
@@ -428,7 +439,10 @@ this work and were confirmed present on a clean tree.
 ## How to verify what's still open
 
 - **OAuth key** — set `TGC_OAUTH_PRIVATE_JWK`, then run enough successive tool
-  calls to hit more than one serverless instance with no re-auth prompt.
+  calls to hit more than one serverless instance with no re-auth prompt. The
+  sharper check is a redeploy: connect the connector, redeploy, and use it again
+  without re-adding it. That exercises the registration path, which is the one
+  that fails days later rather than immediately.
 - **`prioritise_my_gaps`** — connect as a supplier tenant; confirm ranking shifts
   when a gap is shared by more retail partners, and that the tool is absent from a
   retailer connection's tool list.

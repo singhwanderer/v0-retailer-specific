@@ -51,20 +51,7 @@ import {
   searchBricksWithMapping,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
-import {
-  buildReportFileName,
-  runRetailerReport,
-  type ReportFilterRef,
-  type ReportRequest,
-} from "@/lib/compliance-report"
-import {
-  getReportRun,
-  listReportRuns,
-  newRunId,
-  recordReportRun,
-  reportRunUri,
-  summariseRun,
-} from "@/lib/mcp/report-runs"
+import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
 import { TREND_PROVENANCE, getFilterTrend, getSupplierTrend, getSupplierCategoryTrend } from "@/lib/compliance-history"
 
 const DEMO_NOTE =
@@ -169,12 +156,13 @@ export function listSystemFilters() {
  * Run a defensive Compliance Report across the retailer's vendor base —
  * the same engine the portal's retailer Compliance Reports screen uses.
  *
- * Computed on demand from current data, then *retained*: the run is recorded
- * against this tenant (lib/mcp/report-runs.ts) and served back as an MCP
- * resource carrying the full CSV. That retention is what lets a report be
- * re-opened, cited by run id, and handed to someone else — the difference
- * between a number the model said once and an artifact. The portal still keeps
- * its own separate report queue; production would merge the two.
+ * Computed on demand and returned inline. Retaining runs as re-openable,
+ * CSV-backed artifacts was tried and removed: retention lived in per-instance
+ * memory, so on a serverless deployment "pull up Tuesday's scan" usually
+ * resolved to nothing — a feature that reads as broken is worse than one that
+ * was never offered. Bringing it back means a shared store, at which point the
+ * portal's own report queue and this one should become a single list rather
+ * than two.
  */
 export function runComplianceReport(ctx: CallerContext, args: {
   systemFilterId?: string
@@ -227,7 +215,6 @@ export function runComplianceReport(ctx: CallerContext, args: {
   }
 
   const options = { maxAttributes: maxAttributes ?? 10, ignoreDiscontinued: true, tenantId: ctx.tenantId }
-  const startedAt = Date.now()
   const result = runRetailerReport(
     RETAILER_SUPPLIERS,
     getStore(ctx.tenantId).profiles,
@@ -237,89 +224,12 @@ export function runComplianceReport(ctx: CallerContext, args: {
     options
   )
 
-  // Keep the run. Everything below this line is what separates "a number the
-  // model said once" from "a run someone can re-open, quote, and hand to an
-  // auditor" — the same ReportRequest the portal's report queue is built on,
-  // stored against this tenant and addressable as report://run/{id}.
-  const requestedAt = new Date()
-  const requestedBy = ctx.subjectId ?? ctx.agentId
-  const run: ReportRequest = {
-    id: newRunId(requestedAt),
-    side: "retailer",
-    filter,
-    filterLabel,
-    profileName: resolvedProfile,
-    vendorScope,
-    options,
-    requestedBy,
-    requestedAt: requestedAt.toISOString(),
-    status: "Complete",
-    durationMs: Date.now() - startedAt,
-    fileName: buildReportFileName(requestedBy, filterLabel),
-    result,
-  }
-  recordReportRun(ctx.tenantId, run)
-
   return {
-    run_id: run.id,
-    resource_uri: reportRunUri(run.id),
     filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
     vendorScope: vendorScope === "all" ? "All vendors" : vendorScope,
     ...result,
-    citation_note: `Quote run id ${run.id} alongside any figure from this report, so the number can be traced back to the exact scan that produced it.`,
-    artifact_note: `The full CSV — every vendor row, not just the ranked summary above — is attached as MCP resource ${reportRunUri(run.id)} (${run.fileName}). Offer it whenever the user wants to share, file, or archive this report; use get_report_run to re-open it later, or list_report_runs to see earlier scans.`,
     demo_note:
-      "Computed on demand from mock demo data. The run itself is retained for this organisation (in demo memory, so it resets on cold start) and is readable as an MCP resource. Attributes waived by an Active vendor exception are not counted as gaps.",
-  }
-}
-
-/**
- * Earlier report runs for this tenant — the "the Belk scan from Tuesday" lookup.
- *
- * Returns summaries rather than full results: a listing is a menu. The rows live
- * in the CSV behind each run's resource.
- */
-export function listReportRunHistory(ctx: CallerContext, args: { limit?: number }) {
-  const runs = listReportRuns(ctx.tenantId, args.limit ?? 20)
-  if (runs.length === 0) {
-    return {
-      runs: [],
-      note: "No compliance reports have been run through this connection yet. Run one with run_compliance_report — it will be retained here and attached as a downloadable CSV resource.",
-    }
-  }
-  return {
-    runs: runs.map(summariseRun),
-    note: `${runs.length} retained report run${runs.length === 1 ? "" : "s"} for your organisation, newest first. Each one's full CSV is readable as an MCP resource at its resource_uri.`,
-    demo_note:
-      "Runs are retained in demo memory for this organisation only and reset on cold start. Another tenant's runs are not addressable through this connection.",
-  }
-}
-
-/** Re-open one retained run by id. Scoped to the caller's tenant by getReportRun. */
-export function getReportRunDetail(ctx: CallerContext, args: { runId: string }) {
-  const id = args.runId?.trim()
-  const run = id ? getReportRun(ctx.tenantId, id) : undefined
-  if (!run) {
-    const known = listReportRuns(ctx.tenantId, 10).map((r) => r.id)
-    return {
-      error: `No retained report run with id "${args.runId}" for your organisation.`,
-      knownRunIds: known,
-      note:
-        known.length > 0
-          ? `Your most recent run ids: ${known.join(", ")}. Use list_report_runs to see them with their parameters.`
-          : "No reports have been run through this connection yet. Run one with run_compliance_report.",
-    }
-  }
-
-  return {
-    ...summariseRun(run),
-    missingAttributes: run.result.missingAttributes,
-    distinctMissingTotal: run.result.distinctMissingTotal,
-    byCategory: run.result.byCategory,
-    excluded: run.result.excluded,
-    artifact_note: `The full CSV, including all ${run.result.rows.length} detail rows, is attached as MCP resource ${reportRunUri(run.id)} (${run.fileName}).`,
-    demo_note:
-      "Re-read from this organisation's retained runs — the same figures the original scan produced, not a re-computation against today's data.",
+      "Computed on demand from mock demo data, against the state of the catalogue right now — re-running later will produce different figures as suppliers fill gaps, so quote a number alongside when it was produced. Attributes waived by an Active vendor exception are not counted as gaps.",
   }
 }
 
