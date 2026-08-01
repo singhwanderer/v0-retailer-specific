@@ -38,12 +38,19 @@ prototype work.
 
 ---
 
-> **Update — first implementation pass (retailer-first) has landed.** Phase 2's
-> report artifacts, the correlation id, and a startup warning for the OAuth key
-> are now built; the rows below are marked accordingly. What did *not* change:
-> `prioritise_my_gaps` and `get_attribute_help` are supplier-side and were held
-> back for a second pass, and captured history / the Phase 4 scheduler remain
-> deliberately not-prototype-work. See "What the first pass changed" at the end.
+> **Update — two implementation passes have landed.**
+>
+> **Pass 1 (retailer-first):** Phase 2's report artifacts, the correlation id,
+> and a startup warning for the OAuth key.
+>
+> **Pass 2 (supplier):** a `tenantId → supplier` resolver, the supplier-side
+> report tool, and a fix for a real data leak. It also established that
+> **`prioritise_my_gaps` is blocked, not merely unbuilt** — the data it would
+> rank is fixture-invented, and the isolation doctrine does not stretch to cover
+> the read it needs. Waivers/exceptions were left untouched by direction.
+>
+> Still deliberately not-prototype-work: captured history and the Phase 4
+> scheduler. See "What the passes changed" at the end.
 
 ## Phase 0 — Pin the OAuth signing key ⚠️ (warned, not yet set)
 
@@ -176,7 +183,46 @@ undecided product question, so building one now would be guessing.
 
 ## Phase 5 — Coverage expansion (the persuasion tier)
 
-### `prioritise_my_gaps` ❌ — the strongest case on the list
+### `prioritise_my_gaps` ⛔ — blocked, and the reason is not the tool
+
+**This changed on inspection.** The entry below argued this was the highest
+persuasion-per-line item available. That case still holds on merit — but the
+feature is **not honestly buildable today**, because the data it would rank does
+not exist:
+
+- **Supplier gaps are static fixture integers.** `SupplierProduct.retailers`
+  carries `{ retailer: "Dillard's", gaps: 3 }`, and `allocateGaps` turns that
+  opaque integer into attribute *names* by slicing the head of the GS1 brick's
+  attribute pool. **No retailer's `ATTRIBUTE_PROFILES` or `profileExtras` is
+  ever consulted when computing a supplier gap.**
+- **Four of the six "retail partners" are not tenants.** `PARTNERS`
+  (`lib/partner-filters.ts`) is a supplier-side fixture; Nordstrom, Macy's, Saks
+  and Bloomingdale's exist nowhere else, and their extras are a rotating slice of
+  an eight-name hardcoded pool at a per-retailer offset.
+
+Shipping it would loop that pool and emit a confident number with no source —
+the worst failure mode available, because it doesn't look wrong.
+
+**And there is no isolation doctrine to lean on.** ENT-05a's "bilateral fact"
+carve-out works for exceptions because the supplier is a *named party*, so the
+read narrows to "rows about me". A requirement is a unilateral policy statement
+addressed to a whole vendor base: `AttributeProfile`, `AttributeRequirement` and
+`ProfileExtras` carry no party identity, so there is no field to filter on. The
+carve-out fails on its load-bearing leg.
+
+**Decision taken: named disclosure with retailer opt-in.** That needs a
+*published requirement index* keyed `(retailer, brickCode, attributeName,
+status)` that a retailer **emits**, rather than anything read out of
+`getStore(retailerTenantId)` — and it must filter on `status`, because
+`ATTRIBUTE_PROFILES` contains `Draft` rows and leaking unreleased retailer policy
+would be worse than the feature is worth. A trading-relationship record
+(retailer × supplier) is also needed and exists in no form today.
+
+> **BLOCKED, not merely unbuilt.** The prerequisite is a published requirement
+> index plus an ENT-05b doctrine written next to ENT-05a. Recorded here so it
+> isn't re-scoped as a small tool again.
+
+### The original case, for when it is unblocked
 
 **User flow.** A supplier asks the question every supplier actually has: *"I have
 sixty open gaps and limited hours — what do I fix first?"* Today they get a flat
@@ -215,15 +261,33 @@ connector serving both tenant classes.
 > the implementation plan implies: the assembly layer is done, so this is exposure
 > plus the code lists.
 
-### Supplier-side report tool ❌
+### Supplier-side report tool ✅ (built)
 
-**User flow.** *"Am I ready for Retailer B before they pull my data?"* — arguably
-the most MCP-native workflow TGC has, because nobody would open a dashboard to ask
-it. `runSupplierReport()` (`lib/compliance-report.ts:250`) is fully implemented and
-called only from the portal (`app/page.tsx:283`). No MCP tool wraps it.
+**User flow.** *"Am I ready for Belk before they pull my data?"* — arguably the
+most MCP-native workflow TGC has, because nobody would open a dashboard to ask it.
+`run_my_compliance_report` scans the supplier's own catalogue against either a
+System scorecard or one retail partner's account filter, and returns a `run_id`
+plus the full CSV as an MCP resource — the same artifact path the retailer side
+uses, so parity arrived on both surfaces from one implementation.
 
-> **NICE TO HAVE.** Genuinely small — a manifest entry over an existing engine — but
-> `prioritise_my_gaps` tells a better story for comparable effort.
+**It needed none of the disclosure work above**, which is why it shipped while
+`prioritise_my_gaps` did not: it scans the supplier's own products against gap
+state the supplier already holds, and crosses no tenant boundary.
+
+**One thing that had to be got right.** The first version accepted a `target` of
+`"gs1"`, borrowing `get_my_open_gaps`' vocabulary, and mapped it onto the
+`gs1-core` System filter. Those are different measures — the scorecard has its own
+allocation rule in the report engine — and the alias made the tool report **100%
+complete on a catalogue the existing tool scored at 41%**. Two surfaces
+disagreeing about a gap count is precisely what this codebase's shared engines
+exist to prevent. The tool now takes the report vocabulary (`systemFilterId` or
+`retailer`), matching the supplier portal's own report modal, and was verified to
+agree with the portal on every filter.
+
+> **DONE.** `list_report_runs`, `get_report_run` and `list_system_filters` were
+> widened to both tenant classes to support it — safe because run storage is
+> tenant-keyed and has no lookup-by-id-alone, and because System scorecards are
+> platform-wide standards owned by no tenant.
 
 ### Supplier write path ❌ (correctly)
 
@@ -251,10 +315,9 @@ requires a retailer approval workflow that does not exist.
 
 ---
 
-## What the first pass changed
+## What the passes changed
 
-Retailer-first, by request — so the two supplier items that scored highest on
-persuasion were deliberately held for a second pass.
+### Pass 1 — retailer-first, by request
 
 | Item | Before | After |
 | --- | --- | --- |
@@ -281,15 +344,55 @@ nothing to link to. Shipping a link that points at the app root and names a scre
 in prose would look like a feature and behave like a dead end, so it was left
 undone rather than faked.
 
+### Pass 2 — supplier surface
+
+| Item | Before | After |
+| --- | --- | --- |
+| Supplier identity | `myVendorName(_ctx)` discarded its context and returned a constant | Resolved from the authenticated tenant via `Tenant.vendorName` |
+| An unprovisioned supplier tenant | Would be served J.Renée's catalogue | Refused, with a message that names neither the fixture nor its holder |
+| Supplier report | `runSupplierReport` existed, portal-only | `run_my_compliance_report`, with `run_id` + CSV resource |
+| `get_capabilities` (supplier) | Returned Dillard's authored attribute **names** | Returns partner extras as a **count** |
+| `prioritise_my_gaps` | "Small, needs no persistence" | Blocked, with the prerequisite named |
+
+**Three things only the building surfaced.**
+
+*The leak was real and arrived through a default parameter.*
+`getSupplierCapabilities` called `getPartnerExtraAttributes("Dillard's", …)`,
+whose Dillard's branch calls `assembleBrickAttributes(brickCode)` with `tenantId`
+**omitted** — defaulting to the Dillard's store — and returned the literal names
+of custom attributes a Dillard's admin had authored, to a supplier. Nobody
+decided that; a fallback argument did. Confirmed by authoring a canary attribute
+in the Dillard's tenant and watching the old code path return it, so the
+regression test asserts against something that genuinely leaked rather than
+passing vacuously.
+
+*My first fail-closed guard didn't fail closed.* It tested whether the tenant had
+a vendor *name*, so a named supplier with no catalogue sailed through and got a
+confident `0 products, 0% complete, no open gaps` — a clean bill of health for a
+supplier nobody holds any data about. An empty catalogue and a missing catalogue
+are different facts. The resolver now returns identity and catalogue together, or
+refuses.
+
+*Aliasing two vocabularies produced a 100%-vs-41% contradiction.* The report tool
+first accepted `target: "gs1"`, borrowing the gap tool's vocabulary and mapping it
+onto the `gs1-core` System scorecard, which has its own allocation rule. It
+reported a catalogue as fully complete that the existing tool scored at 41%. The
+tool now uses the report vocabulary and was checked filter-by-filter against what
+the portal renders.
+
 ## Still open, in the order I'd take them
 
-1. **`prioritise_my_gaps`** (supplier) — still the highest persuasion-per-line item
-   on the list; held only because this pass was retailer-first.
-2. **`get_attribute_help`** (supplier) — the assembly layer is done; this is
-   exposure plus the code lists.
-3. **Pin `TGC_OAUTH_PRIVATE_JWK`** in the deploy environment — the warning now
-   tells you when it's missing, but only setting it fixes the failure.
-4. **Persist `pending.ts`** — protects two-phase confirm across instances.
+1. **Pin `TGC_OAUTH_PRIVATE_JWK`** in the deploy environment — the warning now
+   tells you when it's missing, but only setting it fixes the failure. Minutes.
+2. **`get_attribute_help`, GS1-only** (supplier) — standard definitions plus the
+   allowed-value lists (`getAllowedValues`, currently portal-only). Neutral
+   reference data, crosses no boundary. The retailer-guidance half waits on the
+   publication model.
+3. **Persist `pending.ts`** — protects two-phase confirm across instances.
+4. **The published requirement index** — the prerequisite for
+   `prioritise_my_gaps`, and the larger piece: a retailer-emitted index keyed
+   `(retailer, brick, attribute, status)`, a `Draft` filter, an ENT-05b doctrine,
+   and a trading-relationship record.
 5. **Portal URL addressing**, which unblocks deep links.
 
 **Still explicitly not prototype work:** captured history (cannot be demoed for six

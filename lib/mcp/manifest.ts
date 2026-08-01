@@ -28,6 +28,7 @@ import {
   getMyOpenGaps,
   listMyExceptions,
   listMyRetailPartners,
+  runMyComplianceReport,
 } from "@/lib/mcp/tools-supplier"
 import {
   addAttributeRequirement,
@@ -255,11 +256,15 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "list_system_filters",
     description:
-      "List the global System attribute filters (e.g. GS1 Core Scorecard, GS1 Extended Scorecard). These are standard rule sets configured platform-wide: suppliers and retailers running the same System filter evaluate the exact same rules. Use the returned ids with run_compliance_report.",
+      "List the global System attribute filters (e.g. GS1 Core Scorecard, GS1 Extended Scorecard). These are standard rule sets configured platform-wide: suppliers and retailers running the same System filter evaluate the exact same rules. Use the returned ids with whichever report tool your side of the network has.",
     schema: {},
     kind: "read",
     requiredScope: SCOPES.read,
-    allowedTenantClasses: RETAILER_ONLY,
+    // Both classes: these are neutral, platform-wide standards, owned by no
+    // tenant — which is precisely what the description claims, and the reason
+    // both sides can be said to evaluate "the exact same rules". A supplier
+    // needs the ids to run its own report against a scorecard.
+    allowedTenantClasses: BOTH_CLASSES,
     allowWorkload: true,
     handler: () => listSystemFilters(),
   },
@@ -303,7 +308,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "list_report_runs",
     description:
-      "List compliance reports previously run through this connection for your organisation, newest first — the 'pull up the Belk scan from Tuesday' lookup. Each run carries its run id, who ran it, when, the exact parameters used, headline figures, and a resource_uri whose MCP resource holds the full CSV (every vendor row, not just the ranked summary). Use this to re-open, compare, or re-share an earlier report instead of re-running it, since a re-run would score against today's data rather than the data the original scan saw.",
+      "List compliance reports previously run through this connection for your organisation, newest first — the 'pull up the scan from Tuesday' lookup. Each run carries its run id, who ran it, when, the exact parameters used, headline figures, and a resource_uri whose MCP resource holds the full CSV (every detail row, not just the ranked summary). Use this to re-open, compare, or re-share an earlier report instead of re-running it, since a re-run would score against today's data rather than the data the original scan saw. Covers whichever report tool your side of the network uses.",
     schema: {
       limit: z
         .number()
@@ -315,7 +320,12 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     },
     kind: "read",
     requiredScope: SCOPES.read,
-    allowedTenantClasses: RETAILER_ONLY,
+    // Both classes: runs are stored per tenant (lib/mcp/report-runs.ts), so a
+    // retailer and a supplier each see only their own. The tool is the same
+    // question on both sides — "what did I run before?" — and gating it to one
+    // class would mean the supplier report tool produced artifacts nothing
+    // could re-open.
+    allowedTenantClasses: BOTH_CLASSES,
     allowWorkload: true,
     handler: (ctx, args) => listReportRunHistory(ctx, args),
   },
@@ -324,11 +334,14 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     description:
       "Re-open one retained compliance report by its run id (from run_compliance_report or list_report_runs). Returns the parameters it was run with, its headline figures, ranked missing attributes, and per-category breakdown, exactly as that scan produced them — not re-computed against today's data. The full CSV including every detail row is attached as the MCP resource named in resource_uri.",
     schema: {
-      runId: z.string().describe("A run id, e.g. 'run-20260731-4f2a'. From run_compliance_report or list_report_runs."),
+      runId: z.string().describe("A run id, e.g. 'run-20260731-4f2a'. From a report tool or list_report_runs."),
     },
     kind: "read",
     requiredScope: SCOPES.read,
-    allowedTenantClasses: RETAILER_ONLY,
+    // Both classes, for the same reason as list_report_runs — and safely,
+    // because getReportRun() is keyed by tenant and has no lookup-by-id-alone,
+    // so one side cannot resolve the other's run id.
+    allowedTenantClasses: BOTH_CLASSES,
     allowWorkload: true,
     handler: (ctx, args) => getReportRunDetail(ctx, args),
   },
@@ -1041,6 +1054,39 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     allowedTenantClasses: SUPPLIER_ONLY,
     allowWorkload: true,
     handler: (ctx, args) => getMyOpenGaps(ctx, args),
+  },
+  {
+    name: "run_my_compliance_report",
+    description:
+      "Run a compliance report across your OWN catalogue and get it back as a downloadable CSV artifact — the 'am I ready for this retailer before they pull my data?' scan. Scan against either a global System scorecard (systemFilterId, from list_system_filters) or one retail partner's account filter (retailer). Returns overall completion %, ranked missing attributes, per-category breakdown, and a run id whose full CSV (every product row) is attached as an MCP resource. Retained, so you can re-open it later with get_report_run rather than re-running it. WHICH FILTER TO PICK: a retail partner answers 'am I ready for them', and is usually what the supplier means. Of the scorecards, 'gs1-extended' is the one that surfaces outstanding attributes; 'gs1-core' and 'nrf-retail-ready' cover core fields that are always populated in this demo catalogue, so they score 100% and are not evidence of overall readiness. NOTE: a System scorecard is a different measure from get_my_open_gaps' 'gs1' baseline target and the two will not agree — always say which one a figure came from.",
+    schema: {
+      systemFilterId: z
+        .string()
+        .optional()
+        .describe(
+          "A System scorecard id, e.g. 'gs1-core', 'gs1-extended', 'nrf-retail-ready'. Mutually exclusive with retailer. Defaults to 'gs1-core'."
+        ),
+      retailer: z
+        .string()
+        .optional()
+        .describe("Scan against one retail partner's account filter, e.g. 'Belk'. Mutually exclusive with systemFilterId."),
+      maxAttributes: z
+        .number()
+        .int()
+        .min(1)
+        .max(999)
+        .optional()
+        .describe("Maximum attributes in the ranked missing list (999 = all). Default 10."),
+      ignoreDiscontinued: z
+        .boolean()
+        .optional()
+        .describe("Exclude discontinued products from the scan. Default true."),
+    },
+    kind: "read",
+    requiredScope: SCOPES.read,
+    allowedTenantClasses: SUPPLIER_ONLY,
+    allowWorkload: true,
+    handler: (ctx, args) => runMyComplianceReport(ctx, args),
   },
   {
     name: "list_my_exceptions",

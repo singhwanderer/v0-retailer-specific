@@ -126,17 +126,24 @@ function describeRun(run: ReportRequest): string {
  *
  * Three independent controls, deliberately not one:
  *
- *   1. **Registration is gated like the tool it mirrors.** run_compliance_report
- *      is retailer-only and read-scoped, so the resource surface is too. A
- *      supplier connection is never offered a retailer's report at all.
+ *   1. **Registration is gated on read scope**, matching the report tools this
+ *      mirrors. Both tenant classes now have one — `run_compliance_report` on
+ *      the retailer side, `run_my_compliance_report` on the supplier side — so
+ *      the surface is bilateral, but a connection without read scope is offered
+ *      nothing.
  *   2. **Resolution is tenant-keyed.** getReportRun() (lib/mcp/report-runs.ts)
  *      takes the tenant as a parameter and there is no lookup-by-id-alone in
  *      that module, so holding another tenant's run id resolves to nothing —
  *      isolation is a property of the storage shape, not a check someone
- *      remembered to write. The listing is filtered the same way.
+ *      remembered to write. The listing is filtered the same way. This is what
+ *      makes widening to both classes safe: a supplier and a retailer reach the
+ *      same code and are partitioned by the identity they authenticated with,
+ *      not by a class check that would have to be repeated correctly.
  *   3. **The read still goes through runGuarded().** That is what puts it in
  *      the audit trail: a resource read leaving no audit line would be a hole
- *      in §4A row 10 exactly as much as an unaudited tool call.
+ *      in §4A row 10 exactly as much as an unaudited tool call. The guard spec
+ *      names the caller's own class, so the audit line records the read under
+ *      the authority it actually used.
  *
  * ── Why a template rather than one static resource per run ───────────────────
  * Registering runs individually looked simpler and was wrong twice over. The
@@ -149,7 +156,7 @@ function describeRun(run: ReportRequest): string {
  * resources/list refresh to make it addressable.
  */
 function registerReportRunResources(server: McpServerArg, ctx: CallerContext) {
-  if (ctx.tenantClass !== "retailer" || !ctx.scopes.has(SCOPES.read)) return
+  if (!ctx.scopes.has(SCOPES.read)) return
 
   server.resource(
     "compliance-report-run",
@@ -180,7 +187,10 @@ function registerReportRunResources(server: McpServerArg, ctx: CallerContext) {
           // merely that "a resource" was.
           name: `resource:${uri.href}`,
           requiredScope: SCOPES.read,
-          allowedTenantClasses: ["retailer"],
+          // The caller's own class. Not a wildcard: the guard should refuse if
+          // this ever runs under a context whose class changed mid-session,
+          // and the audit line should name the authority actually used.
+          allowedTenantClasses: [ctx.tenantClass],
           allowWorkload: true,
         },
         () => {
