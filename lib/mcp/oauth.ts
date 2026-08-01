@@ -16,12 +16,29 @@
 //   - Workload (client-credentials) identities are provisioned per tenant, so
 //     an autonomous agent cannot choose which tenant it acts for either.
 //
-// What is not: client registrations and issued codes live in process memory and
-// reset on cold start (a client simply re-runs the flow). Signing keys used to
-// as well, which broke tokens across serverless instances — set
-// TGC_OAUTH_PRIVATE_JWK to pin one key across the whole deployment.
+// What is not: there is no revocation, and nothing here is stored, so a
+// registration cannot be withdrawn once issued.
+//
+// ── Why nothing here is stored ──────────────────────────────────────────────
+// It used to be. Client registrations and authorization codes lived in Maps in
+// process memory, which is correct on one process and wrong on every
+// serverless deployment: the client registers on one instance and is sent to
+// /oauth/authorize on another, where the Map is empty and the flow dies with
+// "Unknown client_id. Register the client first". Nothing about that message
+// tells the operator the registration was fine and simply landed elsewhere.
+//
+// So client ids, authorization codes, and refresh tokens are now SELF-
+// DESCRIBING: each one carries its own record, authenticated by an HMAC that
+// only this deployment can produce. Verifying one is a signature check, not a
+// lookup, so any instance can verify what any other instance issued and cold
+// starts stop mattering. See signBlob/verifyBlob below.
+//
+// That secret is derived from TGC_OAUTH_PRIVATE_JWK, so the whole flow now
+// hangs off ONE environment variable rather than three independent pieces of
+// per-instance state. Leaving it unset on a multi-instance deployment breaks
+// sign-in outright instead of intermittently, which is the better failure.
 
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto"
 import {
   SignJWT,
   calculateJwkThumbprint,
@@ -71,6 +88,26 @@ interface KeyMaterial {
   publicKey: CryptoKey
   publicJwk: JWK
   kid: string
+  /**
+   * Symmetric secret for the self-describing blobs below (client ids,
+   * authorization codes, refresh tokens).
+   *
+   * Derived from the private JWK rather than configured as its own variable so
+   * a deployment has exactly one secret to set. A second variable would be a
+   * second thing to forget, and forgetting it would reintroduce the same
+   * cross-instance failure in a new place.
+   *
+   * Symmetric rather than RS256 because these values are only ever verified by
+   * the server that minted them — nobody else needs to check them, and an
+   * RSA signature would make a client id roughly 500 characters of query
+   * string for no benefit.
+   */
+  blobSecret: Buffer
+}
+
+/** Domain-separated so a blob secret can never collide with another use of the key. */
+function deriveBlobSecret(privateJwk: JWK): Buffer {
+  return createHash("sha256").update(`tgc-oauth-blob/v1/${privateJwk.d ?? ""}`).digest()
 }
 
 const globalScope = globalThis as typeof globalThis & {
@@ -126,6 +163,7 @@ async function keysFromJwk(encoded: string): Promise<KeyMaterial> {
     publicKey: (await importJWK(publicJwk, JWT_ALG)) as CryptoKey,
     publicJwk,
     kid,
+    blobSecret: deriveBlobSecret(privateJwk),
   }
 }
 
@@ -144,8 +182,9 @@ async function createKeys(): Promise<KeyMaterial> {
   console.warn(
     `[tgc/oauth] ${PRIVATE_JWK_ENV} is not set — generating a per-instance signing key. ` +
       `On a single process this is fine. On any multi-instance deployment (e.g. serverless), ` +
-      `a token minted by one instance will FAIL verification on another, surfacing as a ` +
-      `spurious "Refused before sign-in" and a forced re-authentication mid-session. ` +
+      `NOTHING this server issues will verify on another instance: sign-in fails with ` +
+      `"Unknown client_id", the code exchange fails with "invalid_grant", and any token that ` +
+      `does get minted is refused on the next call. ` +
       `Generate a value with \`pnpm gen:oauth-key\` and set ${PRIVATE_JWK_ENV} in the deploy environment.`
   )
 
@@ -155,7 +194,7 @@ async function createKeys(): Promise<KeyMaterial> {
   publicJwk.kid = kid
   publicJwk.alg = JWT_ALG
   publicJwk.use = "sig"
-  return { privateKey, publicKey, publicJwk, kid }
+  return { privateKey, publicKey, publicJwk, kid, blobSecret: deriveBlobSecret(await exportJWK(privateKey)) }
 }
 
 export function getKeys(): Promise<KeyMaterial> {
@@ -163,7 +202,40 @@ export function getKeys(): Promise<KeyMaterial> {
   return globalScope.__tgcOAuthKeys
 }
 
-// ── In-memory authorization state ────────────────────────────────────────────
+// ── Self-describing authenticated values ─────────────────────────────────────
+//
+// `body.mac`, where body is base64url JSON and mac is an HMAC over it. Not a
+// JWT: nothing outside this file ever needs to read one, and the compact form
+// keeps a client id short enough to sit comfortably in a query string.
+//
+// Field names are single letters purely to keep those values short — they are
+// opaque to every caller, and the interfaces below are what anything else
+// reads.
+
+function signBlob(payload: object, secret: Buffer): string {
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")
+  const mac = createHmac("sha256", secret).update(body).digest("base64url")
+  return `${body}.${mac}`
+}
+
+/**
+ * Returns undefined for anything not minted by this deployment: wrong shape,
+ * bad MAC, or unparseable body. A caller cannot tell those cases apart, which
+ * is deliberate — the distinction is only useful to someone probing.
+ */
+function verifyBlob<T>(blob: string, secret: Buffer): T | undefined {
+  const split = blob.lastIndexOf(".")
+  if (split <= 0) return undefined
+  const body = blob.slice(0, split)
+  const presented = Buffer.from(blob.slice(split + 1))
+  const expected = Buffer.from(createHmac("sha256", secret).update(body).digest("base64url"))
+  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) return undefined
+  try {
+    return JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T
+  } catch {
+    return undefined
+  }
+}
 
 export interface RegisteredClient {
   client_id: string
@@ -186,51 +258,202 @@ export interface AuthCode {
   expiresAt: number
 }
 
+/**
+ * The one thing still held in memory: authorization codes already redeemed on
+ * THIS instance.
+ *
+ * A self-describing code cannot be marked spent in shared storage there isn't
+ * any of, so single use is now best-effort rather than guaranteed. What still
+ * holds unconditionally is the part that carries the security: the code lives
+ * five minutes, is bound to one client and one redirect_uri, and is worthless
+ * without the PKCE verifier that only the client that started the flow holds.
+ * The exposure this trades away is a replay by someone who already has the
+ * verifier — i.e. the client itself.
+ *
+ * That is an acceptable trade for a demo authorization server and would not be
+ * for a real one. Production does not face the choice: the customer's own IdP
+ * has a session store.
+ */
 interface OAuthState {
-  clients: Map<string, RegisteredClient>
-  codes: Map<string, AuthCode>
+  spentCodes: Map<string, number>
 }
 
 function state(): OAuthState {
-  globalScope.__tgcOAuthState ??= { clients: new Map(), codes: new Map() }
+  globalScope.__tgcOAuthState ??= { spentCodes: new Map() }
   return globalScope.__tgcOAuthState
 }
 
-export function registerClient(input: {
+/** Keeps the replay guard from growing without bound; expired codes fail anyway. */
+function pruneSpentCodes(now: number) {
+  const spent = state().spentCodes
+  for (const [code, expiresAt] of spent) if (expiresAt < now) spent.delete(code)
+}
+
+// ── Client registration ──────────────────────────────────────────────────────
+
+/**
+ * Marks a client id as ours before the MAC is even checked, so a caller that
+ * pasted something else entirely gets a clean "not one of ours" rather than a
+ * signature failure.
+ */
+const CLIENT_ID_PREFIX = "tgc-client."
+
+interface ClientBlob {
+  n?: string
+  r: string[]
+  t: number
+}
+
+export async function registerClient(input: {
   client_name?: string
   redirect_uris: string[]
-}): RegisteredClient {
-  const client: RegisteredClient = {
-    client_id: `tgc-client-${randomBytes(12).toString("hex")}`,
+}): Promise<RegisteredClient> {
+  const { blobSecret } = await getKeys()
+  const created_at = Date.now()
+  const blob: ClientBlob = { n: input.client_name, r: input.redirect_uris, t: created_at }
+  return {
+    client_id: CLIENT_ID_PREFIX + signBlob(blob, blobSecret),
     client_name: input.client_name,
     redirect_uris: input.redirect_uris,
-    created_at: Date.now(),
+    created_at,
   }
-  state().clients.set(client.client_id, client)
-  return client
 }
 
-export function getClient(clientId: string): RegisteredClient | undefined {
-  return state().clients.get(clientId)
-}
-
-export function issueAuthCode(input: Omit<AuthCode, "code" | "expiresAt">): AuthCode {
-  const code: AuthCode = {
-    ...input,
-    code: randomBytes(24).toString("base64url"),
-    expiresAt: Date.now() + AUTH_CODE_TTL_MS,
+/**
+ * Resolve a client id back to its registration.
+ *
+ * There is no lookup here — the id *is* the registration, so this succeeds on
+ * any instance for any id this deployment issued, however long ago and however
+ * many cold starts have happened since.
+ */
+export async function getClient(clientId: string): Promise<RegisteredClient | undefined> {
+  if (!clientId.startsWith(CLIENT_ID_PREFIX)) return undefined
+  const { blobSecret } = await getKeys()
+  const blob = verifyBlob<ClientBlob>(clientId.slice(CLIENT_ID_PREFIX.length), blobSecret)
+  if (!blob || !Array.isArray(blob.r) || blob.r.length === 0) return undefined
+  return {
+    client_id: clientId,
+    client_name: typeof blob.n === "string" ? blob.n : undefined,
+    redirect_uris: blob.r.filter((u): u is string => typeof u === "string"),
+    created_at: typeof blob.t === "number" ? blob.t : 0,
   }
-  state().codes.set(code.code, code)
-  return code
 }
 
-/** Authorization codes are single-use: consumed on first redemption. */
-export function consumeAuthCode(code: string): AuthCode | undefined {
-  const entry = state().codes.get(code)
-  if (!entry) return undefined
-  state().codes.delete(code)
-  if (entry.expiresAt < Date.now()) return undefined
-  return entry
+// ── Authorization codes ──────────────────────────────────────────────────────
+
+interface AuthCodeBlob {
+  c: string
+  u: string
+  h: string
+  s: Scope[]
+  t: string
+  b: string
+  o: TenantRole
+  x: number
+  /** Random, so two codes issued in the same millisecond are still distinct. */
+  n: string
+}
+
+export async function issueAuthCode(input: Omit<AuthCode, "code" | "expiresAt">): Promise<AuthCode> {
+  const { blobSecret } = await getKeys()
+  const expiresAt = Date.now() + AUTH_CODE_TTL_MS
+  const blob: AuthCodeBlob = {
+    c: input.clientId,
+    u: input.redirectUri,
+    h: input.codeChallenge,
+    s: input.scopes,
+    t: input.tenantId,
+    b: input.subjectId,
+    o: input.role,
+    x: expiresAt,
+    n: randomBytes(9).toString("base64url"),
+  }
+  return { ...input, code: signBlob(blob, blobSecret), expiresAt }
+}
+
+/** Single-use on this instance, expiry-bound everywhere. */
+export async function consumeAuthCode(code: string): Promise<AuthCode | undefined> {
+  const { blobSecret } = await getKeys()
+  const blob = verifyBlob<AuthCodeBlob>(code, blobSecret)
+  if (!blob) return undefined
+
+  const now = Date.now()
+  pruneSpentCodes(now)
+  if (blob.x < now) return undefined
+  if (state().spentCodes.has(code)) return undefined
+  state().spentCodes.set(code, blob.x)
+
+  return {
+    code,
+    clientId: blob.c,
+    redirectUri: blob.u,
+    codeChallenge: blob.h,
+    scopes: blob.s,
+    tenantId: blob.t,
+    subjectId: blob.b,
+    role: blob.o,
+    expiresAt: blob.x,
+  }
+}
+
+// ── Refresh tokens ───────────────────────────────────────────────────────────
+//
+// Access tokens last an hour and there was previously nothing to renew them
+// with, so a demo that ran long enough simply stopped working: the client's
+// next call 401s, and an MCP client with a dead token presents as a connector
+// with no tools rather than as an expired session. A refresh token is the
+// difference between "sign in once" and "sign in once an hour".
+//
+// Rotated on every use: the response carries a new refresh token and the old
+// one is not tracked, so a client must always use the most recent. Same
+// self-describing shape as everything else here, so renewal works on whichever
+// instance answers.
+
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+export interface RefreshGrant {
+  clientId: string
+  tenantId: string
+  subjectId: string
+  role: TenantRole
+  scopes: Scope[]
+}
+
+interface RefreshBlob {
+  c: string
+  t: string
+  b: string
+  o: TenantRole
+  s: Scope[]
+  x: number
+  n: string
+}
+
+export async function issueRefreshToken(grant: RefreshGrant): Promise<string> {
+  const { blobSecret } = await getKeys()
+  const blob: RefreshBlob = {
+    c: grant.clientId,
+    t: grant.tenantId,
+    b: grant.subjectId,
+    o: grant.role,
+    s: grant.scopes,
+    x: Date.now() + REFRESH_TOKEN_TTL_MS,
+    n: randomBytes(9).toString("base64url"),
+  }
+  return signBlob(blob, blobSecret)
+}
+
+export async function verifyRefreshToken(token: string): Promise<RefreshGrant | undefined> {
+  const { blobSecret } = await getKeys()
+  const blob = verifyBlob<RefreshBlob>(token, blobSecret)
+  if (!blob || blob.x < Date.now()) return undefined
+  return {
+    clientId: blob.c,
+    tenantId: blob.t,
+    subjectId: blob.b,
+    role: blob.o,
+    scopes: Array.isArray(blob.s) ? blob.s.filter(isScope) : [],
+  }
 }
 
 // ── PKCE ─────────────────────────────────────────────────────────────────────

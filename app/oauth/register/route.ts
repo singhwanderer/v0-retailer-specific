@@ -7,6 +7,10 @@
 // Public clients only: no client secret is issued, because a desktop or
 // browser-based MCP client cannot keep one. PKCE is what protects the code
 // exchange instead, and the token endpoint requires it.
+//
+// The issued client_id carries its own registration record (lib/mcp/oauth.ts),
+// so it stays valid across instances and cold starts. It is longer than a
+// random handle for that reason — clients treat it as opaque either way.
 
 import { registerClient } from "@/lib/mcp/oauth"
 
@@ -35,7 +39,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const client = registerClient({ client_name: body.client_name, redirect_uris: redirectUris })
+  const client = await registerClient({ client_name: body.client_name, redirect_uris: redirectUris })
 
   return Response.json(
     {
@@ -43,7 +47,7 @@ export async function POST(req: Request) {
       client_name: client.client_name,
       redirect_uris: client.redirect_uris,
       client_id_issued_at: Math.floor(client.created_at / 1000),
-      grant_types: ["authorization_code"],
+      grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: "none",
     },

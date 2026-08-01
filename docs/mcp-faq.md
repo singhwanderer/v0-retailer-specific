@@ -38,14 +38,26 @@ Sign in with `buyer@dillards.demo`, `buyer@belk.demo`, or `catalog@jrenee.demo` 
 > merge to `main` and use the production URL). Also check Firewall/Bot
 > Protection isn't challenging non-browser clients.
 
-> **Asked to sign in again part-way through a session, or seeing
-> `Token rejected: signature verification failed` in the Access log?** The
-> deployment is signing tokens with a different key per serverless instance, so
-> a token minted by one instance is rejected by the next. Run
-> `pnpm gen:oauth-key` and set the printed value as `TGC_OAUTH_PRIVATE_JWK` in
-> the Vercel project (Production **and** Preview), then redeploy. Without that
-> variable each instance generates a throwaway key on cold start — fine locally,
-> not on Vercel.
+> **Seeing `Unknown client_id` / `This client_id was not issued by this
+> deployment`, an `invalid_grant` on sign-in, a connector that lists **no
+> tools**, or being asked to sign in again part-way through a session?** These
+> are all one fault: `TGC_OAUTH_PRIVATE_JWK` is not set (or has changed) in the
+> hosting project. Every client id, authorization code, refresh token, and
+> access token is authenticated with that key, so when each serverless instance
+> generates its own, nothing one instance issues verifies on another — and which
+> instance answers is luck. Run `pnpm gen:oauth-key` and set the printed value
+> as `TGC_OAUTH_PRIVATE_JWK` in the Vercel project (Production **and**
+> Preview), then redeploy. Fine to leave unset locally, where there is only one
+> process. After setting it, disconnect and re-add the connector once: client
+> ids issued under the old key are dead.
+>
+> **A connector that lists no tools is nearly always this**, not a missing
+> feature — an MCP client whose token is refused shows an empty tool list rather
+> than an error. Both sign-ins do have tools: a Dillard's login gets 23, a
+> J.Renée login gets 13 (the supplier set — `get_my_compliance_status`,
+> `list_my_retail_partners`, `get_my_open_gaps`, `run_my_compliance_report`,
+> `list_my_exceptions`, plus the shared read and confirmation tools). A supplier
+> never sees the retailer authoring tools; that part is by design.
 
 ## 3. The end-to-end create flow — mandatory fields and drop-downs
 

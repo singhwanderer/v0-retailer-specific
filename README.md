@@ -140,12 +140,19 @@ example prompts above:
 > The authorization server here is a **demo** stand-in for a customer's own IdP
 > federated through the TG Aviator Gateway.
 >
-> **Deploying it:** run `pnpm gen:oauth-key` and set the printed value as
-> `TGC_OAUTH_PRIVATE_JWK` in the hosting project. Without it every serverless
-> instance signs tokens with its own key, so a token minted by one is rejected
-> by the next and callers are forced to re-authenticate mid-session. The audit
-> log remains per instance, so an empty Access log is not proof that nothing
-> happened.
+> **Deploying it — required:** run `pnpm gen:oauth-key` and set the printed
+> value as `TGC_OAUTH_PRIVATE_JWK` in the hosting project (Production **and**
+> Preview). Client ids, authorization codes, refresh tokens, and access tokens
+> are all authenticated with that one key. Without it each serverless instance
+> generates its own, nothing one instance issues verifies on another, and
+> sign-in fails with `Unknown client_id` or `invalid_grant` — or succeeds and
+> then presents as a connector with no tools. Fine to leave unset locally, where
+> there is only one process.
+>
+> Nothing else in the OAuth flow is stored, so cold starts no longer interrupt
+> it. The audit log and the write store *are* still per instance, so an empty
+> Access log is not proof that nothing happened, and a write made through one
+> instance may not be visible from the next.
 
 ## Supplier view design intent
 

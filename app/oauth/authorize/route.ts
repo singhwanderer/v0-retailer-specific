@@ -150,14 +150,26 @@ function consentForm(p: AuthorizeParams, clientName: string, error?: string): st
 </form>`)
 }
 
-function validate(p: AuthorizeParams, params: URLSearchParams): string | null {
+async function validate(p: AuthorizeParams, params: URLSearchParams): Promise<string | null> {
   if (params.get("response_type") !== "code") return "Only response_type=code is supported."
   if (!p.clientId) return "Missing client_id."
   if (!p.redirectUri) return "Missing redirect_uri."
   if (!p.codeChallenge) return "Missing code_challenge — PKCE is required."
   if (p.codeChallengeMethod !== "S256") return "Only code_challenge_method=S256 is supported."
-  const client = getClient(p.clientId)
-  if (!client) return "Unknown client_id. Register the client first (dynamic client registration)."
+  const client = await getClient(p.clientId)
+  // A client id is self-verifying (lib/mcp/oauth.ts), so reaching this branch
+  // no longer means "registered somewhere we can't see" — it means the id was
+  // not issued by this deployment's key. The overwhelmingly likely cause is a
+  // deployment whose signing key is unset or was rotated, so the message names
+  // it: the previous wording sent operators off to re-register a client that
+  // had registered perfectly well.
+  if (!client) {
+    return (
+      "This client_id was not issued by this deployment. Disconnect the connector in your AI client " +
+      "and add it again, which re-runs registration. If that keeps happening, the deployment's " +
+      "TGC_OAUTH_PRIVATE_JWK is unset or has changed — every client_id issued under the old key stops verifying."
+    )
+  }
   if (!client.redirect_uris.includes(p.redirectUri)) {
     return "redirect_uri does not match this client's registration."
   }
@@ -167,9 +179,10 @@ function validate(p: AuthorizeParams, params: URLSearchParams): string | null {
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams
   const p = readParams(params)
-  const problem = validate(p, params)
+  const problem = await validate(p, params)
   if (problem) return errorPage(problem)
-  return new Response(consentForm(p, getClient(p.clientId)?.client_name ?? "An MCP client"), {
+  const client = await getClient(p.clientId)
+  return new Response(consentForm(p, client?.client_name ?? "An MCP client"), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   })
 }
@@ -189,10 +202,10 @@ export async function POST(req: Request) {
   const checked = form.getAll("scope").filter((v): v is string => typeof v === "string").filter(isScope)
   p.scopes = checked.length > 0 ? checked : DEFAULT_SCOPES
 
-  const problem = validate(p, params)
+  const problem = await validate(p, params)
   if (problem) return errorPage(problem)
 
-  const clientName = getClient(p.clientId)?.client_name ?? "An MCP client"
+  const clientName = (await getClient(p.clientId))?.client_name ?? "An MCP client"
   const email = String(form.get("email") ?? "").trim()
   const password = String(form.get("password") ?? "")
 
@@ -216,7 +229,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const code = issueAuthCode({
+  const code = await issueAuthCode({
     clientId: p.clientId,
     redirectUri: p.redirectUri,
     codeChallenge: p.codeChallenge,
