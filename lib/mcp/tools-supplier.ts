@@ -17,9 +17,18 @@
 
 import type { CallerContext } from "@/lib/mcp/context"
 import { exceptionsGrantedToVendor } from "@/lib/mcp/store"
-import { PARTNERS, getPartnerExtraAttributes } from "@/lib/partner-filters"
+import { vendorNameForTenant } from "@/lib/mcp/tenants"
 import {
-  SUPPLIER_PERSONA,
+  buildReportFileName,
+  runSupplierReport,
+  type ReportFilterRef,
+  type ReportRequest,
+} from "@/lib/compliance-report"
+import { newRunId, recordReportRun, reportRunUri } from "@/lib/mcp/report-runs"
+import { PARTNERS } from "@/lib/partner-filters"
+import { SYSTEM_FILTERS, getSystemFilter } from "@/lib/system-filters"
+import {
+  SUPPLIER_PERSONA as FIXTURE_VENDOR,
   SUPPLIER_PRODUCTS_SEED,
   countBaselineGaps,
   getCategory,
@@ -32,20 +41,171 @@ import {
 import { getBrickByCode } from "@/lib/gs1-standard-library"
 
 /**
- * The catalogue this supplier tenant owns.
+ * This tenant's own vendor name, as retailers know it. Never an argument.
  *
- * J.Renée is the only supplier tenant in the demo, so this is the shared
- * fixture the portal renders. A real multi-supplier deployment keys this per
- * tenant exactly as the retailer store already is — recorded in
- * docs/mcp-enterprise-auth-trd.md rather than papered over.
+ * Resolved from the authenticated tenant, not from a module constant. The
+ * previous version took a `CallerContext` and discarded it, returning
+ * `SUPPLIER_PERSONA` unconditionally — which is indistinguishable from correct
+ * while exactly one supplier tenant exists, and is a cross-tenant data leak the
+ * moment a second one does: it would authenticate cleanly, pass `runGuarded`'s
+ * tenant-class check, and be served J.Renée's catalogue. The guard was never
+ * going to catch that, because the call *was* authorised — it was the identity
+ * lookup underneath that was hardcoded.
  */
-function myProducts(_ctx: CallerContext): SupplierProduct[] {
-  return SUPPLIER_PRODUCTS_SEED
+function myVendorName(ctx: CallerContext): string | undefined {
+  return vendorNameForTenant(ctx.tenantId)
 }
 
-/** This tenant's own vendor name, as retailers know it. Never an argument. */
-function myVendorName(_ctx: CallerContext): string {
-  return SUPPLIER_PERSONA
+interface SupplierIdentity {
+  vendor: string
+  products: SupplierProduct[]
+}
+
+type SupplierRefusal = { error: string; note: string }
+
+/**
+ * Resolve the calling tenant to a vendor name *and* a catalogue, or refuse.
+ *
+ * Both halves have to resolve together, and the reason is a bug this function
+ * exists to prevent: a supplier tenant that has a name but no catalogue fixture
+ * would otherwise sail through a name-only check and be served an empty product
+ * list, producing a confident "0 products, 0% complete, no open gaps" — a
+ * clean bill of health for a supplier nobody has any data about. An empty
+ * catalogue and a missing catalogue are different facts and must not render the
+ * same way.
+ *
+ * The refusal deliberately does not name whichever supplier *does* hold the
+ * fixture. This is the code path for "you are not that tenant"; disclosing who
+ * is would be a smaller version of the leak it is guarding.
+ */
+function resolveSupplier(ctx: CallerContext): SupplierIdentity | SupplierRefusal {
+  const vendor = myVendorName(ctx)
+  if (!vendor) {
+    return {
+      error: `Tenant "${ctx.tenantId}" is not a provisioned supplier tenant.`,
+      note: "Supplier tools resolve the vendor from the authenticated tenant. This connection has no supplier identity behind it, so there is nothing to report on.",
+    }
+  }
+  if (vendor !== FIXTURE_VENDOR) {
+    return {
+      error: `No catalogue is provisioned for "${vendor}" in this prototype.`,
+      note: "This is a demo fixture limitation, not an empty catalogue: nothing is known about this supplier's products, which is a different fact from having no gaps. Rather than fall back to another supplier's data, this connection returns nothing.",
+    }
+  }
+  return { vendor, products: SUPPLIER_PRODUCTS_SEED }
+}
+
+function isRefusal(r: SupplierIdentity | SupplierRefusal): r is SupplierRefusal {
+  return "error" in r
+}
+
+/**
+ * Run a compliance report over this supplier's own catalogue — the "am I ready
+ * for Retailer B before they pull my data?" scan.
+ *
+ * `runSupplierReport` is the same engine the supplier portal's own report queue
+ * uses; it existed in full and had simply never been reachable over MCP. The run
+ * is retained and served as a CSV resource through exactly the same path the
+ * retailer side uses (lib/mcp/report-runs.ts), so artifact parity arrives on
+ * both surfaces from one implementation rather than two.
+ *
+ * Note what this does *not* need: any retailer's requirement data. It scans the
+ * supplier's own products against gap state the supplier already holds, so it
+ * crosses no tenant boundary and needs none of the publication work that
+ * ranking gaps by retailer demand would.
+ */
+export function runMyComplianceReport(
+  ctx: CallerContext,
+  args: { systemFilterId?: string; retailer?: string; maxAttributes?: number; ignoreDiscontinued?: boolean }
+) {
+  const me = resolveSupplier(ctx)
+  if (isRefusal(me)) return me
+  const { vendor, products } = me
+
+  if (args.systemFilterId && args.retailer) {
+    return {
+      error:
+        "Choose ONE filter mode: either systemFilterId (a global System scorecard) or retailer (one of your retail partners). Omit both to scan against the default System scorecard.",
+    }
+  }
+
+  // ── Vocabulary note ────────────────────────────────────────────────────────
+  // A report scans against a *filter* — a System scorecard or a retail
+  // partner's account filter — which is the same choice the supplier portal's
+  // own report modal offers, and the mirror of run_compliance_report on the
+  // retailer side.
+  //
+  // This is deliberately NOT get_my_open_gaps' `target` vocabulary, which
+  // offers "gs1" for the industry baseline. Those two things are not the same,
+  // and treating them as synonyms was wrong: the compliance screen's GS1
+  // baseline scores every product against the standard set, whereas the "GS1
+  // Core Scorecard" System filter has its own allocation rule in the report
+  // engine. Aliasing one to the other made this tool report 100% complete on a
+  // catalogue that get_my_compliance_status scored at 41% — two surfaces
+  // disagreeing about a gap count, which is exactly what this codebase's shared
+  // engines exist to prevent.
+  let filter: ReportFilterRef
+  let filterLabel: string
+
+  if (args.retailer) {
+    const q = args.retailer.toLowerCase().trim()
+    const partner = PARTNERS.find((p) => p.name.toLowerCase() === q || p.id === q)
+    if (!partner) {
+      return {
+        error: `Unknown retail partner "${args.retailer}". Your retail partners: ${PARTNERS.map((p) => p.name).join(", ")}.`,
+      }
+    }
+    filter = { kind: "account", retailer: partner.name }
+    filterLabel = `${partner.name} — Account Filter`
+  } else {
+    const id = args.systemFilterId ?? SYSTEM_FILTERS[0].id
+    const sys = getSystemFilter(id)
+    if (!sys) {
+      return {
+        error: `Unknown system filter "${args.systemFilterId}". Valid ids: ${SYSTEM_FILTERS.map((f) => f.id).join(", ")}.`,
+      }
+    }
+    filter = { kind: "system", id: sys.id }
+    filterLabel = sys.name
+  }
+
+  const options = {
+    maxAttributes: args.maxAttributes ?? 10,
+    ignoreDiscontinued: args.ignoreDiscontinued ?? true,
+    tenantId: ctx.tenantId,
+  }
+
+  const startedAt = Date.now()
+  const result = runSupplierReport(products, filter, options)
+  const requestedAt = new Date()
+
+  const run: ReportRequest = {
+    id: newRunId(requestedAt),
+    side: "supplier",
+    filter,
+    filterLabel,
+    vendorScope: vendor,
+    options,
+    requestedBy: ctx.subjectId ?? ctx.agentId,
+    requestedAt: requestedAt.toISOString(),
+    status: "Complete",
+    durationMs: Date.now() - startedAt,
+    fileName: buildReportFileName(vendor, filterLabel),
+    result,
+  }
+  recordReportRun(ctx.tenantId, run)
+
+  return {
+    run_id: run.id,
+    resource_uri: reportRunUri(run.id),
+    vendor,
+    filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
+    ...result,
+    citation_note: `Quote run id ${run.id} alongside any figure from this report, so the number can be traced back to the exact scan that produced it.`,
+    artifact_note: `The full CSV — every product row, not just the ranked summary above — is attached as MCP resource ${reportRunUri(run.id)} (${run.fileName}). Use get_report_run to re-open it later, or list_report_runs to see earlier scans.`,
+    demo_note:
+      "Computed on demand from this supplier's own mock catalogue, using the same engine and the same filter vocabulary as the supplier portal's report screen. The run is retained for this organisation (in demo memory, so it resets on cold start) and is readable as an MCP resource. Scoring a retail partner uses that partner's recorded gap state for your products, not a live read of the retailer's requirement set. A System scorecard and get_my_open_gaps' GS1 baseline are different measures and will not agree — say which one a number came from.",
+  }
 }
 
 /** Resolve a free-text target to the shape the gap engine expects. */
@@ -73,11 +233,13 @@ function resolveTarget(target: string | undefined): { target: GapTarget; label: 
  * abstract, only compliant for a given retailer's requirements.
  */
 export function getMyComplianceStatus(ctx: CallerContext) {
-  const products = myProducts(ctx)
+  const me = resolveSupplier(ctx)
+  if (isRefusal(me)) return me
+  const { vendor, products } = me
   const gs1 = getTargetCompletion(products, "gs1")
 
   return {
-    vendor: myVendorName(ctx),
+    vendor,
     catalogue: {
       totalProducts: products.length,
       categorised: products.filter((p) => p.state === "categorised").length,
@@ -113,10 +275,12 @@ export function getMyComplianceStatus(ctx: CallerContext) {
  * the honest answer to "why am I compliant for one retailer and not another".
  */
 export function listMyRetailPartners(ctx: CallerContext) {
-  const products = myProducts(ctx)
+  const me = resolveSupplier(ctx)
+  if (isRefusal(me)) return me
+  const { vendor, products } = me
 
   return {
-    vendor: myVendorName(ctx),
+    vendor,
     partners: PARTNERS.map((partner) => {
       const summary = getPartnerSummary(products, partner.name)
       const completion = getTargetCompletion(products, partner.name)
@@ -145,10 +309,14 @@ export function getMyOpenGaps(
   ctx: CallerContext,
   args: { target?: string; brickCode?: string; maxProducts?: number }
 ) {
+  const me = resolveSupplier(ctx)
+  if (isRefusal(me)) return me
+  const { vendor } = me
+
   const resolved = resolveTarget(args.target)
   if ("error" in resolved) return resolved
 
-  const products = myProducts(ctx).filter((p) => {
+  const products = me.products.filter((p) => {
     if (p.state !== "categorised") return false
     if (args.brickCode && p.brickCode !== args.brickCode) return false
     return true
@@ -205,7 +373,7 @@ export function getMyOpenGaps(
   ).length
 
   return {
-    vendor: myVendorName(ctx),
+    vendor,
     target: resolved.label,
     ...(args.brickCode ? { brickCode: args.brickCode, brickName: getBrickByCode(args.brickCode)?.brickName } : {}),
     productsAssessed: products.length,
@@ -228,7 +396,9 @@ export function getMyOpenGaps(
  * tenant isolation.
  */
 export function listMyExceptions(ctx: CallerContext, args: { status?: "Active" | "Expired" }) {
-  const vendor = myVendorName(ctx)
+  const me = resolveSupplier(ctx)
+  if (isRefusal(me)) return me
+  const { vendor } = me
   const all = exceptionsGrantedToVendor(vendor)
   const matches = args.status ? all.filter((e) => e.status === args.status) : all
 
@@ -270,9 +440,11 @@ export function listMyExceptions(ctx: CallerContext, args: { status?: "Active" |
 
 /** Plain-English capability catalog for a supplier tenant. */
 export function getSupplierCapabilities(ctx: CallerContext) {
-  const products = myProducts(ctx)
+  const me = resolveSupplier(ctx)
+  if (isRefusal(me)) return me
+  const { vendor, products } = me
   const gs1 = getTargetCompletion(products, "gs1")
-  const exceptions = exceptionsGrantedToVendor(myVendorName(ctx))
+  const exceptions = exceptionsGrantedToVendor(vendor)
 
   return {
     about:
@@ -313,15 +485,23 @@ export function getSupplierCapabilities(ctx: CallerContext) {
     },
     writeActions: [],
     liveSnapshot: {
-      vendor: myVendorName(ctx),
+      vendor,
       products: products.length,
       gs1CompletionPct: gs1.pct,
-      retailPartners: PARTNERS.map((p) => p.name),
+      // Partner names and their extras *count*. Deliberately not the extras
+      // themselves: this field used to call getPartnerExtraAttributes("Dillard's",
+      // …), whose Dillard's branch calls assembleBrickAttributes() with the
+      // tenantId argument omitted — so it defaulted to the Dillard's store and
+      // returned the literal names of custom attributes a Dillard's admin had
+      // authored, to a supplier. Retailer requirement content reached the
+      // supplier side through a default parameter rather than a decision.
+      //
+      // A count discloses that a retailer layers extras on the GS1 baseline,
+      // which is the whole premise of the network and is already in the partner
+      // roster. Naming them is a separate disclosure that belongs to the
+      // retailer to make, not to a fallback argument to leak.
+      retailPartners: PARTNERS.map((p) => ({ retailer: p.name, extraAttributesRequired: p.extras })),
       activeExceptionsGrantedToYou: exceptions.filter((e) => e.status === "Active").length,
-      exampleRetailerExtras: getPartnerExtraAttributes(
-        "Dillard's",
-        products.find((p) => p.brickCode)?.brickCode ?? ""
-      ) as string[],
     },
     note:
       "All data is mock/demo and watermarked. This connection is read-only: supplier-side tools do not change requirements or exceptions — only the granting retailer can do that. Out of scope: other suppliers' data, and anything a retailer holds beyond the exceptions that name you.",

@@ -54,11 +54,12 @@ Two things fall out of that graph and are worth saying plainly:
   L2 needs snapshots to persist, L3 needs a schedule and a subscription
   registry to persist. Doing it once, first, is cheaper than three partial
   versions.
-- **Resources are the highest-leverage single primitive.** The connector
-  registers none today (no `server.resource(...)` anywhere in
-  `app/api/[transport]/route.ts`). Adding them resolves artifact parity, help
-  content, and the protocol-native form of subscriptions — three items that
-  look unrelated on a roadmap.
+- **Resources are the highest-leverage single primitive.** ~~The connector
+  registers none today.~~ **Now built** — `app/api/[transport]/route.ts`
+  registers a `ResourceTemplate` for `report://run/{id}` serving retained report
+  runs as CSV. That resolved artifact parity; the same primitive still underpins
+  help content and the protocol-native form of subscriptions, which is why it
+  was worth doing first out of Phase 2.
 
 ---
 
@@ -68,7 +69,7 @@ Not a feature. Removes the failure modes that can break a live session.
 
 | Item | Detail |
 | --- | --- |
-| Pin the OAuth signing key | Set `TGC_OAUTH_PRIVATE_JWK` in the deploy environment (`pnpm gen:oauth-key` → `scripts/generate-oauth-key.mjs` generates it). Without it, `createKeys()` (`lib/mcp/oauth.ts:132`) mints a **per-instance** key, so a token signed by one serverless instance fails verification on another. |
+| Pin the OAuth signing key | Set `TGC_OAUTH_PRIVATE_JWK` in the deploy environment (`pnpm gen:oauth-key` → `scripts/generate-oauth-key.mjs` generates it). Without it, `createKeys()` (`lib/mcp/oauth.ts`) mints a **per-instance** key, so a token signed by one serverless instance fails verification on another. **`createKeys()` now warns loudly, once per instance, when the variable is unset** — naming both the symptom (a spurious "Refused before sign-in" and a forced re-auth mid-session) and the fix, so the fault is diagnosable from the logs rather than mysterious. Setting the variable is still a deploy step no code change can perform. |
 | Know the residual risk | Registered clients and auth codes (`oauth.ts:181`) and pending-change tokens (`pending.ts:58`) are still per-instance. A two-phase confirm can therefore fail between preview and confirm. Phase 1 fixes it properly; until then, run demos in one sitting. |
 
 **Acceptance:** sign in, connect, propose a write, confirm it — repeatedly,
@@ -121,6 +122,14 @@ seeded from mock data. Persistence changes what that reconciliation should do.
 
 ## Phase 2 — Artifact parity (L1) + async job handles (L, highest structural leverage)
 
+> **Status: artifact parity is built** (retailer side). Report runs are retained
+> per tenant in `lib/mcp/report-runs.ts`, `run_compliance_report` returns a
+> `run_id` and a `resource_uri`, `list_report_runs` / `get_report_run` re-open
+> them, and the CSV is served as an MCP resource under a `ResourceTemplate`. The
+> guard rule below was implemented as specified — see the checked items. Async
+> job handles are **not** built and are deliberately deferred: mock data returns
+> inside one call, so they buy a demo nothing.
+
 **Goal:** a report stops being prose in someone's chat history and becomes a
 thing that can be named, re-opened, attached, and handed to an auditor —
 which is most of what the Compliance Reports screen was for.
@@ -155,8 +164,27 @@ depends on.
 > (`app/api/[transport]/route.ts`) already filters tools by scope and tenant
 > class before registering them.
 
-**Acceptance:** "the Belk scan from Tuesday" resolves to a resource; a second
-tenant cannot read it; the read appears in the audit log.
+**Met, with three controls rather than one** (`registerReportRunResources`):
+registration is gated to retailer tenants holding `tgc.read`, matching the tool
+it mirrors; resolution runs through `getReportRun(tenantId, id)`, which has no
+lookup-by-id-alone, so another tenant's run id resolves to nothing; and the read
+goes through `runGuarded()`, which is what puts it in the audit trail named by
+exact URI. A nonexistent run and another tenant's run return the *same* message,
+so the surface can't be used as an oracle for other tenants' run ids.
+
+**Acceptance — met.** "the Belk scan from Tuesday" resolves via
+`list_report_runs`; a second tenant cannot read another's run (asserted from four
+angles, including that the refusal leaks no run ids); the read appears in the
+audit log, verified against a live server rather than in-process only.
+
+**One thing the plan did not anticipate.** Registering one static resource per
+run — the obvious reading of "register resources" — is wrong. The SDK advertises
+the `resources` capability only if something is registered, so a connection with
+no retained runs declares no capability at all, and because the handler is built
+per request the capability blinks in and out as runs come and go. A
+`ResourceTemplate` declares it unconditionally and lets a caller read the id it
+just received without waiting for a `resources/list` refresh. In-process tests
+passed against the broken version; only driving the real protocol caught it.
 
 ---
 
@@ -225,8 +253,10 @@ no human in the session, attributed to a workload identity in the audit log.
 | Item | Size | Notes |
 | --- | --- | --- |
 | **`get_attribute_help`** | S | Assemble authored `guidance` + GS1 standard definition + valid code-list values from `gs1_extended_attribute_master_code_list.csv`. Mostly an *exposure* problem, but be precise about what is exposed today: `assembleBrickAttributes()` (`lib/mcp/attribute-assembly.ts`) already merges authored guidance with the GS1 library, and retailers read it via `get_profile_detail` and `diagnose_gap_pattern`'s `currentGuidance`. What no tool serves is the **allowed-value lists** — `getAllowedValues()` (`lib/gs1-attribute-values.ts`) has only portal consumers (`screen-supplier-gap-detail`, `screen-supplier-product-attributes`, `lib/supplier-catalogue.ts`) — and the **whole lookup supplier-side**. `BOTH_CLASSES`: a supplier asking "what does this field want?" and a retailer asking "what did we tell them?" are the same lookup. **Most in need of Phase 2's guard rule** — it mixes tenant-owned guidance with neutral standard reference in one response. |
-| **`prioritise_my_gaps`** (supplier) | S | Ranks a supplier's outstanding attributes by **how many retail partners each one unblocks**, reusing `getMyOpenGaps()` / `listMyRetailPartners()` (`lib/mcp/tools-supplier.ts`). This is the payoff the README states as the supplier's whole reason to be on the network — fill a gap once, satisfy every retailer requiring it — and nothing computes it today on either surface. |
-| **Supplier-side report tool** | M | `run_compliance_report` is `RETAILER_ONLY`; the engine (`runSupplierReport`) already exists. The supplier's "am I ready for Retailer B before they pull my data?" scan is arguably the most MCP-native workflow TGC has. |
+| **`prioritise_my_gaps`** (supplier) | ⛔ **BLOCKED** | Ranks a supplier's outstanding attributes by **how many retail partners each one unblocks** — the payoff the README states as the supplier's whole reason to be on the network. **Not buildable as specced, and the sizing above was wrong.** Supplier gaps are static fixture integers (`SupplierProduct.retailers: [{ retailer, gaps: 3 }]`) resolved into attribute names by slicing the GS1 brick pool; no retailer's profiles are ever consulted. Four of the six `PARTNERS` are not tenants and their extras come from an eight-name hardcoded pool. Ranking that would emit a confident number with no source. ENT-05a's bilateral-fact carve-out does **not** extend to requirements (unilateral policy, no party field to filter on). **Prerequisite:** a retailer-emitted *published requirement index* keyed `(retailer, brickCode, attributeName, status)` with a `Draft` filter, an ENT-05b doctrine, and a trading-relationship record — none of which exist. |
+| ~~**Supplier-side report tool**~~ **Done** | ~~M~~ | `run_my_compliance_report` wraps the existing `runSupplierReport` engine: scans against a System scorecard or one retail partner's account filter, returns a `run_id` and the full CSV as an MCP resource. Needed none of the disclosure work above — it scans the supplier's own catalogue. `list_report_runs`, `get_report_run` and `list_system_filters` widened to both tenant classes to support it. |
+| ~~**`tenantId → supplier` resolver**~~ **Done** | ~~—~~ | Not previously on this list, and it gated everything else. `myVendorName()` took a `CallerContext` and discarded it, returning a module constant — so a second supplier tenant would authenticate cleanly, pass `runGuarded`, and be served J.Renée's catalogue. Now resolved from `Tenant.vendorName`, and an unprovisioned supplier tenant is refused rather than served a fallback. |
+| ~~**Supplier `get_capabilities` leak**~~ **Fixed** | ~~—~~ | `getSupplierCapabilities` called `getPartnerExtraAttributes("Dillard's", …)`, whose Dillard's branch calls `assembleBrickAttributes()` with `tenantId` omitted — defaulting to the Dillard's store and returning the literal names of retailer-authored custom attributes to a supplier. Retailer requirement content crossing tenants through a default parameter. Now returns partner extras as a count. |
 | **Supplier write path** | — | Currently read-only by design, and correct for now. Their most-wanted write — "request an exception" — means leaving the conversation entirely. Worth deciding deliberately rather than by omission. |
 
 ---
@@ -291,8 +321,8 @@ security reviewer will look for them by name.
 | Gap | Work | Size |
 | --- | --- | --- |
 | **Requirement-set versioning** | The memo's output cites "Fall 2026 / v3.2". `AttributeProfile` has `status` + `lastUpdated` only — no version, no approval workflow, no published-version pinning. A compliance result that cannot name the rule-set version it was evaluated against is not auditable. Biggest of these. | **L** |
-| **Correlation ID in responses** | `AuditEntry.id` already exists (`lib/mcp/audit.ts`) — return it in every tool response so a user can quote it and support can retrieve the record. Currently the audit trail is write-only from the caller's perspective. | **S** |
-| **Portal deep links** | Every result should end with a link back to the system of record ("Open Supplier Compliance in the portal"). Cheap version of the artifact handoff in Phase 2. | **S** |
+| ~~**Correlation ID in responses**~~ **Done** | `runGuarded()` now returns the id of the audit line it wrote, on success *and* refusal, and the route attaches it as `audit_id` to every tool response; `query_access_log` returns `id`, closing the loop. Three tools that returned bare arrays now return objects, since an array has nowhere to carry the id. | ~~S~~ |
+| **Portal deep links** | Every result should end with a link back to the system of record ("Open Supplier Compliance in the portal"). **Blocked on a prerequisite this row missed:** the portal has no URL addressing — screens are React `useState` in `app/page.tsx` — so there is no address to link to. Needs query-param or route-based screen selection first, which is a portal change, not a connector one. Sizing below covers only the link; the prerequisite is separate. | **S** (+ prereq) |
 | **Retailer→supplier entitlement check** | Tenant isolation is enforced per call, but `RETAILER_SUPPLIERS` is shared across retailer tenants (caveat documented in `lib/mcp/tools.ts`). The memo's "unauthorized supplier visibility" control is therefore not modelled. Needs per-tenant vendor entitlement, not just per-tenant storage. | **M** |
 | **Prompt-injection test suite** | The memo requires evidence of no allowlist bypass. Evals exist (`lib/copilot/run-eval.ts`) but cover accuracy, not adversarial input. Add injection cases to the golden set: prompts attempting cross-tenant access, tool-allowlist escape, and instruction override via retrieved text. | **M** |
 | **Rate limits, quotas, response-size caps** | §4A row 8 (ENT-08) is the row, and it reads **Shared** ownership and **⚠️ Partial — bounded retrieval only** (`maxAttributes` on `run_compliance_report`), not Gateway-owned and unimplemented. So the deferred half is specifically the **quotas**, which the TRD puts at the gateway. The pilot makes them **blocking rather than deferred** — "unbounded cost or scraping" is a named risk with required evidence. (Row 9 is ENT-09, container isolation, Aviator-owned — a different problem; don't cite it here.) | **M** |

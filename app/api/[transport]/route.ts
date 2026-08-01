@@ -22,15 +22,41 @@
 // Tenancy used to be a paragraph of English in `instructions` below, i.e. a
 // request that the model behave. It is now a property of the code.
 
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { createMcpHandler } from "mcp-handler"
+import type { ReportRequest } from "@/lib/compliance-report"
 import { authenticateMcpRequest } from "@/lib/mcp/auth"
-import type { CallerContext } from "@/lib/mcp/context"
+import { SCOPES, type CallerContext } from "@/lib/mcp/context"
 import { runGuarded } from "@/lib/mcp/guard"
 import { annotationsFor, guardSpecFor, invokeTool, toolsForScopes } from "@/lib/mcp/manifest"
+import {
+  REPORT_RUN_URI_TEMPLATE,
+  getReportRun,
+  listReportRuns,
+  reportRunUri,
+  runCsv,
+} from "@/lib/mcp/report-runs"
 import { getTenant } from "@/lib/mcp/tenants"
 
 function asText(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] }
+}
+
+/**
+ * Attach the audit id to a tool response.
+ *
+ * The audit trail used to be write-only from the caller's point of view: every
+ * call produced a line, and the caller was never told which one. That makes the
+ * log unusable for the person who actually needs it — someone querying a figure
+ * can describe what they asked but not name the record. Returning the id turns
+ * "I ran a report this morning" into "audit-1753977600000-42".
+ *
+ * Only object payloads are annotated; a tool returning a bare array or scalar is
+ * left alone rather than being wrapped into a different shape.
+ */
+function withAuditId(payload: unknown, auditId: string): unknown {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return payload
+  return { ...(payload as Record<string, unknown>), audit_id: auditId }
 }
 
 /**
@@ -77,12 +103,123 @@ function buildInstructions(ctx: CallerContext, tenantName: string): string {
   )
 }
 
+/** The server object `createMcpHandler` hands to its setup callback. */
+type McpServerArg = Parameters<Parameters<typeof createMcpHandler>[0]>[0]
+
+/** One line of prose describing a run, shared by the listing and the read. */
+function describeRun(run: ReportRequest): string {
+  const scope = run.vendorScope && run.vendorScope !== "all" ? `, ${run.vendorScope}` : ""
+  return (
+    `Compliance report ${run.id} — ${run.filterLabel}${scope}, run by ${run.requestedBy} at ${run.requestedAt}. ` +
+    `${run.result.overallPct}% compliant across ${run.result.itemsAssessed} assessed items. Full CSV, every detail row.`
+  )
+}
+
+/**
+ * Expose this tenant's retained report runs as MCP resources.
+ *
+ * ── Why this needs its own security note ────────────────────────────────────
+ * Every authorization control in this codebase runs through runGuarded() on
+ * *tool* invocation. Resources are a second surface, and the SDK does not route
+ * them through that choke point — so a resource layer written carelessly walks
+ * straight around the thing the whole authorization story depends on.
+ *
+ * Three independent controls, deliberately not one:
+ *
+ *   1. **Registration is gated on read scope**, matching the report tools this
+ *      mirrors. Both tenant classes now have one — `run_compliance_report` on
+ *      the retailer side, `run_my_compliance_report` on the supplier side — so
+ *      the surface is bilateral, but a connection without read scope is offered
+ *      nothing.
+ *   2. **Resolution is tenant-keyed.** getReportRun() (lib/mcp/report-runs.ts)
+ *      takes the tenant as a parameter and there is no lookup-by-id-alone in
+ *      that module, so holding another tenant's run id resolves to nothing —
+ *      isolation is a property of the storage shape, not a check someone
+ *      remembered to write. The listing is filtered the same way. This is what
+ *      makes widening to both classes safe: a supplier and a retailer reach the
+ *      same code and are partitioned by the identity they authenticated with,
+ *      not by a class check that would have to be repeated correctly.
+ *   3. **The read still goes through runGuarded().** That is what puts it in
+ *      the audit trail: a resource read leaving no audit line would be a hole
+ *      in §4A row 10 exactly as much as an unaudited tool call. The guard spec
+ *      names the caller's own class, so the audit line records the read under
+ *      the authority it actually used.
+ *
+ * ── Why a template rather than one static resource per run ───────────────────
+ * Registering runs individually looked simpler and was wrong twice over. The
+ * SDK only advertises the `resources` capability if something is registered, so
+ * a fresh connection with no retained runs would declare no capability at all —
+ * and because the handler is rebuilt per request, the capability would blink in
+ * and out of existence as runs came and went, which is not a thing a client can
+ * reasonably consume. A template also lets a caller read the id it just got
+ * back from run_compliance_report immediately, instead of waiting for a
+ * resources/list refresh to make it addressable.
+ */
+function registerReportRunResources(server: McpServerArg, ctx: CallerContext) {
+  if (!ctx.scopes.has(SCOPES.read)) return
+
+  server.resource(
+    "compliance-report-run",
+    new ResourceTemplate(REPORT_RUN_URI_TEMPLATE, {
+      // Only this tenant's runs are ever listed.
+      list: () => ({
+        resources: listReportRuns(ctx.tenantId).map((run) => ({
+          uri: reportRunUri(run.id),
+          name: run.fileName,
+          description: describeRun(run),
+          mimeType: "text/csv",
+        })),
+      }),
+    }),
+    {
+      description:
+        "A compliance report run by this organisation, as the full CSV — every vendor detail row, not just the ranked summary the tool response carries. Addressed by run id (report://run/{id}); ids come from run_compliance_report or list_report_runs.",
+      mimeType: "text/csv",
+    },
+    async (uri, variables) => {
+      const rawId = variables.id
+      const id = Array.isArray(rawId) ? rawId[0] : rawId
+
+      const outcome = runGuarded(
+        ctx,
+        {
+          // Named so the audit line says exactly which artifact was read, not
+          // merely that "a resource" was.
+          name: `resource:${uri.href}`,
+          requiredScope: SCOPES.read,
+          // The caller's own class. Not a wildcard: the guard should refuse if
+          // this ever runs under a context whose class changed mid-session,
+          // and the audit line should name the authority actually used.
+          allowedTenantClasses: [ctx.tenantClass],
+          allowWorkload: true,
+        },
+        () => {
+          const run = id ? getReportRun(ctx.tenantId, id) : undefined
+          // Same message whether the run never existed or belongs to someone
+          // else: a distinguishable "exists, but not yours" would turn this
+          // into an oracle for other tenants' run ids.
+          if (!run) throw new Error(`No retained report run "${id}" for this organisation.`)
+          return runCsv(run)
+        }
+      )
+
+      // Throwing rather than returning an error body: a refusal must surface to
+      // the client as a failed read, not as a resource whose contents happen to
+      // be the word "forbidden".
+      if (!outcome.ok) throw new Error(outcome.error.error)
+
+      return { contents: [{ uri: uri.href, mimeType: "text/csv", text: outcome.result }] }
+    }
+  )
+}
+
 /**
  * Build an MCP server exposing exactly the tools this caller may use.
  *
  * The handler is constructed per request rather than once at module load
  * precisely because the tool list is caller-dependent — that is what makes
- * progressive scopes real rather than cosmetic.
+ * progressive scopes real rather than cosmetic. Resources are rebuilt on the
+ * same cadence and for the same reason.
  */
 function buildHandler(ctx: CallerContext) {
   const tenant = getTenant(ctx.tenantId)
@@ -104,10 +241,12 @@ function buildHandler(ctx: CallerContext) {
             // guard still wraps both phases, so the proposal and the approval
             // each produce their own audit line.
             const outcome = runGuarded(ctx, guardSpecFor(tool), () => invokeTool(ctx, tool, args))
-            return asText(outcome.ok ? outcome.result : outcome.error)
+            return asText(withAuditId(outcome.ok ? outcome.result : outcome.error, outcome.auditId))
           }
         )
       }
+
+      registerReportRunResources(server, ctx)
 
       // ── Starter prompts ────────────────────────────────────────────────────
       // Surfaced by MCP clients (e.g. claude.ai's prompt picker) as clickable

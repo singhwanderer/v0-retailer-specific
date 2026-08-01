@@ -38,7 +38,21 @@ prototype work.
 
 ---
 
-## Phase 0 — Pin the OAuth signing key ❌
+> **Update — two implementation passes have landed.**
+>
+> **Pass 1 (retailer-first):** Phase 2's report artifacts, the correlation id,
+> and a startup warning for the OAuth key.
+>
+> **Pass 2 (supplier):** a `tenantId → supplier` resolver, the supplier-side
+> report tool, and a fix for a real data leak. It also established that
+> **`prioritise_my_gaps` is blocked, not merely unbuilt** — the data it would
+> rank is fixture-invented, and the isolation doctrine does not stretch to cover
+> the read it needs. Waivers/exceptions were left untouched by direction.
+>
+> Still deliberately not-prototype-work: captured history and the Phase 4
+> scheduler. See "What the passes changed" at the end.
+
+## Phase 0 — Pin the OAuth signing key ⚠️ (warned, not yet set)
 
 **User flow.** A PM opens Claude, connects the TGC connector, signs in, and asks
 "how many suppliers are non-compliant on Women's Footwear?" — works. They ask a
@@ -54,7 +68,11 @@ as a visible re-auth in the middle of the story being told. It costs one
 environment variable — `pnpm gen:oauth-key` generates the value, and `createKeys()`
 already prefers it whenever it is present.
 
-> **REQUIRED.** Highest ratio of demo risk removed to effort spent, anywhere here.
+> **REQUIRED — half done.** `createKeys()` now logs a loud, one-per-instance
+> warning naming the symptom and the fix when the variable is unset, so the
+> failure is diagnosable instead of mysterious. The variable itself still has to
+> be set in the deploy environment; no code change can do that, and this stays
+> ❌ until it is.
 
 ## Phase 1 — Persistence ❌ (one part is prototype work; the rest isn't)
 
@@ -78,30 +96,42 @@ being claimed as the thing that makes the system safe.
 > profiles, audit, and OAuth clients is production work wearing a prototype's
 > clothes; the honest `demo_note` covers those for now.
 
-## Phase 2 — Report artifacts and MCP resources ❌
+## Phase 2 — Report artifacts and MCP resources ✅ (built)
 
-**User flow.** A retailer asks "run the compliance report for the Belk account
-filter" and gets a good prose answer with real numbers. Then they ask what everyone
-asks next — *"can you send that to my auditor?"* — and there is nothing to send.
-`reportToCsv()` (`lib/compliance-report.ts:496`) already generates the file.
-`ReportRequest` (`:121`) already carries `id`, `requestedBy`, `requestedAt`,
-`status`. Neither is surfaced: no `server.resource(...)` is registered anywhere in
-the codebase, so the report exists only as prose in chat scrollback. The portal's
-Compliance Reports screen, meanwhile, has had a working Export button for years.
+**User flow, before.** A retailer asked "run the compliance report for the Belk
+account filter" and got a good prose answer with real numbers. Then they asked what
+everyone asks next — *"can you send that to my auditor?"* — and there was nothing
+to send. The report existed only as prose in chat scrollback, while the portal's
+Compliance Reports screen has had a working Export button for years.
 
-**Why the prototype needs it.** Because of what the deck claims. §4 argues for
-*inversion* — conversation as the primary surface, screens as fallback. An audience
-member who knows the portal will ask "where's my CSV?", and the honest answer today
-is "go back to the screen," which concedes the argument. This is the widest gap
-between what the demo claims and what the demo does.
+**User flow, now.** The same question returns the same figures plus a `run_id`
+(`run-20260731-4f2a`) and a `resource_uri` (`report://run/{id}`). The full CSV —
+every vendor detail row, not just the ranked summary — is attached as an MCP
+resource the client can read, save, or forward. `list_report_runs` answers "pull up
+the Belk scan from Tuesday"; `get_report_run` re-opens it with the figures that
+scan produced rather than re-scoring against today's data.
 
-**Not prototype work:** async job handles (`start_report` → `get_report_status`).
-Mock data returns instantly and the UI already simulates the Running → Complete
-queue. Real vendor-base scans need this; a demo does not.
+**How it was built.** `reportToCsv()` and `ReportRequest` already existed and
+already drove the portal's report queue — the work was retention plus exposure, not
+new reporting logic. `lib/mcp/report-runs.ts` holds tenant-keyed run history;
+`run_compliance_report` records each run; the route registers a `ResourceTemplate`
+for `report://run/{id}`.
 
-> **REQUIRED IF the demo makes the inversion claim.** Either build the artifact or
-> soften the claim — but don't keep asserting it while the screen still wins the
-> most obvious follow-up question.
+**The security rule this had to get right.** Resources are a second surface that
+the SDK does not route through `runGuarded()`. Three controls, all verified against
+a live server: registration is gated to retailer + `tgc.read` like the tool it
+mirrors; resolution goes through `getReportRun(tenantId, id)`, which has no
+lookup-by-id-alone, so another tenant's run id resolves to nothing; and the read
+runs through `runGuarded()` so it lands in the audit trail named by exact URI. A
+run id that doesn't exist and one belonging to another tenant return the *same*
+message, so the endpoint can't be used as an oracle for other tenants' run ids.
+
+**Still not prototype work:** async job handles (`start_report` →
+`get_report_status`). Mock data returns instantly and the UI already simulates the
+Running → Complete queue.
+
+> **DONE.** The screen no longer wins the "where's my CSV?" follow-up, so §4's
+> inversion argument is now supported by the demo rather than asserted over it.
 
 ## Phase 3 — Captured history ❌
 
@@ -153,7 +183,46 @@ undecided product question, so building one now would be guessing.
 
 ## Phase 5 — Coverage expansion (the persuasion tier)
 
-### `prioritise_my_gaps` ❌ — the strongest case on the list
+### `prioritise_my_gaps` ⛔ — blocked, and the reason is not the tool
+
+**This changed on inspection.** The entry below argued this was the highest
+persuasion-per-line item available. That case still holds on merit — but the
+feature is **not honestly buildable today**, because the data it would rank does
+not exist:
+
+- **Supplier gaps are static fixture integers.** `SupplierProduct.retailers`
+  carries `{ retailer: "Dillard's", gaps: 3 }`, and `allocateGaps` turns that
+  opaque integer into attribute *names* by slicing the head of the GS1 brick's
+  attribute pool. **No retailer's `ATTRIBUTE_PROFILES` or `profileExtras` is
+  ever consulted when computing a supplier gap.**
+- **Four of the six "retail partners" are not tenants.** `PARTNERS`
+  (`lib/partner-filters.ts`) is a supplier-side fixture; Nordstrom, Macy's, Saks
+  and Bloomingdale's exist nowhere else, and their extras are a rotating slice of
+  an eight-name hardcoded pool at a per-retailer offset.
+
+Shipping it would loop that pool and emit a confident number with no source —
+the worst failure mode available, because it doesn't look wrong.
+
+**And there is no isolation doctrine to lean on.** ENT-05a's "bilateral fact"
+carve-out works for exceptions because the supplier is a *named party*, so the
+read narrows to "rows about me". A requirement is a unilateral policy statement
+addressed to a whole vendor base: `AttributeProfile`, `AttributeRequirement` and
+`ProfileExtras` carry no party identity, so there is no field to filter on. The
+carve-out fails on its load-bearing leg.
+
+**Decision taken: named disclosure with retailer opt-in.** That needs a
+*published requirement index* keyed `(retailer, brickCode, attributeName,
+status)` that a retailer **emits**, rather than anything read out of
+`getStore(retailerTenantId)` — and it must filter on `status`, because
+`ATTRIBUTE_PROFILES` contains `Draft` rows and leaking unreleased retailer policy
+would be worse than the feature is worth. A trading-relationship record
+(retailer × supplier) is also needed and exists in no form today.
+
+> **BLOCKED, not merely unbuilt.** The prerequisite is a published requirement
+> index plus an ENT-05b doctrine written next to ENT-05a. Recorded here so it
+> isn't re-scoped as a small tool again.
+
+### The original case, for when it is unblocked
 
 **User flow.** A supplier asks the question every supplier actually has: *"I have
 sixty open gaps and limited hours — what do I fix first?"* Today they get a flat
@@ -192,15 +261,33 @@ connector serving both tenant classes.
 > the implementation plan implies: the assembly layer is done, so this is exposure
 > plus the code lists.
 
-### Supplier-side report tool ❌
+### Supplier-side report tool ✅ (built)
 
-**User flow.** *"Am I ready for Retailer B before they pull my data?"* — arguably
-the most MCP-native workflow TGC has, because nobody would open a dashboard to ask
-it. `runSupplierReport()` (`lib/compliance-report.ts:250`) is fully implemented and
-called only from the portal (`app/page.tsx:283`). No MCP tool wraps it.
+**User flow.** *"Am I ready for Belk before they pull my data?"* — arguably the
+most MCP-native workflow TGC has, because nobody would open a dashboard to ask it.
+`run_my_compliance_report` scans the supplier's own catalogue against either a
+System scorecard or one retail partner's account filter, and returns a `run_id`
+plus the full CSV as an MCP resource — the same artifact path the retailer side
+uses, so parity arrived on both surfaces from one implementation.
 
-> **NICE TO HAVE.** Genuinely small — a manifest entry over an existing engine — but
-> `prioritise_my_gaps` tells a better story for comparable effort.
+**It needed none of the disclosure work above**, which is why it shipped while
+`prioritise_my_gaps` did not: it scans the supplier's own products against gap
+state the supplier already holds, and crosses no tenant boundary.
+
+**One thing that had to be got right.** The first version accepted a `target` of
+`"gs1"`, borrowing `get_my_open_gaps`' vocabulary, and mapped it onto the
+`gs1-core` System filter. Those are different measures — the scorecard has its own
+allocation rule in the report engine — and the alias made the tool report **100%
+complete on a catalogue the existing tool scored at 41%**. Two surfaces
+disagreeing about a gap count is precisely what this codebase's shared engines
+exist to prevent. The tool now takes the report vocabulary (`systemFilterId` or
+`retailer`), matching the supplier portal's own report modal, and was verified to
+agree with the portal on every filter.
+
+> **DONE.** `list_report_runs`, `get_report_run` and `list_system_filters` were
+> widened to both tenant classes to support it — safe because run storage is
+> tenant-keyed and has no lookup-by-id-alone, and because System scorecards are
+> platform-wide standards owned by no tenant.
 
 ### Supplier write path ❌ (correctly)
 
@@ -217,8 +304,8 @@ requires a retailer approval workflow that does not exist.
 
 | Item | Status | Prototype? |
 | --- | --- | --- |
-| **Correlation ID in responses** | ❌ | **Yes, cheap.** `AuditEntry.id` exists (`audit.ts:23`) but `query_access_log` strips it before returning (`tools.ts:1253`). Returning it lets a demo say "quote this id to support" — small, and makes responses feel operated rather than mocked. |
-| **Portal deep links** | ❌ | **Yes, cheap.** Ending a result with "open this in the portal" is the honest version of the artifact handoff, and it demos coexistence — conversation and screen pointing at each other rather than competing. |
+| **Correlation ID in responses** | ✅ | **Built.** `runGuarded()` now returns the id of the audit line it wrote — on success *and* on refusal — and the route attaches it to every tool response as `audit_id`. `query_access_log` returns `id` too, so the loop closes: a user quotes the id, support resolves it. Refusals carrying one matters most, since "why was I refused?" is only answerable against a specific record. Three tools that returned bare arrays (`list_attribute_profiles`, `list_system_filters`, `list_vendor_exceptions`) now return objects, because an array has nowhere to put the id; two already returned objects when empty, so this also removed a response shape that varied by result count. |
+| **Portal deep links** | ❌ | **Blocked on a prerequisite the plan didn't anticipate.** The portal has no URL addressing — screens are React `useState` in `app/page.tsx` — so there is no address to link *to*. A "deep link" today could only point at the app root and name a screen in prose, which is worse than nothing: it looks like a link and doesn't behave like one. Needs query-param or route-based screen selection first. Small, but it is a portal change, not a connector change. |
 | **Prompt-injection evals** | ❌ | No. Gates a security review; invisible to a demo. Zero adversarial cases exist today in `lib/copilot/run-eval.ts` or `scripts/generate-golden-dataset.ts`. |
 | **Requirement-set versioning** | ❌ | No. `AttributeProfile` carries `status` + `lastUpdated` only. Large, and an auditability requirement rather than a demo one. |
 | **Retailer→supplier entitlement** | ❌ | No. `RETAILER_SUPPLIERS` is one shared fixture across retailer tenants. A security reviewer will ask; an audience will not. |
@@ -228,28 +315,117 @@ requires a retailer approval workflow that does not exist.
 
 ---
 
-## The short answer
+## What the passes changed
 
-**Build for the prototype** — all small, none dependent on each other:
+### Pass 1 — retailer-first, by request
 
-1. **Pin the OAuth key.** One env var; removes the only live-failure risk.
-2. **`prioritise_my_gaps`.** The network-effect payoff nothing computes today.
-3. **Persist `pending.ts`.** Protects two-phase confirm, the safety centrepiece.
-4. **Correlation ID + portal deep links.** Two small touches that make responses
-   feel operated.
+| Item | Before | After |
+| --- | --- | --- |
+| Report runs | Computed and discarded | Retained per tenant, `run_id` returned, re-openable via `list_report_runs` / `get_report_run` |
+| The CSV | Generated by `reportToCsv()`, never surfaced | Served as an MCP resource at `report://run/{id}` |
+| Resources primitive | None registered anywhere | `ResourceTemplate`, gated + tenant-keyed + audited on read |
+| Correlation id | `AuditEntry.id` written, never returned | `audit_id` on every tool response, success and refusal alike |
+| OAuth key | Silent per-instance fallback | Loud startup warning naming the symptom and the fix |
 
-**Build only if the demo makes the inversion claim:**
+**Two things worth flagging that only turned up in the building.**
 
-5. **Report resources + the CSV as an attachable artifact.** Otherwise the screen
-   wins the most obvious follow-up question and §4's argument goes unsupported.
+*Registering one resource per run was wrong, and the live test is what caught it.*
+The SDK only advertises the `resources` capability if something is registered, so a
+fresh connection with no retained runs declared no capability at all — and since
+the handler is rebuilt per request, the capability would blink in and out as runs
+came and went. A `ResourceTemplate` declares it unconditionally and lets a caller
+read the id it just received without waiting for a `resources/list` refresh. The
+in-process tests all passed against the broken version; only driving the real
+protocol surfaced it.
 
-**Explicitly not prototype work:** captured history (cannot be demoed for six
+*Portal deep links are blocked on a prerequisite nobody had noticed.* The portal
+has no URL addressing — screens are `useState` in `app/page.tsx` — so there is
+nothing to link to. Shipping a link that points at the app root and names a screen
+in prose would look like a feature and behave like a dead end, so it was left
+undone rather than faked.
+
+### Pass 2 — supplier surface
+
+| Item | Before | After |
+| --- | --- | --- |
+| Supplier identity | `myVendorName(_ctx)` discarded its context and returned a constant | Resolved from the authenticated tenant via `Tenant.vendorName` |
+| An unprovisioned supplier tenant | Would be served J.Renée's catalogue | Refused, with a message that names neither the fixture nor its holder |
+| Supplier report | `runSupplierReport` existed, portal-only | `run_my_compliance_report`, with `run_id` + CSV resource |
+| `get_capabilities` (supplier) | Returned Dillard's authored attribute **names** | Returns partner extras as a **count** |
+| `prioritise_my_gaps` | "Small, needs no persistence" | Blocked, with the prerequisite named |
+
+**Three things only the building surfaced.**
+
+*The leak was real and arrived through a default parameter.*
+`getSupplierCapabilities` called `getPartnerExtraAttributes("Dillard's", …)`,
+whose Dillard's branch calls `assembleBrickAttributes(brickCode)` with `tenantId`
+**omitted** — defaulting to the Dillard's store — and returned the literal names
+of custom attributes a Dillard's admin had authored, to a supplier. Nobody
+decided that; a fallback argument did. Confirmed by authoring a canary attribute
+in the Dillard's tenant and watching the old code path return it, so the
+regression test asserts against something that genuinely leaked rather than
+passing vacuously.
+
+*My first fail-closed guard didn't fail closed.* It tested whether the tenant had
+a vendor *name*, so a named supplier with no catalogue sailed through and got a
+confident `0 products, 0% complete, no open gaps` — a clean bill of health for a
+supplier nobody holds any data about. An empty catalogue and a missing catalogue
+are different facts. The resolver now returns identity and catalogue together, or
+refuses.
+
+*Aliasing two vocabularies produced a 100%-vs-41% contradiction.* The report tool
+first accepted `target: "gs1"`, borrowing the gap tool's vocabulary and mapping it
+onto the `gs1-core` System scorecard, which has its own allocation rule. It
+reported a catalogue as fully complete that the existing tool scored at 41%. The
+tool now uses the report vocabulary and was checked filter-by-filter against what
+the portal renders.
+
+## Still open, in the order I'd take them
+
+1. **Pin `TGC_OAUTH_PRIVATE_JWK`** in the deploy environment — the warning now
+   tells you when it's missing, but only setting it fixes the failure. Minutes.
+2. **`get_attribute_help`, GS1-only** (supplier) — standard definitions plus the
+   allowed-value lists (`getAllowedValues`, currently portal-only). Neutral
+   reference data, crosses no boundary. The retailer-guidance half waits on the
+   publication model.
+3. **Persist `pending.ts`** — protects two-phase confirm across instances.
+4. **The published requirement index** — the prerequisite for
+   `prioritise_my_gaps`, and the larger piece: a retailer-emitted index keyed
+   `(retailer, brick, attribute, status)`, a `Draft` filter, an ENT-05b doctrine,
+   and a trading-relationship record.
+5. **Portal URL addressing**, which unblocks deep links.
+
+**Still explicitly not prototype work:** captured history (cannot be demoed for six
 months, and the honest reconstruction is a strength), the Phase 4 scheduler and
 delivery channel (a manual trigger demos identically), async job handles, and every
 pilot-readiness control — versioning, entitlement, quotas, injection evals, the
 read-only profile. Those gate a *customer* conversation, not this one.
 
-## How to verify each, when built
+## How this pass was verified
+
+Not by inspection — by running it.
+
+- **33 in-process assertions** covering run persistence, re-open-by-id, the
+  summary shape, CSV generation, correlation ids on success and refusal, and
+  tenant isolation from four angles (a second tenant sees no runs, cannot resolve
+  a known run id through the store or the tool, and gets a refusal that does not
+  leak the first tenant's run ids).
+- **A live MCP session against a running server** — real OAuth client-credentials
+  token, real `initialize` / `tools/list` / `resources/list` / `resources/read`
+  handshake. Confirmed: unauthenticated calls get 401; the capability is advertised
+  with zero runs retained; a run becomes addressable after `run_compliance_report`;
+  `resources/read` returns 5.8 KB of real CSV across 163 lines; an unknown run id
+  errors rather than returning empty content; and write tools are absent from a
+  read-only identity's tool list.
+- **The audit trail, read back from the live server**, confirming resource reads
+  are logged by exact URI and attributed to the calling identity — including the
+  failed read, recorded with `outcome: error`.
+
+Build and lint are clean; the three pre-existing type errors in
+`screen1-attribute-profiles.tsx` and two pre-existing lint errors are unchanged by
+this work and were confirmed present on a clean tree.
+
+## How to verify what's still open
 
 - **OAuth key** — set `TGC_OAUTH_PRIVATE_JWK`, then run enough successive tool
   calls to hit more than one serverless instance with no re-auth prompt.
@@ -258,6 +434,3 @@ read-only profile. Those gate a *customer* conversation, not this one.
   retailer connection's tool list.
 - **`pending.ts` persistence** — preview a write, force an instance change, confirm
   the token is still honoured.
-- **Report resources** — confirm a second tenant cannot read another tenant's run
-  and that the read lands in the audit log. Resources do not pass through
-  `runGuarded()`, so this must be asserted, never assumed.

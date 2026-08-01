@@ -51,7 +51,20 @@ import {
   searchBricksWithMapping,
 } from "@/lib/mcp/attribute-assembly"
 import { SYSTEM_FILTERS, getSystemFilter, type SystemFilterId } from "@/lib/system-filters"
-import { runRetailerReport, type ReportFilterRef } from "@/lib/compliance-report"
+import {
+  buildReportFileName,
+  runRetailerReport,
+  type ReportFilterRef,
+  type ReportRequest,
+} from "@/lib/compliance-report"
+import {
+  getReportRun,
+  listReportRuns,
+  newRunId,
+  recordReportRun,
+  reportRunUri,
+  summariseRun,
+} from "@/lib/mcp/report-runs"
 import { TREND_PROVENANCE, getFilterTrend, getSupplierTrend, getSupplierCategoryTrend } from "@/lib/compliance-history"
 
 const DEMO_NOTE =
@@ -89,7 +102,11 @@ export function listAttributeProfiles(ctx: CallerContext, status?: ProfileStatus
       note: `No attribute profiles with status "${status}". Available statuses: ${available.join(", ")}. Call list_attribute_profiles with no filter to see all ${profiles.length} profiles.`,
     }
   }
-  return matches
+  // Wrapped rather than returned bare, for two reasons: this tool already
+  // returned an object in the empty case above, so a bare array made its shape
+  // depend on whether anything matched; and the route can only attach the
+  // correlation id (audit_id) to an object payload.
+  return { matches, count: matches.length }
 }
 
 export function getProfileDetail(ctx: CallerContext, brickCode: string) {
@@ -145,14 +162,19 @@ export function getSupplierCompliance(supplier: string) {
 
 /** The global System attribute filters both sides of the network can run. */
 export function listSystemFilters() {
-  return SYSTEM_FILTERS.map(({ id, name, description, scope }) => ({ id, name, description, scope }))
+  return { filters: SYSTEM_FILTERS.map(({ id, name, description, scope }) => ({ id, name, description, scope })) }
 }
 
 /**
  * Run a defensive Compliance Report across the retailer's vendor base —
  * the same engine the portal's retailer Compliance Reports screen uses.
- * Stateless read: computed on demand from current data; the portal UI keeps
- * its own report queue, so nothing is persisted here.
+ *
+ * Computed on demand from current data, then *retained*: the run is recorded
+ * against this tenant (lib/mcp/report-runs.ts) and served back as an MCP
+ * resource carrying the full CSV. That retention is what lets a report be
+ * re-opened, cited by run id, and handed to someone else — the difference
+ * between a number the model said once and an artifact. The portal still keeps
+ * its own separate report queue; production would merge the two.
  */
 export function runComplianceReport(ctx: CallerContext, args: {
   systemFilterId?: string
@@ -204,21 +226,100 @@ export function runComplianceReport(ctx: CallerContext, args: {
     vendorScope = match.supplier
   }
 
+  const options = { maxAttributes: maxAttributes ?? 10, ignoreDiscontinued: true, tenantId: ctx.tenantId }
+  const startedAt = Date.now()
   const result = runRetailerReport(
     RETAILER_SUPPLIERS,
     getStore(ctx.tenantId).profiles,
     filter,
     resolvedProfile,
     vendorScope,
-    { maxAttributes: maxAttributes ?? 10, ignoreDiscontinued: true, tenantId: ctx.tenantId }
+    options
   )
 
+  // Keep the run. Everything below this line is what separates "a number the
+  // model said once" from "a run someone can re-open, quote, and hand to an
+  // auditor" — the same ReportRequest the portal's report queue is built on,
+  // stored against this tenant and addressable as report://run/{id}.
+  const requestedAt = new Date()
+  const requestedBy = ctx.subjectId ?? ctx.agentId
+  const run: ReportRequest = {
+    id: newRunId(requestedAt),
+    side: "retailer",
+    filter,
+    filterLabel,
+    profileName: resolvedProfile,
+    vendorScope,
+    options,
+    requestedBy,
+    requestedAt: requestedAt.toISOString(),
+    status: "Complete",
+    durationMs: Date.now() - startedAt,
+    fileName: buildReportFileName(requestedBy, filterLabel),
+    result,
+  }
+  recordReportRun(ctx.tenantId, run)
+
   return {
+    run_id: run.id,
+    resource_uri: reportRunUri(run.id),
     filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
     vendorScope: vendorScope === "all" ? "All vendors" : vendorScope,
     ...result,
+    citation_note: `Quote run id ${run.id} alongside any figure from this report, so the number can be traced back to the exact scan that produced it.`,
+    artifact_note: `The full CSV — every vendor row, not just the ranked summary above — is attached as MCP resource ${reportRunUri(run.id)} (${run.fileName}). Offer it whenever the user wants to share, file, or archive this report; use get_report_run to re-open it later, or list_report_runs to see earlier scans.`,
     demo_note:
-      "Computed on demand from mock demo data; nothing is persisted — the portal UI keeps its own report queue. Attributes waived by an Active vendor exception are not counted as gaps.",
+      "Computed on demand from mock demo data. The run itself is retained for this organisation (in demo memory, so it resets on cold start) and is readable as an MCP resource. Attributes waived by an Active vendor exception are not counted as gaps.",
+  }
+}
+
+/**
+ * Earlier report runs for this tenant — the "the Belk scan from Tuesday" lookup.
+ *
+ * Returns summaries rather than full results: a listing is a menu. The rows live
+ * in the CSV behind each run's resource.
+ */
+export function listReportRunHistory(ctx: CallerContext, args: { limit?: number }) {
+  const runs = listReportRuns(ctx.tenantId, args.limit ?? 20)
+  if (runs.length === 0) {
+    return {
+      runs: [],
+      note: "No compliance reports have been run through this connection yet. Run one with run_compliance_report — it will be retained here and attached as a downloadable CSV resource.",
+    }
+  }
+  return {
+    runs: runs.map(summariseRun),
+    note: `${runs.length} retained report run${runs.length === 1 ? "" : "s"} for your organisation, newest first. Each one's full CSV is readable as an MCP resource at its resource_uri.`,
+    demo_note:
+      "Runs are retained in demo memory for this organisation only and reset on cold start. Another tenant's runs are not addressable through this connection.",
+  }
+}
+
+/** Re-open one retained run by id. Scoped to the caller's tenant by getReportRun. */
+export function getReportRunDetail(ctx: CallerContext, args: { runId: string }) {
+  const id = args.runId?.trim()
+  const run = id ? getReportRun(ctx.tenantId, id) : undefined
+  if (!run) {
+    const known = listReportRuns(ctx.tenantId, 10).map((r) => r.id)
+    return {
+      error: `No retained report run with id "${args.runId}" for your organisation.`,
+      knownRunIds: known,
+      note:
+        known.length > 0
+          ? `Your most recent run ids: ${known.join(", ")}. Use list_report_runs to see them with their parameters.`
+          : "No reports have been run through this connection yet. Run one with run_compliance_report.",
+    }
+  }
+
+  return {
+    ...summariseRun(run),
+    missingAttributes: run.result.missingAttributes,
+    distinctMissingTotal: run.result.distinctMissingTotal,
+    byCategory: run.result.byCategory,
+    excluded: run.result.excluded,
+    artifact_note: `The full CSV, including all ${run.result.rows.length} detail rows, is attached as MCP resource ${reportRunUri(run.id)} (${run.fileName}).`,
+    demo_note:
+      "Re-read from this organisation's retained runs — the same figures the original scan produced, not a re-computation against today's data.",
   }
 }
 
@@ -467,7 +568,9 @@ export function listVendorExceptions(ctx: CallerContext, vendor?: string, status
         : `No vendor exceptions with status "${status}". Call list_vendor_exceptions with no filters to see all ${vendorExceptions.length}.`,
     }
   }
-  return matches
+  // Wrapped for the same reason as listAttributeProfiles: consistent shape with
+  // the empty case above, and an object the correlation id can attach to.
+  return { matches, count: matches.length }
 }
 
 /**
@@ -1273,6 +1376,11 @@ export function queryAccessLog(ctx: CallerContext, args: {
   const truncated = rows.length > limit
   return {
     entries: rows.slice(0, limit).map((e) => ({
+      // Returned so the log is addressable from the outside: every tool
+      // response carries its own audit_id, and this is the field that resolves
+      // one back to the record. Without it a user can quote an id nobody can
+      // then look up, which is worse than not quoting one.
+      id: e.id,
       timestamp: e.timestamp,
       actingAs: e.subjectType === "workload" ? `service identity (${e.agentId})` : e.subjectId,
       agent: e.agentId,

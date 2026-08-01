@@ -30,6 +30,26 @@ export interface Tenant {
    * authenticated property of the identity), local source.
    */
   realm: string
+  /**
+   * For supplier tenants: the vendor name retailers know this supplier by — the
+   * string that appears in `RETAILER_SUPPLIERS`, in exception rows, and in the
+   * supplier's own catalogue fixture.
+   *
+   * This exists because "which tenant is calling" and "which vendor's rows are
+   * theirs" were previously two different things joined by a module constant:
+   * `myVendorName()` returned `SUPPLIER_PERSONA` and discarded its
+   * `CallerContext` entirely. With one supplier tenant that reads as a
+   * simplification; with two it is a data leak, because the second tenant
+   * authenticates cleanly, passes `runGuarded`, and is served the first one's
+   * catalogue. Deriving the vendor name from the authenticated tenant is the
+   * same rule the rest of this file exists to enforce — a caller never asserts
+   * who it is — applied one level further in.
+   *
+   * Absent on retailer tenants, and absent on a supplier tenant that has no
+   * catalogue fixture yet. Callers must treat absence as "serve nothing",
+   * never as "fall back to the demo persona".
+   */
+  vendorName?: string
 }
 
 /**
@@ -66,8 +86,21 @@ export type TenantRole = "admin" | "member"
 export const TENANTS: Tenant[] = [
   { id: "dillards", name: "Dillard's", tenantClass: "retailer", realm: "dillards.demo" },
   { id: "belk", name: "Belk", tenantClass: "retailer", realm: "belk.demo" },
-  { id: "jrenee", name: "J.Renée", tenantClass: "supplier", realm: "jrenee.demo" },
+  { id: "jrenee", name: "J.Renée", tenantClass: "supplier", realm: "jrenee.demo", vendorName: "J.Renée" },
 ]
+
+/**
+ * The vendor name a supplier tenant trades under, or undefined.
+ *
+ * Undefined for retailer tenants, for unknown ids, and for a supplier tenant
+ * with no catalogue — all three of which must lead callers to serve nothing
+ * rather than to a default.
+ */
+export function vendorNameForTenant(tenantId: string): string | undefined {
+  const tenant = getTenant(tenantId)
+  if (!tenant || tenant.tenantClass !== "supplier") return undefined
+  return tenant.vendorName
+}
 
 // An admin and a member on each of the two demoed sides, so the role gate can
 // be shown rather than merely asserted. Belk carries one member only — it
