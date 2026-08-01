@@ -38,6 +38,24 @@ Sign in with `buyer@dillards.demo`, `buyer@belk.demo`, or `catalog@jrenee.demo` 
 > merge to `main` and use the production URL). Also check Firewall/Bot
 > Protection isn't challenging non-browser clients.
 
+> **`Unknown client_id` / "registration was not issued by this deployment" when
+> signing in?** Your AI client is presenting a registration the server can no
+> longer verify. Registrations used to live in server memory, so they were lost
+> on every cold start and redeploy while the client kept re-sending the same
+> id — the connector worked when first added and then failed days later. They
+> are now signed and self-contained, so they survive restarts. Two things to
+> check, in order: **remove the connector and add it again** (one-time, to
+> replace the stale registration), and make sure `TGC_OAUTH_PRIVATE_JWK` is set
+> in the hosting project — without it each instance derives its own secret and
+> the same failure returns.
+
+> **Connector shows as connected but lists no tools?** That is an
+> authentication failure, not an empty tool list — the server returns 401
+> before the tool catalogue is ever built, and clients render that as a
+> connector with nothing in it. Check the two causes above; both produce it.
+> A supplier sign-in (`admin@jrenee.demo`) should list 13 tools, a retailer
+> sign-in more.
+
 > **Asked to sign in again part-way through a session, or seeing
 > `Token rejected: signature verification failed` in the Access log?** The
 > deployment is signing tokens with a different key per serverless instance, so

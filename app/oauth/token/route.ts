@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     const clientId = String(form.get("client_id") ?? "")
     const redirectUri = String(form.get("redirect_uri") ?? "")
 
-    const entry = consumeAuthCode(code)
+    const entry = await consumeAuthCode(code)
     if (!entry) return oauthError("invalid_grant", "Authorization code is unknown, already used, or expired.")
     if (entry.clientId !== clientId) return oauthError("invalid_grant", "Authorization code was issued to a different client.")
     if (entry.redirectUri !== redirectUri) return oauthError("invalid_grant", "redirect_uri does not match the authorization request.")
