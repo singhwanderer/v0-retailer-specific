@@ -1,28 +1,36 @@
 // Token endpoint.
 //
-// Two grants, because there are genuinely two kinds of caller (§4A rows 3-4):
+// Three grants — two kinds of caller (§4A rows 3-4), and a human session that
+// outlives one access token:
 //
 //   authorization_code   A human delegated this action in a live session. The
 //                        tenant rides along from the sign-in that produced the
 //                        code — it is never re-read from the request.
+//
+//   refresh_token        That same session an hour later. Tenant, subject and
+//                        role ride along from the original sign-in in exactly
+//                        the same way; the request supplies none of them and
+//                        cannot widen what was granted.
 //
 //   client_credentials   An autonomous workload with no human in the session,
 //                        e.g. a scheduled compliance check. Its tenant comes
 //                        from its provisioning record, so it cannot choose one
 //                        either. Read-only by policy.
 //
-// Both mint audience-bound tokens (RFC 8707): the `aud` is this deployment's
-// MCP endpoint and nothing else, so the token is useless against any other
-// service — and any other service's token is useless here.
+// All three mint audience-bound tokens (RFC 8707): the `aud` is this
+// deployment's MCP endpoint and nothing else, so the token is useless against
+// any other service — and any other service's token is useless here.
 
 import { isScope, type Scope } from "@/lib/mcp/context"
 import {
   consumeAuthCode,
   getWorkloadClient,
   issueAccessToken,
+  issueRefreshToken,
   originFromRequest,
   resourceIdentifier,
   verifyPkceS256,
+  verifyRefreshToken,
 } from "@/lib/mcp/oauth"
 import { getTenant } from "@/lib/mcp/tenants"
 
@@ -73,7 +81,67 @@ export async function POST(req: Request) {
         access_token: token,
         token_type: "Bearer",
         expires_in: expiresIn,
+        refresh_token: await issueRefreshToken({
+          clientId: entry.clientId,
+          tenantId: tenant.id,
+          subjectId: entry.subjectId,
+          role: entry.role,
+          scopes: entry.scopes,
+        }),
         scope: entry.scopes.join(" "),
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    )
+  }
+
+  // ── Renewal of a human-delegated session ──────────────────────────────────
+  if (grantType === "refresh_token") {
+    const presented = String(form.get("refresh_token") ?? "")
+    const clientId = String(form.get("client_id") ?? "")
+
+    const grant = await verifyRefreshToken(presented)
+    if (!grant) return oauthError("invalid_grant", "Refresh token is unknown or expired. Sign in again.")
+    // Bound to the client the original code was issued to, so one client's
+    // refresh token is not usable by another that happens to obtain it.
+    if (grant.clientId !== clientId) {
+      return oauthError("invalid_grant", "Refresh token was issued to a different client.")
+    }
+
+    const tenant = getTenant(grant.tenantId)
+    if (!tenant) return oauthError("invalid_grant", "The tenant this session belongs to no longer exists.")
+
+    // Same rule as the workload grant below: a request may ask for less than it
+    // holds, never more. Renewal is not a second consent screen.
+    const requested = String(form.get("scope") ?? "")
+      .split(/[\s+]+/)
+      .filter(isScope) as Scope[]
+    const granted = requested.length > 0 ? requested.filter((s) => grant.scopes.includes(s)) : grant.scopes
+
+    if (granted.length === 0) {
+      return oauthError("invalid_scope", `This session holds: ${grant.scopes.join(", ")}.`)
+    }
+
+    const { token, expiresIn } = await issueAccessToken({
+      issuer,
+      audience,
+      subject: grant.subjectId,
+      tenantId: tenant.id,
+      agentId: grant.clientId,
+      subjectType: "user",
+      role: grant.role,
+      scopes: granted,
+    })
+
+    return Response.json(
+      {
+        access_token: token,
+        token_type: "Bearer",
+        expires_in: expiresIn,
+        // Rotated, so the token just presented should not be reused. Not
+        // revocation — there is no store to revoke against — but it keeps a
+        // long-lived credential from sitting unchanged in a client for a month.
+        refresh_token: await issueRefreshToken({ ...grant, scopes: granted }),
+        scope: granted.join(" "),
       },
       { headers: { "Cache-Control": "no-store" } }
     )

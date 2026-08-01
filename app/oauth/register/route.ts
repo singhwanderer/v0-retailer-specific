@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       client_name: client.client_name,
       redirect_uris: client.redirect_uris,
       client_id_issued_at: Math.floor(client.created_at / 1000),
-      grant_types: ["authorization_code"],
+      grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: "none",
     },

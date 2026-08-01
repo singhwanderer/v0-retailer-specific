@@ -42,8 +42,6 @@ import {
   listAttributeProfiles,
   listMySuppliers,
   getComplianceTrend,
-  getReportRunDetail,
-  listReportRunHistory,
   listSystemFilters,
   listVendorExceptions,
   queryAccessLog,
@@ -304,46 +302,6 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: true,
     handler: (ctx, args) => runComplianceReport(ctx, args),
-  },
-  {
-    name: "list_report_runs",
-    description:
-      "List compliance reports previously run through this connection for your organisation, newest first — the 'pull up the scan from Tuesday' lookup. Each run carries its run id, who ran it, when, the exact parameters used, headline figures, and a resource_uri whose MCP resource holds the full CSV (every detail row, not just the ranked summary). Use this to re-open, compare, or re-share an earlier report instead of re-running it, since a re-run would score against today's data rather than the data the original scan saw. Covers whichever report tool your side of the network uses.",
-    schema: {
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(50)
-        .optional()
-        .describe("Maximum runs to return, newest first. Default 20."),
-    },
-    kind: "read",
-    requiredScope: SCOPES.read,
-    // Both classes: runs are stored per tenant (lib/mcp/report-runs.ts), so a
-    // retailer and a supplier each see only their own. The tool is the same
-    // question on both sides — "what did I run before?" — and gating it to one
-    // class would mean the supplier report tool produced artifacts nothing
-    // could re-open.
-    allowedTenantClasses: BOTH_CLASSES,
-    allowWorkload: true,
-    handler: (ctx, args) => listReportRunHistory(ctx, args),
-  },
-  {
-    name: "get_report_run",
-    description:
-      "Re-open one retained compliance report by its run id (from run_compliance_report or list_report_runs). Returns the parameters it was run with, its headline figures, ranked missing attributes, and per-category breakdown, exactly as that scan produced them — not re-computed against today's data. The full CSV including every detail row is attached as the MCP resource named in resource_uri.",
-    schema: {
-      runId: z.string().describe("A run id, e.g. 'run-20260731-4f2a'. From a report tool or list_report_runs."),
-    },
-    kind: "read",
-    requiredScope: SCOPES.read,
-    // Both classes, for the same reason as list_report_runs — and safely,
-    // because getReportRun() is keyed by tenant and has no lookup-by-id-alone,
-    // so one side cannot resolve the other's run id.
-    allowedTenantClasses: BOTH_CLASSES,
-    allowWorkload: true,
-    handler: (ctx, args) => getReportRunDetail(ctx, args),
   },
   {
     name: "get_compliance_trend",
@@ -1058,7 +1016,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "run_my_compliance_report",
     description:
-      "Run a compliance report across your OWN catalogue and get it back as a downloadable CSV artifact — the 'am I ready for this retailer before they pull my data?' scan. Scan against either a global System scorecard (systemFilterId, from list_system_filters) or one retail partner's account filter (retailer). Returns overall completion %, ranked missing attributes, per-category breakdown, and a run id whose full CSV (every product row) is attached as an MCP resource. Retained, so you can re-open it later with get_report_run rather than re-running it. WHICH FILTER TO PICK: a retail partner answers 'am I ready for them', and is usually what the supplier means. Of the scorecards, 'gs1-extended' is the one that surfaces outstanding attributes; 'gs1-core' and 'nrf-retail-ready' cover core fields that are always populated in this demo catalogue, so they score 100% and are not evidence of overall readiness. NOTE: a System scorecard is a different measure from get_my_open_gaps' 'gs1' baseline target and the two will not agree — always say which one a figure came from.",
+      "Run a compliance report across your OWN catalogue — the 'am I ready for this retailer before they pull my data?' scan. Scan against either a global System scorecard (systemFilterId, from list_system_filters) or one retail partner's account filter (retailer). Returns overall completion %, ranked missing attributes and per-category breakdown, computed against the catalogue as it stands right now — nothing is retained, so re-running later will give different figures as products are enriched. WHICH FILTER TO PICK: a retail partner answers 'am I ready for them', and is usually what the supplier means. Of the scorecards, 'gs1-extended' is the one that surfaces outstanding attributes; 'gs1-core' and 'nrf-retail-ready' cover core fields that are always populated in this demo catalogue, so they score 100% and are not evidence of overall readiness. NOTE: a System scorecard is a different measure from get_my_open_gaps' 'gs1' baseline target and the two will not agree — always say which one a figure came from.",
     schema: {
       systemFilterId: z
         .string()

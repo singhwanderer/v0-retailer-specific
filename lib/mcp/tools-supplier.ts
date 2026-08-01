@@ -18,13 +18,7 @@
 import type { CallerContext } from "@/lib/mcp/context"
 import { exceptionsGrantedToVendor } from "@/lib/mcp/store"
 import { vendorNameForTenant } from "@/lib/mcp/tenants"
-import {
-  buildReportFileName,
-  runSupplierReport,
-  type ReportFilterRef,
-  type ReportRequest,
-} from "@/lib/compliance-report"
-import { newRunId, recordReportRun, reportRunUri } from "@/lib/mcp/report-runs"
+import { runSupplierReport, type ReportFilterRef } from "@/lib/compliance-report"
 import { PARTNERS } from "@/lib/partner-filters"
 import { SYSTEM_FILTERS, getSystemFilter } from "@/lib/system-filters"
 import {
@@ -104,10 +98,9 @@ function isRefusal(r: SupplierIdentity | SupplierRefusal): r is SupplierRefusal 
  * for Retailer B before they pull my data?" scan.
  *
  * `runSupplierReport` is the same engine the supplier portal's own report queue
- * uses; it existed in full and had simply never been reachable over MCP. The run
- * is retained and served as a CSV resource through exactly the same path the
- * retailer side uses (lib/mcp/report-runs.ts), so artifact parity arrives on
- * both surfaces from one implementation rather than two.
+ * uses; it existed in full and had simply never been reachable over MCP. Results
+ * come back inline — see runComplianceReport in lib/mcp/tools.ts for why the
+ * retained-artifact layer that once wrapped both sides was removed.
  *
  * Note what this does *not* need: any retailer's requirement data. It scans the
  * supplier's own products against gap state the supplier already holds, so it
@@ -175,36 +168,14 @@ export function runMyComplianceReport(
     tenantId: ctx.tenantId,
   }
 
-  const startedAt = Date.now()
   const result = runSupplierReport(products, filter, options)
-  const requestedAt = new Date()
-
-  const run: ReportRequest = {
-    id: newRunId(requestedAt),
-    side: "supplier",
-    filter,
-    filterLabel,
-    vendorScope: vendor,
-    options,
-    requestedBy: ctx.subjectId ?? ctx.agentId,
-    requestedAt: requestedAt.toISOString(),
-    status: "Complete",
-    durationMs: Date.now() - startedAt,
-    fileName: buildReportFileName(vendor, filterLabel),
-    result,
-  }
-  recordReportRun(ctx.tenantId, run)
 
   return {
-    run_id: run.id,
-    resource_uri: reportRunUri(run.id),
     vendor,
     filter: { label: filterLabel, type: filter.kind === "system" ? "System" : "Account" },
     ...result,
-    citation_note: `Quote run id ${run.id} alongside any figure from this report, so the number can be traced back to the exact scan that produced it.`,
-    artifact_note: `The full CSV — every product row, not just the ranked summary above — is attached as MCP resource ${reportRunUri(run.id)} (${run.fileName}). Use get_report_run to re-open it later, or list_report_runs to see earlier scans.`,
     demo_note:
-      "Computed on demand from this supplier's own mock catalogue, using the same engine and the same filter vocabulary as the supplier portal's report screen. The run is retained for this organisation (in demo memory, so it resets on cold start) and is readable as an MCP resource. Scoring a retail partner uses that partner's recorded gap state for your products, not a live read of the retailer's requirement set. A System scorecard and get_my_open_gaps' GS1 baseline are different measures and will not agree — say which one a number came from.",
+      "Computed on demand from this supplier's own mock catalogue, using the same engine and the same filter vocabulary as the supplier portal's report screen. Scoring a retail partner uses that partner's recorded gap state for your products, not a live read of the retailer's requirement set. A System scorecard and get_my_open_gaps' GS1 baseline are different measures and will not agree — say which one a number came from.",
   }
 }
 

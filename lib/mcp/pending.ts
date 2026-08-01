@@ -31,7 +31,7 @@
 import type { CallerContext } from "@/lib/mcp/context"
 
 /** Deliberately short. A proposal is a live conversational turn, not a ticket. */
-export const PENDING_TTL_MS = 10 * 60 * 1000
+const PENDING_TTL_MS = 10 * 60 * 1000
 
 export interface PendingChange {
   token: string

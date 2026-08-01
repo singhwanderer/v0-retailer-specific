@@ -51,7 +51,7 @@ import {
 import { DEFAULT_SCOPES, isScope, type Scope } from "@/lib/mcp/context"
 import type { TenantRole } from "@/lib/mcp/tenants"
 
-export const JWT_ALG = "RS256"
+const JWT_ALG = "RS256"
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000
 
@@ -125,7 +125,8 @@ const globalScope = globalThis as typeof globalThis & {
  * Without it each serverless instance generates its own key pair, so a token
  * minted by one instance fails signature verification on the next — surfacing
  * as a spurious "Refused before sign-in" line in the audit log and, for the
- * caller, a full re-authentication mid-session (there is no refresh token).
+ * caller, a full re-authentication mid-session that even the refresh grant
+ * cannot rescue, since the refresh token is signed with the same material.
  * Generate a value with `pnpm gen:oauth-key`.
  */
 const PRIVATE_JWK_ENV = "TGC_OAUTH_PRIVATE_JWK"
@@ -404,6 +405,75 @@ export async function consumeAuthCode(code: string): Promise<AuthCode | undefine
     subjectId: payload.sub,
     role: payload.r,
     expiresAt: payload.x,
+  }
+}
+
+// ── Refresh tokens (stateless) ───────────────────────────────────────────────
+//
+// Access tokens last an hour and there was previously nothing to renew them
+// with. That is not a cosmetic gap: when the token expires the next MCP call
+// gets a 401 before buildHandler is ever reached, and a client with no tool
+// catalogue to show renders the connector as EMPTY rather than as an expired
+// session. "It lost all its tools" and "you need to sign in again" look
+// identical from the outside, and only one of them is true.
+//
+// Same signed-envelope shape as everything else here, so renewal works on
+// whichever instance answers — the whole point of this file.
+
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+export interface RefreshGrant {
+  clientId: string
+  tenantId: string
+  subjectId: string
+  role: TenantRole
+  scopes: Scope[]
+}
+
+/** The grant as it travels inside the refresh token. Short keys, as above. */
+interface RefreshPayload {
+  c: string
+  tn: string
+  sub: string
+  r: TenantRole
+  s: Scope[]
+  /** expiry, ms since epoch */
+  x: number
+  /** salt, so a rotation always yields a different token */
+  z: string
+}
+
+export async function issueRefreshToken(grant: RefreshGrant): Promise<string> {
+  const payload: RefreshPayload = {
+    c: grant.clientId,
+    tn: grant.tenantId,
+    sub: grant.subjectId,
+    r: grant.role,
+    s: grant.scopes,
+    x: Date.now() + REFRESH_TOKEN_TTL_MS,
+    z: randomBytes(9).toString("base64url"),
+  }
+  return signEnvelope(payload)
+}
+
+/**
+ * Verify a refresh token and recover the grant it carries.
+ *
+ * Note what is NOT re-read from the request at renewal time: tenant, subject
+ * and role all travel inside the token, exactly as they travel inside an
+ * authorization code. Renewal is the same session an hour later, not a second
+ * consent screen and not an opportunity to become someone else.
+ */
+export async function verifyRefreshToken(token: string): Promise<RefreshGrant | undefined> {
+  const payload = await openEnvelope<RefreshPayload>(token)
+  if (!payload) return undefined
+  if (typeof payload.x !== "number" || payload.x < Date.now()) return undefined
+  return {
+    clientId: payload.c,
+    tenantId: payload.tn,
+    subjectId: payload.sub,
+    role: payload.r,
+    scopes: Array.isArray(payload.s) ? payload.s.filter(isScope) : [],
   }
 }
 

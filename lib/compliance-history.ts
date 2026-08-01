@@ -38,7 +38,7 @@ export const TREND_PROVENANCE = "reconstructed" as const
  * Derives from the real clock so the window never goes stale in a doc or a
  * demo run months from now.
  */
-export function getTrendMonths(asOf: Date = new Date()): string[] {
+function getTrendMonths(asOf: Date = new Date()): string[] {
   const labels: string[] = []
   for (let i = 5; i >= 0; i--) {
     const d = new Date(asOf.getFullYear(), asOf.getMonth() - i, 1)
