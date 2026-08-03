@@ -289,6 +289,18 @@ guarantees are actually guarantees. Anywhere the column says "requested only," w
 owe ourselves a measurement, because **a request that is never measured is an
 assumption.**
 
+## One assumption this whole comparison rests on
+
+Everything above assumes the question can be answered from **one system's data** —
+which is true of catalogue compliance today, and stops being true the moment the
+expansion in Section 4 succeeds. A deduction dispute spans orders, shipments,
+invoices and catalogue records at once.
+
+That does not overturn the comparison, but it does add a third option that is
+invisible from here, and it changes which surface wins for which question.
+Section 4 picks that up directly, because it is the difference between an
+expansion plan that works and one that quietly turns into four integrations.
+
 ---
 ---
 
@@ -432,6 +444,160 @@ stage 3 and 4 concretely look like, not whether they are worth pursuing.
 — nothing ships across a boundary until the control for that boundary exists —
 is being applied again, one level up, to a real and current conversation. That is
 consistent with the rest of this document's argument, not an exception to it.
+
+## When the answer spans systems, who owns the join?
+
+Section 3 compared two surfaces on the assumption that one system holds the
+answer. Stage 3 breaks that assumption on purpose. So the question has to be
+asked again, and it resolves differently.
+
+The reframe that does most of the work: **spanning systems is a reading problem.
+Acting is not.** Filing a dispute, granting a waiver, correcting an item — each
+of those still belongs to exactly one system, no matter how many systems the
+question had to touch to get there. So the two surfaces do not merge as data
+spreads out. They specialise harder: **reads drift outward toward whoever can
+reach everything, while writes stay pinned to the product that owns the record.**
+
+Which gives a usable rule:
+
+| When the question spans | The better surface is | Because |
+| --- | --- | --- |
+| One system, and an action follows | That product's in-product agent | Authority, workflow context and citation are all enforceable there |
+| One system, insight only, asked somewhere else | The external connector | Portability is the entire value |
+| Several systems, all of them ours | The insight layer | We can compute the join deterministically and stand behind it |
+| Several systems, some of them the customer's | The customer's own assistant | It is the only thing that can physically reach both, and we cannot compete with that |
+
+Two things about that last row deserve saying plainly.
+
+**The customer's assistant has an advantage here we cannot ever close.** The
+decisive evidence for a deduction may sit in their own receiving system, their
+warehouse records, or their logistics provider's data — none of which we will
+ever hold. That is not a gap to out-build. It is a reason to be an excellent
+participant in someone else's assembly rather than to pretend we can own every
+question.
+
+**But it also acquires a failure mode that gets worse with every system added.**
+With one system, the grounding rules mostly hold: a single engine computed the
+number and the assistant relays it. With four, **the model itself is performing
+the join** — and nothing guarantees that the item identifier in the catalogue is
+the same identifier on the invoice line, or that a completeness score and an
+on-time score can be sensibly related at all. It will produce a confident
+narrative across that seam, because that is what it is good at. The three
+"requested only" rows in Section 3 degrade fastest precisely here, because now
+there is no deterministic answer it could have quoted even in principle.
+
+## Expansion means participating, not absorbing
+
+The obvious next move is the wrong one, and it is worth naming before it becomes
+the default plan.
+
+The instinct is to give the catalogue's own agent more reach — let it read
+orders, let it read invoices. That fails for three reasons:
+
+- It makes one product a client of data it has **no authority over and no
+  workflow context for.** It cannot show a user the screen where they would
+  verify an order, because it does not own that screen.
+- It does not scale past two systems. Every product reaching into every other
+  produces a quadratic number of trust relationships, each one a fresh place to
+  get authorization wrong.
+- It rebuilds the exact problem Section 1 opens on — a second copy of the
+  security logic per pair of systems — just moved one level up and given a
+  friendlier name.
+
+**Expanding across the network does not mean expanding the catalogue's agent. It
+means publishing capabilities clean and well-grounded enough that somebody else's
+join is trustworthy.** The catalogue becomes an excellent participant rather than
+the integrator, and that is a different roadmap from "add order tools to the
+compliance agent" — cheaper, and the only one that survives the third system.
+
+## The insight layer is the join owner — and therefore the upsell
+
+Here the architectural answer and the commercial answer turn out to be the same
+answer, which is the useful kind of coincidence.
+
+**The join owner already exists as a shipping product.** Two parts of the network
+already do this work:
+
+- **Trading Grid Insights** (formerly Trading Grid Lens) gives a view across all
+  transactions on the platform — partner and document metrics, historical
+  analytics — and is **already integrated with Aviator for real-time, AI-driven
+  querying.** So the in-product agent pattern over cross-transaction data is not
+  something this document is proposing. It ships.
+- **Trading Grid Command Center** is described as leveraging a common data
+  platform to integrate data from various sources across order-to-cash and
+  procure-to-pay, to find bottlenecks and predict disruptions. **That is the
+  cross-product join, productised.**
+
+So stage 3 is not "build an orchestrator." It is "feed one that already exists."
+That is a materially cheaper story than it first appears, and it is already a
+named direction — establishing the catalogue as the source of truth for buyer
+networks through cross-product integration is on the roadmap as a
+further-horizon bet. This is a mechanism for a bet we already hold, not a new one.
+
+**Which reframes the commercial motion.** The upsell is not "here is another
+product you could buy." It is:
+
+> **Every product you add makes the answers better, and the answers appear in the
+> insight layer.**
+
+Each rung has standalone value and compounding value at the same time. A customer
+who adds the supplier-facing portal gets that product's own worth, *and* every
+cross-document question they can already ask gets sharper. That is a much
+stronger motion than a bundle, because the value of what they already bought
+visibly increases.
+
+## How this pays back to the catalogue
+
+Worth being honest about, because somebody will ask it in the first meeting where
+this is presented: **the catalogue earns on data events flowing through the
+network, not on seats.** The insight products are a different revenue line. So on
+its face, this upsell is good for the company and neutral for the number the
+catalogue itself is accountable for.
+
+It pays back through one specific chain, and the chain has to be stated or the
+argument sounds like suite loyalty:
+
+> Cross-document insight shows that catalogue data quality is driving deductions →
+> the retailer now has a hard financial reason to mandate complete attributes from
+> their suppliers → more suppliers submit and maintain more data → more events
+> across the network.
+
+That is a **stronger** version of the visibility argument the catalogue already
+makes. A completeness score tells a retailer they have a data problem. A
+deduction figure tells them what that problem costs, in money, this quarter. The
+second one changes behaviour; the first one gets filed.
+
+## What has to stay true
+
+Three conditions, in the same spirit as the reuse condition above. Each is a
+place this could quietly fail.
+
+**1. The insight layer must sell computation, not collation.** This is the risk
+that runs in the opposite direction to everything above: the same standard
+interface that lets us assemble a cross-product view lets the *customer's*
+assistant assemble one too. Once every product publishes cleanly, "all your data
+on one dashboard" is something their own assistant reproduces for free. What it
+cannot reproduce is anything computed **across the network** — how this supplier
+compares to the median for their category, what normal looks like across millions
+of transactions, which partners fail this document type most often. Only the
+network operator can calculate those. The catalogue's own plans already reach for
+this, with supplier benchmarking and peer comparison. That instinct is the
+defensible half, and it should be the pitch.
+
+**2. The identifiers and the vocabulary have to line up.** Both multi-system paths
+depend on the products agreeing on what an item, an order and a trading partner
+are. If they do not, the insight layer cannot compute the join — and the
+customer's assistant will confidently fake it. This is a data-governance problem
+across product teams rather than an architecture decision one team can make,
+which likely makes it **slower than the identity work named above**, and it is
+the one most easily assumed away.
+
+**3. One insight surface per kind of question.** The catalogue has its own
+compliance dashboard coming. If that grows into a cross-document view, it will
+disagree with the insight layer in front of a customer, and two confident
+disagreeing answers is worse than one. Deciding now — the catalogue's dashboard
+answers catalogue questions, the insight layer answers cross-document ones — is
+nearly free today and expensive once both have shipped and both have users.
 
 ## The same architecture, described from outside
 
@@ -624,6 +790,21 @@ slide.**
 *OpenText product descriptions — all of Section 4's Trading Grid material:*
 
 - [Trading Grid](https://www.opentext.com/products/trading-grid), [Supply Chain Automation](https://www.opentext.com/products/supply-chain-automation), and the [Trading Grid with Aviator overview](https://www.opentext.com/media/product-overview/opentext-trading-grid-with-aviator-po-en.pdf) — the Active Orders scope, the 60+ country e-Invoicing coverage, and Aviator's natural-language-over-EDI capability all come from **public marketing pages, not internal roadmap**. Confirm the module boundaries and current capability with the product owners before presenting the expansion sequence as a plan
+- [Trading Grid Insights / Lens](https://www.softwareadvice.co.uk/software/393359/lens)
+  and [Trading Grid Command Center](https://www.opentext.com/en-gb/products/trading-grid-command-center)
+  — the transaction-wide view, the existing Aviator integration for AI-driven
+  querying, and Command Center's "common data platform integrating data from
+  various sources" all come from public product pages. **The claim that Command
+  Center is the natural owner of the cross-product join is this document's
+  argument, not the product's stated positioning** — validate with those product
+  owners before presenting it as a joint plan, since it has implications for
+  their roadmap as well as ours
+- **One inference, flagged rather than buried.** An internal working session
+  referred to scoping assistant access to catalogue tools only, "not Lens or CC
+  tools." Reading that shorthand as these two products is an inference drawn
+  while writing this document — it is not stated in any source. It is a
+  well-supported reading, and it is still a reading. Confirm it before relying on
+  it, for the same reason the deduction figure below was replaced
 
 *Analyst and security material:*
 
