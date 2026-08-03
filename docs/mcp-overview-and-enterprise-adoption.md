@@ -584,13 +584,73 @@ network operator can calculate those. The catalogue's own plans already reach fo
 this, with supplier benchmarking and peer comparison. That instinct is the
 defensible half, and it should be the pitch.
 
-**2. The identifiers and the vocabulary have to line up.** Both multi-system paths
-depend on the products agreeing on what an item, an order and a trading partner
-are. If they do not, the insight layer cannot compute the join — and the
-customer's assistant will confidently fake it. This is a data-governance problem
-across product teams rather than an architecture decision one team can make,
-which likely makes it **slower than the identity work named above**, and it is
-the one most easily assumed away.
+**2. The identifiers and the vocabulary have to line up — and memory is how this
+gets solved incrementally instead of by decree.** Both multi-system paths depend
+on the products agreeing on what an item, an order and a trading partner are. Left
+as a governance project, this is slow: it means standardising vocabulary across
+product teams before anything can be joined, and a lot of the real mappings are
+specific to one customer's own numbering and terminology, which a central data
+model handles badly. The practical fix is agent memory — an assistant that
+remembers, once corrected, that this retailer's reference number is that
+purchase order field, and applies the correction from then on. That converts a
+standardisation project into something that accumulates from ordinary use, and
+it is the only realistic way to cover the long tail of idiosyncratic mappings a
+formal model will never reach.
+
+**That fix only works if the memory is ours, not the customer's assistant's.**
+The July 2026 specification update removed the concept of a session entirely —
+every call now carries its own complete context, and nothing about memory is part
+of the protocol. Memory belongs to whoever runs the agent. If it lives in the
+customer's AI workspace, we cannot inspect it, correct it, or share it across the
+people who work at that account, and it is typically scoped per user — so two
+people at the same retailer can end up with two different mappings and two
+different answers to the same question, which is the canonical-number problem
+from Section 3 made permanent rather than per-session. If it lives in the
+embedded agent, it is tenant-scoped, correctable, shared, and it survives staff
+turnover. **This is a real argument for the embedded surface, on top of the ones
+already made — not a footnote to the memory idea, but a reason it belongs there.**
+
+A remembered mapping is also a belief, not a fact, and that distinction matters
+most exactly where the stakes are highest. For a deduction dispute, the entire
+deliverable is evidence a counterparty will actively contest. "The agent
+remembered these two fields mean the same thing" is not something that survives
+being put in front of a retailer's AP team. Memory can accelerate assembling a
+case; it cannot be what the case rests on. The fix is to give memory the same
+two-tier discipline the rest of this document already argues for everything
+else: a **remembered** mapping is a proposal, fine for navigation and drafting,
+never cited as evidence — a **ratified** mapping is one a human has confirmed
+once, after which it becomes a stored, versioned, audited fact belonging to the
+tenant rather than to the agent, usable by anyone at that account, and citable
+in a dispute. Propose, confirm, enforce — identical in shape to the two-phase
+write pattern already in Section 3, because it is the same problem: nothing
+should carry authority until a human has approved it once.
+
+Left unaddressed, this is also a genuine new attack surface, and it is worth
+naming rather than discovering in review. Security researchers now treat memory
+poisoning as a distinct category — OWASP added it to its Agentic AI Top 10 in
+2026 — precisely because it does not reset when the conversation ends: an
+attacker plants a false mapping once, and the agent acts on it months later,
+at machine speed, with no further interaction from the attacker required.
+Published attack success rates against unprotected agent memory run as high as
+90%+ in research settings. The uncomfortable detail is that our own two-phase
+confirmation does not catch this: it gates *actions* — a human approves "grant
+this waiver" — but the human confirming that action never sees that the term
+"this attribute" was resolved through a poisoned mapping upstream of the
+decision they thought they were making. Existing defences generally fail for
+the same reason: they check whether an action looks malicious, not whether a
+belief was corrupted before the action was even proposed. In a bilateral
+network where a counterparty has a direct financial incentive to make an
+inconvenient discrepancy disappear, treating this as theoretical would be a
+mistake. The ratify-before-it-counts design above is the mitigation — an
+unratified memory has no authority, so poisoning one produces a wrong
+suggestion to reject, not a wrong action taken — but it has to be built in from
+the start rather than retrofitted once memory is already load-bearing.
+
+One reason to build this regardless of the risk: a ratified, tenant-specific
+semantic map is proprietary in a way a generic assistant's memory cannot be.
+It accumulates from real disputes at one customer and is worthless to anyone
+else's — which is the *computation, not collation* argument from condition 1,
+extended from numbers to the vocabulary itself.
 
 **3. One insight surface per kind of question.** The catalogue has its own
 compliance dashboard coming. If that grows into a cross-document view, it will
@@ -634,7 +694,7 @@ wrong.** Disagree with a row without discarding the document.
 | Embedded AI assistants are becoming standard in enterprise software | **True** | **High** | Aviator ships one today over EDI data; every major enterprise suite has shipped or announced one | Customers actively switching them off. The opposite is happening |
 | The embedded agent is the right surface for actions that change things | **True** | **High** | Confirmation, impact preview, audit trail and separation of duties are all things we can *enforce* only where we own the screen | Confirmation moving into the protocol so completely that the distinction stops mattering. Partly happening — see the weaknesses below |
 | Embedded first, external selectively, is the right sequence | **True** | **Medium-high** | The hard work is shared; the embedded surface has the smaller blast radius and no third-party procurement conversation attached | A customer signing for external access before the embedded work lands. A good problem, and it would reorder the plan |
-| **External connectors will not make the embedded agent redundant** | **True** | **Medium** | The three "requested only" rows in Section 3. Citation, provenance and honest framing are guarantees only where we own the rendering | Assistants proving reliable enough at citation and provenance that the distinction is academic. **This is the row most likely to be argued with, and it should be** |
+| **External connectors will not make the embedded agent redundant** | **True** | **Medium-high** | The three "requested only" rows in Section 3, plus a fourth reason that hardens the case: memory. The vocabulary and identifier mapping that makes cross-system questions answerable has to live somewhere tenant-scoped, correctable and shared across an account — which a customer's own AI workspace structurally cannot offer, since it is typically scoped per user and outside our ability to inspect or fix | Assistants proving reliable enough at citation and provenance that the distinction is academic, or memory becoming a genuinely shared, auditable, tenant-level primitive inside third-party assistants rather than a per-user convenience. Neither is true today |
 
 ## Retail and CPG specifically
 
@@ -677,6 +737,20 @@ authoring, enforcing and deleting are four separate grants, nothing changing
 without a confirmation, and every action logged including the refusals. That is a
 defensible position — but it must always be stated as *"we did the work,"* never
 as *"this technology is secure."*
+
+**One category this list does not yet cover: memory poisoning**, now serious
+enough that it has its own place in OWASP's Agentic AI Top 10 as of 2026 — an
+attacker plants a false fact in an agent's persistent memory once, and the agent
+acts on it correctly-looking but wrongly, months later, with no further
+interaction from the attacker required. This matters here specifically because
+Section 4 proposes agent memory as the practical fix for cross-system vocabulary,
+and our own confirmation gate does not catch it: confirmation approves an
+*action*, not the belief that produced it, so a human confirming "grant this
+waiver" never sees that the term it was granted on was resolved through a
+corrupted mapping upstream. The mitigation is the same discipline as every other
+control in this document — nothing gets authority until a human has ratified it
+once — and it has to be designed in from the first memory feature, not added
+after memory is already something people rely on.
 
 **3. The standard is still moving, and it moves our own boundaries.** The
 specification released six days before this document changes the deployment model
@@ -810,6 +884,7 @@ slide.**
 
 - [Gartner — Hype Cycle for Agentic AI, 2026](https://www.gartner.com/en/articles/hype-cycle-for-agentic-ai) — the 17% figure, the >40% cancellation forecast, the trough placement. **Paywalled; these come from secondary coverage**
 - [OWASP — the tool-poisoning attack class](https://owasp.org/www-community/attacks/MCP_Tool_Poisoning), [Invariant Labs' cross-system demonstration](https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks), [Microsoft's warning](https://thehackernews.com/2026/06/microsoft-warns-poisoned-mcp-tool.html), and the [NSA guidance of June 2026](https://media.defense.gov/2026/Jun/02/2003943289/-1/-1/0/CSI_MCP_SECURITY.PDF)
+- Memory poisoning specifically — OWASP's 2026 Agentic AI Top 10 addition, and the general research finding that published attack success rates against unprotected agent memory run very high in controlled settings. Individual percentages are research-setting figures, not production incident rates, and should be treated that way if quoted
 - Supply-chain analyst framing on shared capabilities across agents — [ARC Advisory Group](https://www.arcweb.com/blog/ai-supply-chain-part-3-mcp-model-context-protocol-shared-reasoning-across-agents) and [Logistics Viewpoints](http://logisticsviewpoints.com/2026/07/29/model-context-protocol-and-the-future-of-agentic-supply-chains/)
 - [Stacklok — State of MCP in Retail 2026](https://stacklok.com/resources/state-of-mcp-in-retail-2026/) — the >40%-of-retailers-in-production figure and the data-quality finding
 
