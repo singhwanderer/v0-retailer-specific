@@ -21,6 +21,10 @@ retrieval, so those figures are marked as needing a primary-source check before
 they go in front of a customer or onto a slide. Read that section before quoting
 a number from this one.
 
+**There is also an annex at the end**, separate from the argument: the screens a
+cross-product collaboration demo would need, for the other product teams. They are
+unbuilt, and the annex is the brief for building them.
+
 ---
 ---
 
@@ -546,6 +550,44 @@ cross-document question they can already ask gets sharper. That is a much
 stronger motion than a bundle, because the value of what they already bought
 visibly increases.
 
+## Anchor and engine, not two halves
+
+It is tempting to describe this as shared ownership — the catalogue holds item
+vocabulary, the insight layer holds cross-document joins, everyone contributes.
+That framing is comfortable and it is wrong, because it makes two things sound
+like peers when one is a foundation the other stands on.
+
+**The catalogue is the vocabulary anchor. The insight layer is the join engine.**
+
+If the catalogue publishes canonical item identity as something any other product
+can call, the insight layer stops resolving items altogether. It no longer needs
+to know that this stock code and that one are the same product — it asks. Its job
+narrows to the genuinely cross-document part: order references, document numbers,
+the fields that only exist because two systems recorded the same event
+differently. That is a smaller and more tractable problem than the one it would
+otherwise own.
+
+**Strategically this is the difference between being a dependency and being a
+feed.** A product whose identity layer everything else calls is very hard to
+remove. A product that merely contributes rows to somebody else's warehouse is
+replaceable by any other source of the same rows.
+
+Which names the real risk inside our own portfolio, and it is worth saying before
+someone else does: **if the insight layer builds its own item resolution — because
+ours is not reachable, not fast enough, or simply not published as something
+callable — the catalogue gets bypassed and becomes just another feed.** That is
+not a hostile act by anyone; it is what a team does when it needs an answer and
+the anchor is not available. Whoever establishes canonical identity first holds
+the anchor position, which is a strong argument for publishing identity
+capabilities early rather than waiting until the mapping design is perfect.
+
+One tension to hold rather than resolve prematurely: the more portable and
+exportable a customer's mapping is, the less it locks them in — but the less
+portable it is, the more they hesitate to invest in building it at all. The
+resolution is probably readable and exportable by the customer, maintained in the
+platform. Trust is what buys adoption, and adoption is what creates the switching
+cost anyway.
+
 ## How this pays back to the catalogue
 
 Worth being honest about, because somebody will ask it in the first meeting where
@@ -584,73 +626,127 @@ network operator can calculate those. The catalogue's own plans already reach fo
 this, with supplier benchmarking and peer comparison. That instinct is the
 defensible half, and it should be the pitch.
 
-**2. The identifiers and the vocabulary have to line up — and memory is how this
-gets solved incrementally instead of by decree.** Both multi-system paths depend
-on the products agreeing on what an item, an order and a trading partner are. Left
-as a governance project, this is slow: it means standardising vocabulary across
-product teams before anything can be joined, and a lot of the real mappings are
-specific to one customer's own numbering and terminology, which a central data
-model handles badly. The practical fix is agent memory — an assistant that
-remembers, once corrected, that this retailer's reference number is that
-purchase order field, and applies the correction from then on. That converts a
-standardisation project into something that accumulates from ordinary use, and
-it is the only realistic way to cover the long tail of idiosyncratic mappings a
-formal model will never reach.
+**2. The identifiers and the vocabulary have to line up — and the answer is a
+declared mapping surface, not a clever agent.** Both multi-system paths depend on
+the products agreeing on what an item, an order and a trading partner are. The
+temptation is to let the assistant work it out and remember the answer. That is
+the wrong instinct, and it is worth being precise about why, because the right
+answer is both safer and simpler.
 
-**That fix only works if the memory is ours, not the customer's assistant's.**
-The July 2026 specification update removed the concept of a session entirely —
-every call now carries its own complete context, and nothing about memory is part
-of the protocol. Memory belongs to whoever runs the agent. If it lives in the
-customer's AI workspace, we cannot inspect it, correct it, or share it across the
-people who work at that account, and it is typically scoped per user — so two
-people at the same retailer can end up with two different mappings and two
-different answers to the same question, which is the canonical-number problem
-from Section 3 made permanent rather than per-session. If it lives in the
-embedded agent, it is tenant-scoped, correctable, shared, and it survives staff
-turnover. **This is a real argument for the embedded surface, on top of the ones
-already made — not a footnote to the memory idea, but a reason it belongs there.**
+Four steps, in order of how much work each removes:
 
-A remembered mapping is also a belief, not a fact, and that distinction matters
-most exactly where the stakes are highest. For a deduction dispute, the entire
-deliverable is evidence a counterparty will actively contest. "The agent
-remembered these two fields mean the same thing" is not something that survives
-being put in front of a retailer's AP team. Memory can accelerate assembling a
-case; it cannot be what the case rests on. The fix is to give memory the same
-two-tier discipline the rest of this document already argues for everything
-else: a **remembered** mapping is a proposal, fine for navigation and drafting,
-never cited as evidence — a **ratified** mapping is one a human has confirmed
-once, after which it becomes a stored, versioned, audited fact belonging to the
-tenant rather than to the agent, usable by anyone at that account, and citable
-in a dispute. Propose, confirm, enforce — identical in shape to the two-phase
-write pattern already in Section 3, because it is the same problem: nothing
-should carry authority until a human has approved it once.
+**Eliminate first.** Where a standard identifier already exists on both sides,
+there is no mapping to make at all. A global trade item number is a global trade
+item number. The mapping problem exists only for *non-standard* identifiers —
+internal stock codes, purchase order references, custom fields somebody invented
+in 2004. Which means **the catalogue's standards discipline is itself a
+semantic-alignment asset**: the size of the remaining problem is a function of how
+much standardisation already happened upstream, and the catalogue is the product
+in the network that has done the most of it.
 
-Left unaddressed, this is also a genuine new attack surface, and it is worth
-naming rather than discovering in review. Security researchers now treat memory
-poisoning as a distinct category — OWASP added it to its Agentic AI Top 10 in
-2026 — precisely because it does not reset when the conversation ends: an
-attacker plants a false mapping once, and the agent acts on it months later,
-at machine speed, with no further interaction from the attacker required.
-Published attack success rates against unprotected agent memory run as high as
-90%+ in research settings. The uncomfortable detail is that our own two-phase
-confirmation does not catch this: it gates *actions* — a human approves "grant
-this waiver" — but the human confirming that action never sees that the term
-"this attribute" was resolved through a poisoned mapping upstream of the
-decision they thought they were making. Existing defences generally fail for
-the same reason: they check whether an action looks malicious, not whether a
-belief was corrupted before the action was even proposed. In a bilateral
-network where a counterparty has a direct financial incentive to make an
-inconvenient discrepancy disappear, treating this as theoretical would be a
-mistake. The ratify-before-it-counts design above is the mitigation — an
-unratified memory has no authority, so poisoning one produces a wrong
-suggestion to reject, not a wrong action taken — but it has to be built in from
-the start rather than retrofitted once memory is already load-bearing.
+**Declare the residue.** What is left goes on an explicit mapping surface — a
+visible, versioned declaration that this field corresponds to that one — rather
+than living as an inference inside a model. Four reasons, strongest first:
 
-One reason to build this regardless of the risk: a ratified, tenant-specific
-semantic map is proprietary in a way a generic assistant's memory cannot be.
-It accumulates from real disputes at one customer and is worthless to anyone
-else's — which is the *computation, not collation* argument from condition 1,
-extended from numbers to the vocabulary itself.
+- **Visibility is the mitigation.** An invisible corrupted mapping cannot exist
+  when every mapping is a row somebody can read. This turns out to be a better
+  defence than anything cryptographic, and it is free.
+- **It moves the row from "requested only" to "enforced"** in Section 3's table.
+  A declared mapping is applied deterministically. A remembered one is a hope
+  with good intentions.
+- **It is native to what this product already is.** A rule-authoring system where
+  one party declares and the system enforces is not a new paradigm here — it is
+  the existing one, pointed at vocabulary instead of attributes.
+- **It is citable.** "Your administrator declared this mapping on this date"
+  survives a counterparty challenge. "The assistant remembered it" does not.
+
+**Let the assistant propose into it.** This is where AI earns its place, and it is
+not a small role — it solves the two things a screen alone cannot. **Cold start:**
+an empty mapping surface delivers nothing on day one, which is exactly why data
+governance projects stall before they produce value. **The long tail:** nobody
+hand-enters hundreds of idiosyncratic mappings, and those are precisely the ones a
+central data model will never cover. An assistant watching real work happen can
+propose candidates continuously and cheaply.
+
+**And never let memory be load-bearing.** Unratified candidates suggest;
+only declared mappings are used for anything that counts. That single rule is what
+makes the rest of this safe.
+
+**Where the candidates get proposed still matters, and it favours the embedded
+surface.** The July 2026 specification removed the concept of a session entirely —
+every call now carries its own context, and nothing about memory is part of the
+protocol. Memory belongs to whoever runs the agent. In the customer's own AI
+workspace it is typically scoped per user, and we cannot inspect it, correct it,
+or share it across an account — so two people at the same retailer accumulate two
+different sets of candidates. In the embedded agent it is tenant-scoped,
+correctable, and shared. That is a real argument for the embedded surface on top
+of the ones already made.
+
+**On the attack this design defuses.** Security researchers now treat memory
+poisoning as its own category — OWASP added it to the Agentic AI Top 10 in 2026 —
+because unlike ordinary prompt injection it does not reset when the conversation
+ends: plant a false belief once and the agent acts on it months later, with no
+further contact from whoever planted it. The uncomfortable part, worth stating
+rather than discovering in review, is that **our existing confirmation gate does
+not catch this.** It approves *actions* — a human confirms "grant this waiver" —
+but that human never sees that the term the waiver was granted on had been
+resolved through a corrupted mapping upstream of the decision they thought they
+were making. Confirmation checks whether an action looks reasonable, not whether
+the belief behind it was already wrong.
+
+The declared-mapping design is what answers that, and it answers it cleanly: if
+nothing is used until it has been declared, then poisoning produces **a wrong row
+on a screen for somebody to reject, rather than a wrong action taken quietly.**
+The threat does not need detecting, because it cannot reach anything. That is why
+this should be built as declare-then-use from the start rather than retrofitted
+once an assistant's memory has already become something people rely on.
+
+One more reason to build it regardless of the risk: a declared, customer-specific
+mapping accumulates from that customer's real work and is worthless to anyone
+else. It is the *computation, not collation* argument from condition 1, extended
+from numbers to the vocabulary itself — and unlike a dashboard view, it is not
+something a general-purpose assistant can reconstruct.
+
+### Who ratifies a mapping — three classes, not one question
+
+"Who has the authority to declare a mapping" looks unanswerable when the two
+parties have opposed financial interests. It stops looking that way once the
+three genuinely different things being conflated are separated.
+
+**Self-descriptive mappings** — "our internal stock code is that standard item
+number," "our department code is that product category." Only one party knows the
+answer and the other has no standing to judge it. Declared unilaterally by
+whoever owns the data. This is almost certainly the bulk of all mappings by
+volume, and it carries no conflict at all.
+
+**Relationship facts** — true of the trading relationship itself, with both
+parties party to them. **This is the exact shape vendor exceptions already have**
+in this product: one party declares, the other sees it, it is audited, and
+neither can silently rewrite it. That governance model already exists and already
+works, so it should be reused rather than reinvented.
+
+**Instance correspondence** — "this invoice line is that order line is that
+catalogue item." **Treating this as a mapping is a category error**, and an
+expensive one. Mappings are schema-level: stable, reusable, true until changed.
+Whether one invoice line matches one order line is a fact about a single
+transaction, determined per dispute from the documents themselves and derived
+deterministically wherever a shared identifier exists. Storing it as a durable
+mapping is precisely how you would manufacture the poisoning risk described
+above, by turning a per-case judgement into a permanent belief.
+
+That leaves a genuine residue: schema mappings where the interpretation carries
+money — where calling one weight field equivalent to another is the difference
+between a chargeback standing and falling. For those, **the retailer ratifying is
+the right default — not because retailers are more trustworthy, but because it
+mirrors the exception model the network already runs on**, where one party decides
+and the other has visibility and a route to contest.
+
+With one refinement worth building in: **record the proposer and the ratifier
+separately, and require that they differ.** A mapping proposed by a supplier and
+ratified by a retailer is a materially stronger artifact than either party
+asserting it alone, and the record shows exactly that. The counterparty's
+protection is not a veto — it is visibility plus the right to dispute, which is
+how exceptions already work.
 
 **3. One insight surface per kind of question.** The catalogue has its own
 compliance dashboard coming. If that grows into a cross-document view, it will
@@ -901,3 +997,96 @@ The retail landscape sources — Walmart's supplier-facing agent, the PIM vendor
 Microsoft's and SAP's commerce systems, the network operators, and the EU Digital
 Product Passport material — are catalogued in our MCP presentation deck with their
 own verification caveats, which still apply.
+
+---
+---
+
+# Annex — screens a cross-product demo would need
+
+**This is a build brief, not part of the argument above.** Everything in it is
+currently unbuilt.
+
+The working prototype behind this document covers the catalogue only: retailers
+authoring requirements, suppliers seeing and meeting them, compliance reporting on
+both sides, and an assistant connected to all of it. That is enough to demonstrate
+Sections 1 through 3 convincingly, and it is *not* enough to demonstrate Section 4,
+because every interesting claim in Section 4 is about what happens between
+products.
+
+The screens below are what a demo for the other product teams would need. They
+would live outside the catalogue prototype — the point is precisely that they are
+not one product's screens — and they are described here at product level so a
+later session can build them without re-deriving the reasoning.
+
+## The screens
+
+**1. Mapping Console.** The declared surface from Section 4's second condition.
+Every mapping as a visible row: which field in which system corresponds to which
+field in which other system, its scope, its version, who proposed it, who ratified
+it, and when. Filterable by which pair of systems it bridges.
+*Proves: semantics are enforced rather than remembered. This is the screen that
+makes the poisoning answer concrete instead of theoretical.*
+
+**2. Candidate Review.** The inbox of assistant-proposed mappings waiting for a
+human. Each candidate shows the evidence behind the proposal — what the assistant
+saw that made it suggest this — which party's session it came from, and which
+automatic corroboration checks it passed or failed before a person ever saw it.
+Accept, reject, or amend.
+*Proves: propose, confirm, enforce. And it makes the security argument visible —
+a poisoned candidate is a row somebody rejects, not a silent belief acted on.*
+
+**3. Dispute Evidence Workbench.** The payoff screen, and the one to lead a demo
+with. A single deduction claim, with the order, the shipment notice, the invoice
+and the catalogue record assembled beside each other — and **every join between
+them labelled** as either derived directly from a shared standard identifier or
+resolved through a specific named mapping, with that mapping's provenance one
+click away. Ends in an action: contest, accept, or correct the underlying data.
+*Proves the whole of Section 2 end to end, and it is the screen most likely to
+land with a customer-facing audience, because the money is visible in it.*
+
+**4. Identity Anchor.** Give it an internal stock code, a document reference, or a
+partner's own item number, and it resolves to the canonical item — showing which
+standard did the work and where the residual mapping was needed.
+*Proves the anchor-and-engine claim. This is the screen aimed squarely at the
+insight-layer team, because it is the concrete version of "we will make items
+resolvable so you do not have to."*
+
+**5. Bilateral Mapping Agreement.** The relationship-class view: one mapping, both
+parties looking at the same record, who ratified it, when, and the route the other
+party takes to contest it.
+*Proves that cross-party governance reuses the vendor-exception model already in
+the product rather than inventing new machinery.*
+
+**6. Capability Registry.** What each product publishes, what authority each
+capability requires, which kinds of tenant may call it, and what a given
+connection can therefore actually see.
+*Proves "participation, not absorption" is an architecture rather than a slogan —
+and it is the screen a platform or security audience will ask for by name.*
+
+**7. Memory Inspector.** Side by side: what the assistant currently believes,
+versus what has actually been ratified. Anything in the first column that is not
+in the second is explicitly marked as unusable for anything that counts.
+*Proves visibility-as-mitigation. Aimed at a security or architecture reviewer,
+and the fastest way to close the memory-poisoning conversation.*
+
+## Sequencing, if the demo has to be built in stages
+
+**Screen 3 sells the story** — it is the one where a viewer sees money and
+recognises their own week. Build it first if only one screen gets built.
+
+**Screens 1 and 2 are what make screen 3 honest.** Without them the workbench is
+just a nice layout, and the obvious question — *how do you know these two records
+refer to the same thing?* — has no answer to point at.
+
+**Screen 4 is what the insight-layer conversation turns on.** If that team is in
+the room, this is the screen that determines whether the discussion is about
+partnership or about territory.
+
+**Screens 5, 6 and 7 are for specific audiences** — trading-partner governance,
+platform and security respectively — and are worth building when those audiences
+are actually scheduled, not before.
+
+One caution for whoever builds this: the point of the demo is that these screens
+belong to *no single product*. If it is built inside the catalogue prototype and
+styled as a catalogue feature, it will be read as the catalogue trying to absorb
+everyone else's data — which is the exact conclusion Section 4 argues against.
