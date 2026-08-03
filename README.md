@@ -92,6 +92,12 @@ against an attribute profile or a global System filter from
 `list_system_filters`), and authoring requirements (including multi-brick
 creation). Setup and usage:
 
+- `docs/mcp-overview-and-enterprise-adoption.md` — start here if you're new to
+  MCP, and the one document written for a reader with no repository access: what
+  the standard is, the retail/CPG cost of the data disputes it addresses, why the
+  in-product Compliance Agent and the external connector are two different jobs,
+  how catalogue compliance expands across the Trading Grid network, and an
+  evidence-backed verdict with the counter-evidence attached
 - `docs/mcp-getting-started.md` — connect a client and try it
 - `docs/mcp-demo-quickstart.md`, `docs/mcp-faq.md` — walkthrough and FAQ
 - `docs/mcp-pm-presentation.md` — a 45-minute deck, the long-form read behind
