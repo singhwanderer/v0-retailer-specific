@@ -148,15 +148,22 @@ rounding error. It is one of the largest controllable costs in the relationship.
 
 ## Then the finding that reframes it
 
-Research from the Retail Value Chain Federation indicates that **65–80% of retail
-shortage claims are invalid** — driven by clerical errors, EDI mismatches, and
-receiving delays rather than by any real failure to deliver.
+A benchmark survey by Attain Consulting Group and the Credit Research Foundation
+— 203 companies, most recently run in 2018, part of a study that has tracked this
+since 1998 — found that the median company has **5–10% of its deduction dollars
+invalid**: the retailer was wrong, the deduction should never have been taken,
+and the supplier was entitled to that money. The same survey found something
+sharper: even once a company *identifies* a deduction as invalid, it recovers
+only 60% of it. **The other 40% goes uncollected because the paperwork, the
+dispute window, or the internal capacity ran out before anyone could act.**
 
-Read that again in commercial terms. **The majority of the money in dispute is
-disputed because two systems disagree about data, not because anything went wrong
-in the physical world.** The supplier did ship it. The retailer did receive it.
-The purchase order, the shipment notice, the invoice and the catalogue record do
-not line up, and somebody has to prove which one is right.
+Read that in commercial terms. **A meaningful share of the money moving through
+this relationship is moving wrongly, and a further share stays wrong even after
+somebody notices** — not because the underlying facts are in dispute for long,
+but because assembling the proof costs more time than the deadline allows. The
+purchase order, the shipment notice, the invoice and the catalogue record do not
+line up, and by the time somebody can show which one is right, the window has
+often already closed.
 
 ## Why that work is so expensive today
 
@@ -164,7 +171,9 @@ Disputing a single deduction means assembling evidence across documents that liv
 in different places: what was ordered, what was notified as shipped, what was
 invoiced, and what the item's data said it was in the first place. The question is
 
-- **urgent** — deduction disputes have deadlines, often short ones;
+- **urgent** — deduction disputes have deadlines, often short ones, and the 40%
+  that goes permanently uncollected is exactly what happens when the deadline
+  wins that race;
 - **one-off** — shaped by the specific claim, not by a reporting schedule;
 - **cross-cutting** — it spans orders, shipments, invoices and item data, so no
   single screen was ever designed to answer exactly it.
@@ -174,7 +183,9 @@ work is not the analysis. The work is the fetching** — and the fetching happen
 because the answer lives somewhere the question isn't.
 
 That is precisely the shape of question a connected assistant is good at, and
-precisely the shape of question a dashboard is bad at.
+precisely the shape of question a dashboard is bad at. The value is not really in
+proving more deductions are wrong — it is in proving it *fast enough that the
+40% stops being permanent.*
 
 ## The instance of it we already solve
 
@@ -312,6 +323,10 @@ just a go-to-market slogan.
 | **3. Expand across the network** | Orders, shipment notices and invoices; country-specific invoicing rules; EDI exception handling and the deduction-dispute workflow | Domain capabilities per document type | All of the above, plus the customer relationship and the approved connection |
 | **4. Platform** | The same connection fronting other Trading Grid capabilities through the shared Aviator gateway | Gateway-level routing and metering | All of the above |
 
+Stages 1 and 2 are a single product's data and are ready to sequence today. Stages
+3 and 4 cross into other products' data, which opens a prerequisite that has not
+been closed yet — named explicitly below rather than assumed away.
+
 ## The Trading Grid surface this expands into
 
 Trading Grid is already a B2B trading-partner management and integration platform
@@ -343,9 +358,10 @@ If Section 2's numbers are right, this is the highest-value cross-document
 question on the network:
 
 - The money is large and it is a line item somebody already owns.
-- The majority of claims are invalid, so the work is *evidence assembly* — which
-  is what this technology is unusually good at and what screens are unusually bad
-  at.
+- A meaningful share of claims are invalid, and a further share of the *known*-invalid
+  ones go uncollected purely on time, so the work is *fast evidence assembly* —
+  which is what this technology is unusually good at and what screens are
+  unusually bad at.
 - Trading Grid already carries every document the argument needs.
 - The workflow ends in an action — file the dispute, accept the claim, correct the
   data — and finding the problem and acting on it stop being two different
@@ -365,6 +381,57 @@ control it requires exists. We have held that line once already: supplier-side
 access was gated on being able to prove that retailer and supplier organisations
 are properly isolated from each other, and it shipped the day that was true, not
 before.
+
+## The named prerequisite for stages 3 and 4
+
+Stated as plainly as the condition above, because this document loses credibility
+the moment it treats an open question as settled: **reaching beyond a single
+product's data depends on a company-level decision that has not been made yet,**
+and it is currently being worked, not stalled.
+
+Once a capability needs to reach across more than one product's data, a genuinely
+different question shows up: whose identity system authenticates the request once
+it crosses that boundary, and who owns the shared gate it crosses through. Two
+things about this are settled and two are not.
+
+Settled:
+
+- **The identity pattern has a working precedent.** A shared gateway can
+  authenticate a user once through the company's standard identity system and
+  hand each product a verified identity to check against its own permissions —
+  the same discipline argued for throughout this document, owned one level up
+  rather than rebuilt per product. Another team inside the company added support
+  for this in about a quarter, which is a real data point on cost, not a guess.
+- **The alternative is worse, and everyone involved agrees on that.** Each
+  product building and maintaining its own separate connection to a customer's
+  assistant is exactly the "second copy of the security logic per integration"
+  problem from Section 1 — just moved one level up instead of solved.
+
+Not yet settled:
+
+- **Who owns running the shared gate.** The proposal on the table is a central
+  platform team rather than each product team building its own — consistent
+  with the general guidance this technology's security practice gives, not
+  something invented for this document — but it is not yet decided.
+- **The specific concern raised by the architecture team, and it should be
+  named rather than paraphrased into something softer: sensitive, multi-tenant
+  customer data is a different risk class than the public-facing systems this
+  technology was first built for, and that gap has to be closed with the same
+  rigor as the identity work in Section 3 before a shared gateway is safe to
+  build on** — not assumed closed because the pattern works elsewhere.
+
+There is also a live fork on *how* two products would ever reach each other's
+data even once the gate exists: whether one product's agent calls another's
+directly, in natural language, with no customer assistant in the loop at all —
+an internal pattern with at least one other team's capability already running
+this way in production — or whether the connector model in Section 3 is the
+only path even for internal, cross-product use. Which one wins changes what
+stage 3 and 4 concretely look like, not whether they are worth pursuing.
+
+**Read this as sequencing, not doubt.** The same discipline already applied once
+— nothing ships across a boundary until the control for that boundary exists —
+is being applied again, one level up, to a real and current conversation. That is
+consistent with the rest of this document's argument, not an exception to it.
 
 ## The same architecture, described from outside
 
@@ -537,10 +604,22 @@ slide.**
 - Chargeback and deduction ranges (5–15% of invoices, 2–10% of revenue, 3–8% of
   retail sales), and the Walmart, Target and Amazon penalty structures — drawn
   from several vendor and industry analyses, none independently confirmed
-- The Retail Value Chain Federation finding that **65–80% of retail shortage
-  claims are invalid** — this is the single most load-bearing number in the
-  document, and it should be traced to the RVCF's own publication before it is
-  quoted anywhere externally
+- The [Attain Consulting Group / Credit Research Foundation Customer Deductions
+  Benchmark Survey](https://www.prnewswire.com/news-releases/attain-consulting-group-releases-report-on-customer-deductions-300200008.html)
+  (203 companies, 2018) — the source for the 5–10%-invalid and 60%-recovered
+  figures. Reached via secondary citation rather than the original survey
+  report, so it is **not verified** in the strict sense used here, but it is a
+  named, dated study with a stated sample size, which is more than the figure
+  it replaced. **Worth stating plainly, because it is the kind of correction
+  this section exists to catch:** an earlier draft of this document used a more
+  dramatic figure — "65–80% of retail shortage claims are invalid," attributed
+  to the Retail Value Chain Federation. That figure could not be traced to any
+  RVCF publication. Every public repetition of it leads back to deduction-recovery
+  service providers, who have a direct commercial interest in citing the highest
+  plausible number, and RVCF's own research is membership-gated, so the claim
+  could not be checked against a primary source at all. It was replaced with the
+  Attain/CRF figure above for that reason. **Confirm the Attain/CRF figures
+  against the original survey report before using either number externally**
 
 *OpenText product descriptions — all of Section 4's Trading Grid material:*
 
