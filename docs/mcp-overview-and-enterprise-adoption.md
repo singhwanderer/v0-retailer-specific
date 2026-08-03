@@ -1,485 +1,568 @@
-# MCP: what it is, why TGC has one, and whether it is actually the future
+# MCP, and why it is how Trading Grid Catalogue lands and expands
 
-### A cold-start read for PM and leadership
+### A cold-start read. No technical background assumed.
 
-Three questions, answered in order, ending in a verdict rather than a pitch:
+Four questions, answered in order:
 
-1. **What is MCP?** — Part One. No TGC knowledge assumed.
-2. **Why is it in this product?** — Part Two. The commercial reason and the
-   architectural one, which are different.
-3. **Is MCP adoption — internal and external — the future for enterprise
-   products, and is that actually true?** — Part Three. A claim ledger with
-   verdicts, confidence levels, counter-evidence, and what would prove each claim
-   wrong.
+1. **What is MCP?** — Section 1. Nothing about our product required.
+2. **What problem does it solve in retail and CPG?** — Section 2. This is a money
+   argument before it is a technology argument.
+3. **Why do we have two AI surfaces rather than one?** — Section 3. The in-product
+   Compliance Agent and the external connector do different jobs, and the
+   difference is not a matter of taste.
+4. **Is this actually the future for enterprise products, and how far does it
+   take us?** — Sections 4 and 5. The expansion case, then an honest verdict with
+   the counter-evidence attached.
 
-Part Four is the practical residue: what we should build next, and which files in
-this repo should be deleted.
-
-## How this relates to the other MCP docs
-
-There are fourteen of them. This one exists because none answers question 3, and
-question 1 is only available in fragments inside documents written to argue
-something else.
-
-| If you want | Read |
-| --- | --- |
-| The concept, the security model, and whether chat replaces our screens — as a 45-minute deck | [`mcp-pm-presentation.md`](./mcp-pm-presentation.md) |
-| To connect a client and try it | [`mcp-getting-started.md`](./mcp-getting-started.md), [`mcp-demo-quickstart.md`](./mcp-demo-quickstart.md) |
-| The published schemas and the questions people actually ask | [`mcp-faq.md`](./mcp-faq.md) |
-| The decision memo for a security/architecture audience | [`enterprise-safe-remote-mcp.md`](./enterprise-safe-remote-mcp.md) |
-| Requirements, acceptance criteria, and what is deliberately not demonstrated | [`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md) |
-| Where the in-portal agent ends and the external connector begins | [`embedded-agent-first-remote-mcp-selectively.md`](./embedded-agent-first-remote-mcp-selectively.md) |
-| Phased sequencing | [`mcp-implementation-plan.md`](./mcp-implementation-plan.md) |
-
-**A note on numbers.** Everything stated here about *this codebase* was
-re-counted against the source while writing, because several of the documents
-above have gone stale on exactly these figures (Part 4a lists which). Everything
-stated about the outside world carries a source and a verification status at the
-end — some sources block automated fetching and are marked accordingly.
+**On sourcing.** Everything about the outside world carries a source and a
+verification status in Section 6. Several sources — including OpenText's own
+public product pages and the retail deduction research — block automated
+retrieval, so those figures are marked as needing a primary-source check before
+they go in front of a customer or onto a slide. Read that section before quoting
+a number from this one.
 
 ---
 ---
 
-# Part One — What MCP is
+# Section 1 — What MCP is
 
 ## The problem it was invented for
 
-To make an AI assistant useful against a company's real, live data, someone has
-to build a bridge between the assistant and the systems. Before MCP that bridge
-was proprietary in both directions: each AI vendor defined its own plugin format,
-and each company built to it. Supporting a second assistant meant building a
-second integration — **including a second copy of the authorization logic**, which
-is the expensive half and the one that gets it wrong.
+To make an AI assistant useful against a company's real, live business data,
+somebody has to build a bridge between the assistant and the systems. Before MCP,
+that bridge was proprietary in both directions: each AI vendor defined its own
+format, and each software company built to it. Supporting a second assistant meant
+building a second integration — **including a second copy of the security and
+permissions logic**, which is the expensive half and the half that gets it wrong.
 
-Most companies did the arithmetic and concluded it wasn't worth it. That is why so
-few products had an AI integration, not because the idea was unappealing.
+Most software companies did the arithmetic and concluded it was not worth it. That
+is why so few enterprise products had a working AI integration. Not because the
+idea was unappealing — because it cost too much per assistant.
 
-**MCP is the standard that makes it one integration instead of one per vendor.**
-The shorthand people use is "USB-C for AI assistants." It is an open protocol, not
-a product, not a model, and — since December 2025 — not owned by any one vendor.
+**MCP is the standard that turns that into one integration instead of one per
+vendor.** The shorthand people use is "USB-C for AI assistants." It is an open
+protocol, not a product, not a model, and — since December 2025 — not owned by any
+single vendor.
 
-## The three primitives
+## What a company publishes over MCP
 
-Almost everything about MCP reduces to what a server is allowed to publish.
+Almost everything reduces to three kinds of thing a system can offer.
 
-| Primitive | What it is | Plain example |
+| | What it is | Example in our world |
 | --- | --- | --- |
-| **Tools** | Things the assistant can *call*, each with a typed input contract | "run a compliance report", "grant a vendor exception" |
-| **Resources** | Things that *exist and can be referred to again*, addressable by URI | "the Belk scan from Tuesday", a CSV, a help article |
-| **Prompts** | Starter suggestions the client can surface as clickable entry points | "review supplier compliance" |
+| **Capabilities** | Things the assistant can *do*, each with a strict list of what it needs | "Run a compliance report on this supplier"; "grant this vendor a 60-day extension" |
+| **Documents** | Things that *exist and can be referred to again*, with an address | "The Belk scan from Tuesday"; a scorecard; a help article |
+| **Starting points** | Suggested openers a customer's assistant can offer as buttons | "Review supplier compliance" |
 
-**TGC registers tools and prompts, and no resources at all.** That is not a
-detail — it is the single most load-bearing gap in the product, and Part 4a
-returns to it. The distinction that matters: a tool call produces *an answer that
-happened once*; a resource produces *an artifact you can name, re-open, and hand
-to an auditor*. Most of what a report screen is for is the second thing.
+We publish capabilities and starting points today. **We publish no documents**,
+and that gap is worth understanding, because it is the difference between an
+answer that happened once in somebody's chat window and an artifact you can name,
+re-open, attach to an email, and hand to an auditor. Most of what a report screen
+is actually for is the second thing.
 
-## The self-describing property, which is the actual innovation
+## The part that is genuinely new
 
-When a client connects, it asks the server what is available and gets back every
-tool's input contract as JSON Schema. Two fields do nearly all the work:
+When an assistant connects, it asks what is available and gets back a strict
+contract for every capability: which pieces of information are mandatory, and
+where a field has fixed choices, exactly which choices are allowed.
 
-- **`required`** — the mandatory fields.
-- **`enum`** — the fixed set of allowed values, which is a drop-down as far as the
-  model is concerned.
+Take adding an image requirement. The contract states that image format must be
+one of JPEG, PNG, TIFF or WebP, that background must be one of pure white, light
+grey, transparent or lifestyle, and that seven fields in total are mandatory. So
+when a category manager types *"add a lifestyle image requirement to Footwear,"*
+their assistant asks for the seven things it needs and offers only the four valid
+formats — because it read our rules thirty seconds ago, not because anyone wrote
+a script describing image formats.
 
-Concretely, from TGC's own published schema for `set_image_requirement`:
+**Change the rule on our side and every connected assistant asks the new question
+immediately.** No retraining, no redeployment, no software update on their side.
 
-```json
-{
-  "format":     { "type": "string", "enum": ["JPEG", "PNG", "TIFF", "WebP"] },
-  "background": { "type": "string", "enum": ["Pure white (#FFFFFF)", "Light grey (#F5F5F5)", "Transparent", "Lifestyle/contextual"] },
-  "required": ["brickCode", "requirementName", "format", "background", "minDimensions", "maxFileSize", "shapeCrop"]
-}
-```
+One qualification that matters, because it is what separates a real system from a
+demo: **the contract is not the enforcement.** It is the first of two. The contract
+makes the assistant cooperative; our own systems checking the request again when
+it arrives makes it irrelevant whether the assistant cooperated. Any argument that
+rests only on the first layer is a bad argument, and we should never make it.
 
-So when a user says *"add a lifestyle image requirement to Footwear,"* the
-assistant asks for the seven mandatory fields and offers only the four valid
-formats — because it read the contract thirty seconds ago, not because anyone
-wrote a prompt describing image formats. Change the enum on our side and every
-connected assistant asks the new question immediately. No retraining, no
-redeployment, no version negotiation.
+## Where the standard stands, as of August 2026
 
-**The contract is not the enforcement.** It is the first of two. The schema makes
-the assistant cooperative; the server validating again on arrival makes it
-irrelevant whether the assistant cooperated. Any argument that rests only on the
-first layer is a bad argument.
+Four facts that change the risk of building on it.
 
-## Where MCP stands as of August 2026
-
-Four facts worth having, because they change the risk profile of betting on it:
-
-- **It is vendor-neutral now.** Anthropic donated MCP to the **Agentic AI
-  Foundation, a directed fund under the Linux Foundation**, announced 9 December
-  2025. Co-founders are Anthropic, Block, and OpenAI; supporters include Google,
-  Microsoft, AWS, Cloudflare, and Bloomberg. The Linux Foundation explicitly
-  "will not dictate the technical direction of MCP" — maintainers keep decision
-  authority, guided by a public standards process. *(Verified — fetched directly.)*
-- **It is large.** TypeScript and Python SDKs have each passed one billion total
-  downloads, with close to half a billion downloads a month across Tier 1 SDKs.
-  *(Verified — fetched directly.)*
-- **It just went stateless.** The **2026-07-28 specification**, released six days
-  before this document, removes the initialize handshake so any request can land
-  on any server instance behind an ordinary load balancer. It also adds
-  header-based routing (`Mcp-Method`, `Mcp-Name`) so gateways and rate limiters
-  can meter without parsing JSON bodies, cacheable list results, authorization
-  hardening (RFC 9207 issuer validation; Client ID Metadata Documents replacing
-  Dynamic Client Registration), and a formal extensions framework. Deprecated
-  features get a twelve-month window. *(Verified — fetched directly.)*
-- **Enterprise SSO is a solved, shipped part of the spec.** **Enterprise-Managed
-  Authorization** — zero-touch OAuth, where an admin enables a server for the org
-  and users get it automatically scoped to the groups they already have — went
-  stable on 18 June 2026, with Okta as the first IdP, Claude and VS Code as
-  clients, and Asana, Atlassian, Canva, Figma, Linear and Supabase among the
-  servers. *(Verified — fetched directly.)*
+- **It is vendor-neutral.** Anthropic donated MCP to the Agentic AI Foundation, a
+  fund under the Linux Foundation, in December 2025. Co-founders are Anthropic,
+  Block and OpenAI; supporters include Google, Microsoft, AWS, Cloudflare and
+  Bloomberg. The Linux Foundation explicitly does not direct the technical
+  roadmap. *(Verified.)*
+- **It is large.** The two main developer kits have each passed a billion
+  downloads, with close to half a billion downloads a month across the supported
+  set. *(Verified.)*
+- **It is built for scale now, not just for laptops.** The specification released
+  on 28 July 2026 — six days before this document — removed the session handshake
+  so requests can be spread across servers behind an ordinary load balancer, and
+  added routing information that lets corporate gateways meter and rate-limit
+  traffic without inspecting message contents. Anything being retired gets a
+  twelve-month notice period. *(Verified.)*
+- **Corporate single sign-on is shipped and stable.** Since 18 June 2026, an IT
+  administrator can approve a system for the whole organisation once, and staff
+  get access automatically, scoped to the groups and roles they already have — no
+  individual sign-in per person per system. Okta was the first identity provider;
+  Asana, Atlassian, Canva, Figma, Linear and Supabase are among the businesses
+  already offering their systems this way. *(Verified.)*
 
 ## What MCP is *not*
 
-This list earns the credibility that Part Three spends.
+This list is what earns the credibility that Section 5 spends.
 
-- **Not a model.** It carries no intelligence. A bad model connected over MCP is
-  still a bad model.
-- **Not a database connection.** A server publishes a short allowlist of named
-  capabilities with typed inputs. It does not expose schemas, queries, or tables
-  unless someone deliberately builds a tool that does.
-- **Not a security product.** MCP standardises *where* authorization goes, not
-  whether you did it. Part Three has the incident record on what happens when
-  people skip it.
-- **Not an Anthropic thing.** It was, for thirteen months. It is now a Linux
+- **Not a model.** It carries no intelligence of its own. A weak assistant
+  connected over MCP is still a weak assistant.
+- **Not a database connection.** What gets published is a short, named list of
+  business capabilities. It does not expose tables, queries or raw records unless
+  somebody deliberately builds a capability that does.
+- **Not a security product.** MCP standardises *where* the permission checks go,
+  not whether you did them. Section 5 has the incident record on what happens when
+  companies skip that work.
+- **Not an Anthropic product.** It was, for thirteen months. It is now a Linux
   Foundation project that OpenAI co-founded.
-- **Not a replacement for your API.** It is a second façade over the same
-  business logic, aimed at a different caller.
+- **Not a replacement for our existing interfaces.** It is a second front door onto
+  the same business logic, built for a different kind of caller.
 
 ---
 ---
 
-# Part Two — Why it is in TGC
+# Section 2 — The problem this solves in retail and CPG
 
-## The customer problem, in two sentences
+## Start with the money
 
-A category operations manager two weeks from an intake freeze wants to know
-*"which of my suppliers will make the date, and what do I chase first?"* — a
-question that is urgent, one-off, crosses suppliers and categories and attributes,
-and therefore matches no screen anyone designed. Today, answering it means opening
-screens, exporting, and reassembling by hand.
+The retailer–supplier relationship leaks cash through data disputes, and the
+numbers are not small.
 
-The commercial observation on top of that: **that manager already has Claude,
-ChatGPT, or Copilot open, paid for and approved** — and it is the one tool on
-their desk that cannot see any of this. The assistant is not missing intelligence.
-It is missing access.
+| | Figure |
+| --- | --- |
+| Manufacturer invoices to retailers that incur some chargeback | **5–15%** |
+| Vendor chargebacks as a share of a manufacturer's total revenue | **2–10%** |
+| Total retail deductions as a share of annual retail sales, for most brands | **3–8%** |
+| Walmart on-time-in-full non-compliance | **~3% of cost of goods sold**, plus $50–500 per shipment-notice error and $25–200 per labelling violation |
+| Target / Amazon | Target around 5%; Amazon runs 15+ chargeback types, from $2.60 per unit to $250 per incident |
 
-## The reason it was cheap, which is the part the other docs undersell
+For a supplier doing meaningful volume with a national retailer, this is not a
+rounding error. It is one of the largest controllable costs in the relationship.
 
-TGC did not "add MCP." It factored out a tool layer and then discovered MCP was
-nearly free.
+## Then the finding that reframes it
 
-```
-        lib/mcp/tools.ts  +  lib/mcp/tools-supplier.ts
-        (the actual business logic: read / create / edit / remove)
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-   Portal UI            External MCP          In-portal agent
-   (app/page.tsx,       connector             (compliance-agent-panel
-   direct calls)        (app/api/             → /api/copilot →
-                        [transport]/route.ts) lib/copilot/tools.ts)
-```
+Research from the Retail Value Chain Federation indicates that **65–80% of retail
+shortage claims are invalid** — driven by clerical errors, EDI mismatches, and
+receiving delays rather than by any real failure to deliver.
 
-Three consumers, one implementation. `lib/mcp/attribute-assembly.ts` is the single
-place that answers "what does this GS1 brick require," so the screen and the
-connector cannot drift apart.
+Read that again in commercial terms. **The majority of the money in dispute is
+disputed because two systems disagree about data, not because anything went wrong
+in the physical world.** The supplier did ship it. The retailer did receive it.
+The purchase order, the shipment notice, the invoice and the catalogue record do
+not line up, and somebody has to prove which one is right.
 
-**This is the transferable lesson for any other OpenText product, and it is the
-bridge into Part Three.** The expensive work was never the protocol — it was
-having one authoritative, callable business layer with authority declared next to
-it. A product that has that can publish an MCP server in a sprint. A product that
-doesn't will spend the sprint discovering its logic lives in its React components.
+## Why that work is so expensive today
 
-## What is actually built
+Disputing a single deduction means assembling evidence across documents that live
+in different places: what was ordered, what was notified as shipped, what was
+invoiced, and what the item's data said it was in the first place. The question is
 
-Re-counted against `lib/mcp/manifest.ts` while writing this:
+- **urgent** — deduction disputes have deadlines, often short ones;
+- **one-off** — shaped by the specific claim, not by a reporting schedule;
+- **cross-cutting** — it spans orders, shipments, invoices and item data, so no
+  single screen was ever designed to answer exactly it.
 
-| Surface | Tools | Split |
+So somebody opens four systems, exports from each, and reassembles by hand. **The
+work is not the analysis. The work is the fetching** — and the fetching happens
+because the answer lives somewhere the question isn't.
+
+That is precisely the shape of question a connected assistant is good at, and
+precisely the shape of question a dashboard is bad at.
+
+## The instance of it we already solve
+
+Trading Grid Catalogue solves one version of this problem today: **catalogue
+compliance.** A category operations manager two weeks from a seasonal intake
+freeze wants to know *"which of my suppliers will make the date, and what do I
+chase first?"* Same properties — urgent, one-off, crossing suppliers and
+categories and attributes. Same manual reassembly.
+
+And the same person almost certainly already has Claude, ChatGPT or Microsoft
+Copilot open on the other monitor: paid for, IT-approved, in daily use, and unable
+to answer a single question about their actual catalogue, because it has no way to
+reach it. **The assistant is not missing intelligence. It is missing access.**
+
+Item data is also the *upstream* cause of a large share of downstream disputes.
+Wrong pack details, missing dimensions, an item never properly set up — these
+surface later as a labelling violation, a receiving discrepancy, or a deduction
+nobody can explain. Fixing data quality at the catalogue is not a separate problem
+from the deduction problem. It is the same problem, caught earlier.
+
+---
+---
+
+# Section 3 — Why we have two AI surfaces
+
+We run two, deliberately, and they are not competing versions of the same idea.
+
+## Internal — the in-product Compliance Agent
+
+A chat panel inside our own portal. The customer stays in our product.
+
+- **It already knows the context.** Which retailer, which supplier, which
+  category, which requirement set, what the user is currently looking at. The user
+  does not have to reconstruct any of that in a prompt.
+- **It shows its work.** Every answer points back to the screen where the user can
+  verify it themselves — and that pointer is derived from what the agent actually
+  looked up, not from the model's impression of our navigation.
+- **It is the right place to act.** Creating a requirement, approving an
+  exception, changing what suppliers are measured against — these need explicit
+  confirmation, an impact preview, validation, audit history, and sometimes
+  separation of duties. Before anything changes, the agent puts a confirmation
+  card on screen stating exactly what will happen.
+- **It protects where the value is.** The portal is where customers see evidence,
+  configure obligations and complete remediation. The agent should make that
+  better, not become a shortcut around it.
+
+## External — the customer's own assistant
+
+The customer pastes one address into the assistant they already pay for, signs in
+with their own work account, and chooses how much access to grant.
+
+- **Nothing to install, no key to manage.** Their entire setup is an address and a
+  sign-in.
+- **Which organisation's data they get is decided by who they are**, never chosen
+  from a list. There is deliberately no account picker anywhere in the flow.
+  Typing "show me a competitor's supplier gaps" does not work; natural language
+  never overrides a permission check.
+- **Read-only is a setting, not a different build.** A customer who grants only
+  read access is never even shown the capabilities that change things.
+- **Nothing changes on a first request.** Every capability that would alter
+  something returns a preview of exactly what would change and what it does to the
+  compliance numbers, and a separate confirmation step is the only thing that
+  commits it. An abandoned conversation changes nothing.
+- **One address, both sides of the network.** A retailer and a supplier paste the
+  identical address and get different capabilities, because their identity decides
+  which side of the relationship they are on. A supplier can see the waivers a
+  retailer granted *them* — a shared fact they are party to — and nothing else
+  that retailer holds.
+
+## The relationship between them
+
+This is the part usually got wrong. They are not two peer surfaces sharing a
+back end.
+
+> **The portal governs the connector.** An administrator inside our product sees
+> which capabilities an outside assistant holds, and reads the log of every action
+> it took — allowed or refused, who acted, which assistant, what it asked for.
+> Access is granted, revoked and audited from inside the product.
+
+That is the concrete answer to the question a security reviewer will ask: *what
+stops the customer's AI workspace from becoming the control plane?* We do. On a
+screen they own.
+
+## The honest reason both exist
+
+Some guarantees survive the trip to somebody else's assistant, and some do not.
+
+| Property | In our portal | Through the customer's assistant |
 | --- | --- | --- |
-| **Retailer** | 27 | 15 read, 12 write — of which 10 are business mutations and 2 (`confirm_pending_change`, `discard_pending_change`) are the confirmation plumbing |
-| **Supplier** | 5 | all read — own status, retail partners, open gaps, own compliance report, exceptions granted to them |
-| **Total** | **32** | **20 read, 12 write** |
+| Keeping each customer's data separate | Enforced | **Enforced** — re-checked on every request |
+| What a given user is allowed to do | Enforced | **Enforced** — filtered per person |
+| Nothing changes without confirmation | Enforced | **Enforced** — built into the protocol |
+| Every answer cites a verifiable source | Enforced | **Requested only** |
+| Saying that history is reconstructed, not recorded | Enforced | **Requested only** |
+| Never restating a figure from memory | Enforced | **Requested only** |
+| How it looks on screen | Ours | **Not ours** — the assistant's choice |
 
-Five scopes gate them: `tgc.read`, `tgc.requirements.write`,
-`tgc.exceptions.write`, `tgc.requirements.activate` (required *in addition to*
-write), `tgc.destructive` (required *in addition to* the relevant write scope).
-
-Three design decisions are worth naming because Part Three's verdict depends on
-them:
-
-**1. The tenant is derived from identity, never chosen.** A supplier and a
-retailer paste the identical URL; what they can do falls out of who signed in
-(`lib/mcp/tenants.ts`, re-checked per call in `lib/mcp/guard.ts`). There is no
-account picker anywhere in the flow and deliberately nowhere to add one. A user
-can type "show me Belk's supplier gaps" and the server refuses, because natural
-language does not override server-side policy.
-
-**2. Authority is declared as data, not scattered through handlers.** Every entry
-in the registry carries its required scope, which tenant classes may call it,
-and whether an autonomous workload may. The route filters `tools/list` by the
-caller's scopes — so a read-only grant means the write tools are *never listed*,
-which makes read-only a configuration rather than a separate build. The header
-comment on `lib/mcp/manifest.ts` makes the further claim that this shape
-(tool + scope + tenant class + read/write) is a candidate **platform** registry
-schema for the TG Aviator MCP Gateway, not just TGC plumbing. Part Three tests
-whether that bet is a good one.
-
-**3. Nothing mutates on a first call.** Every mutating tool returns a preview of
-exactly what would change, what that does to compliance numbers, and a
-short-lived single-use token; `confirm_pending_change` is the only path that
-writes (`lib/mcp/pending.ts`). This lives in the *protocol* rather than in a UI
-card because an external ChatGPT session has no card of ours to render — see
-[`mcp-enterprise-auth-trd.md`](./mcp-enterprise-auth-trd.md) ENT-06a. An
-abandoned conversation changes nothing.
-
-## Honest limits of what is built
-
-Stated compactly rather than re-argued; the full version is
-[`mcp-pm-presentation.md`](./mcp-pm-presentation.md) Appendix G.
-
-- All data is mock, watermarked, in an in-memory store that resets on cold start.
-- The OAuth is real; the identity provider is a local demo stand-in for a
-  customer's Entra ID or Okta federated through the Gateway.
-- Chat-made writes do not appear in the portal screens — separate runtime
-  processes, separate module scope.
-- No report run persists, so nothing the connector produces is citable.
-- Connector calls are not traced and are not covered by the golden eval set.
+The three "requested only" rows are the entire argument for keeping the in-product
+agent. It is not a lesser copy of the connector — it is the surface where those
+guarantees are actually guarantees. Anywhere the column says "requested only," we
+owe ourselves a measurement, because **a request that is never measured is an
+assumption.**
 
 ---
 ---
 
-# Part Three — Is MCP adoption the future for enterprise products?
+# Section 4 — Land and expand
 
-The question has two halves that get conflated and shouldn't be:
+## The shape of the bet
 
-- **External adoption** — a vendor publishes a server; the *customer's* assistant
-  connects to it. This is TGC's bet.
-- **Internal adoption** — an enterprise runs MCP as its own integration fabric:
-  its systems behind its own gateway and registry, called by its own agents and
-  employees. For us that means the TG Aviator MCP Gateway, a Catalogue Domain
-  Agent, product-to-product access, and the in-portal Compliance Agent — which
-  already consumes the same tool layer today.
+Catalogue compliance is a good place to land: it is a real, funded pain, it is
+where our differentiated data already sits, and it is narrow enough to get the
+governance right. But it is not where the value stops, and the reason is
+structural rather than aspirational.
 
-They have different buyers, different timelines, and different risks. Below, each
-claim gets a verdict, a confidence level, and — the part that makes this a ledger
-rather than a pitch — **what would prove it wrong.**
+**Every expansion after the first one adds a capability, not an integration.**
 
-## The ledger: external adoption
+The expensive work — proving who the user is, deciding which organisation's data
+they may touch, checking permissions on every single request, logging it, and
+requiring a human confirmation before anything changes — is done once. It is not
+specific to catalogue data. A purchase order, a shipment notice and an invoice go
+through the same gate. Adding one is publishing a new capability inside a
+connection the customer already approved, not negotiating a new integration and a
+new security review.
 
-| # | Claim | Verdict | Confidence | Basis | What would falsify it |
-| --- | --- | --- | --- | --- | --- |
-| E1 | Implement once, and every major assistant can call it | **True** | **High** | OpenAI, Google, Microsoft, AWS all support MCP; OpenAI co-founded the foundation that now governs it; ~half a billion SDK downloads/month | A major client shipping a competing proprietary format *and* refusing MCP. No current signal of this |
-| E2 | The standard is durable enough to build on | **True** | **High** | Linux Foundation stewardship since Dec 2025 with maintainer independence; a formal standards process; a 12-month deprecation window on the 2026-07-28 spec | Foundation governance stalling, or a spec revision without a migration window |
-| E3 | Enterprise B2B software vendors — not just commerce platforms — are shipping customer-facing servers | **True, and this updates our own prior** | **Medium-high** | Asana, Atlassian, Canva, Figma, Linear, Supabase are named server-side adopters of Enterprise-Managed Authorization. That is enterprise SaaS, not commerce | These proving to be pilots that quietly lapse. Worth re-checking in two quarters |
-| E4 | Customers will permit third-party assistants against their data | **Partly — and it is a procurement question, not an architecture one** | **Medium** | Zero-touch OAuth (stable Jun 2026, Okta + Microsoft + Anthropic) exists precisely because enterprises demanded central control. The customer's own IdP is the gatekeeper; TGC never holds a user directory | Enterprises standardising on "internal agents only, no external connectors." Plausible in regulated sectors |
-| E5 | A governed MCP server is safer than the alternative customers already accept | **True, and under-used as an argument** | **Medium-high** | The realistic alternative is a CSV export or a bulk feed, which copies data outside our control boundary permanently, with no revocation and no audit of what was read | A customer demonstrating equivalent per-call policy enforcement on their existing feed. Rare in practice |
+That is why "land and expand" is a description of the architecture here, and not
+just a go-to-market slogan.
 
-**Where this corrects the existing deck.** `mcp-pm-presentation.md` §6.2 concludes
-that external connectors are "almost entirely from commerce platforms and data
-aggregators" and that TGC's bet has "no direct precedent in retail/CPG." The first
-half is now out of date — the enterprise-auth adopter list is squarely enterprise
-SaaS. The second half still stands: **retailer↔supplier catalogue compliance
-specifically remains unprecedented.** Keep saying that; it is the honest and more
-credible framing.
+## The stages
 
-## The ledger: internal adoption
+| Stage | What it covers | What is new | What is reused |
+| --- | --- | --- | --- |
+| **1. Land** | Catalogue compliance — requirements, supplier gaps, exceptions, reports, both sides of the network | Everything | — |
+| **2. Deepen** | Proactive alerting instead of asking; citable report artifacts; telling a supplier which single fix unblocks the most retail partners | Alerting, stored artifacts | Identity, permissions, audit, confirm-before-change, the connection |
+| **3. Expand across the network** | Orders, shipment notices and invoices; country-specific invoicing rules; EDI exception handling and the deduction-dispute workflow | Domain capabilities per document type | All of the above, plus the customer relationship and the approved connection |
+| **4. Platform** | The same connection fronting other Trading Grid capabilities through the shared Aviator gateway | Gateway-level routing and metering | All of the above |
 
-| # | Claim | Verdict | Confidence | Basis | What would falsify it |
-| --- | --- | --- | --- | --- | --- |
-| I1 | Large enterprises are standardising MCP internally, not only consuming it | **True** | **Medium-high** | Block runs MCP company-wide with all servers built in-house; Bloomberg adopted it as an organisation-wide standard across 9,500+ engineers, explicitly building *identity-aware, multi-tenant* servers — the same shape as TGC's | These turning out to be engineering-productivity deployments only, never reaching line-of-business systems |
-| I2 | The gateway + registry split is becoming the standard enterprise pattern | **True** | **Medium** | The pattern is consistently described the same way — the registry *discovers*, the gateway *enforces* — and Kong, Azure API Management with Entra ID, and several dedicated vendors ship it. The 2026-07-28 spec added header-based routing specifically so gateways can meter without parsing bodies | Clients moving to direct server connections with policy enforced client-side. The spec is moving the other way |
-| I3 | TGC's registry shape is a reasonable candidate platform schema for the Aviator Gateway | **Plausible, unproven** | **Low-medium** | It carries exactly the metadata a gateway needs — tool, scope, tenant class, read/write, workload-callable — and the industry consensus is that gateways need this. But it has never been reviewed by the platform team, and no second product has tried to adopt it | Aviator selecting a commercial gateway with its own registry schema. **This is the claim in this document most likely to be wrong**, and it is cheap to test: show it to the platform team |
-| I4 | Internal adoption should precede external, because the hard work is shared | **True, and it is the strategic recommendation** | **Medium-high** | Identity, tenancy, audit and the tool layer are identical either way; the blast radius of getting them wrong is smaller internally. TGC already demonstrates the pattern — the in-portal Compliance Agent consumes the same `lib/mcp/tools.ts` | A customer signing for the external connector before the internal work lands. A good problem, and it would reorder the roadmap |
-| I5 | Internal MCP will eat conventional internal integration | **Not yet — and don't claim it** | **Low** | MCP is a façade over business logic, not a replacement for it. Everything cited above wraps existing services; nothing retires an integration layer | It becoming true would look like a company running MCP as its primary system-to-system transport. Nobody credible is doing this |
+## The Trading Grid surface this expands into
+
+Trading Grid is already a B2B trading-partner management and integration platform
+spanning traditional EDI and modern APIs. Three parts of it are the obvious next
+ground, and each maps onto a problem named in Section 2:
+
+- **Active Orders** covers purchase orders, invoices, shipment notices, and order
+  status across the procure-to-pay lifecycle including fulfilment, transportation
+  and invoicing. **This is where the deduction dispute lives.** Every document
+  needed to answer "was this claim valid?" is already on the network.
+- **Trading Grid e-Invoicing** provides connectivity and formatting to meet local
+  requirements in 60+ countries. Regulatory rules per country are exactly the kind
+  of thing that is painful to look up and easy to publish as a strict contract —
+  the same mechanism that makes an assistant offer only the four valid image
+  formats makes it offer only the fields a given country actually requires.
+- **Aviator** already analyses integrated data to find bottlenecks and predict
+  errors, and **already offers natural-language querying over EDI payloads** so
+  non-technical users can analyse transactions and explore patterns.
+
+**That last point deserves emphasis, because it de-risks half of this document.**
+The in-product agent pattern is not a novel bet we are asking anyone to take on
+faith. It ships inside OpenText's own suite today. The Compliance Agent is that
+same pattern applied to catalogue data, with a governed path to *change* something
+added on top — and that governed write path is the part that is genuinely ours.
+
+## Why the second land should be the deduction dispute
+
+If Section 2's numbers are right, this is the highest-value cross-document
+question on the network:
+
+- The money is large and it is a line item somebody already owns.
+- The majority of claims are invalid, so the work is *evidence assembly* — which
+  is what this technology is unusually good at and what screens are unusually bad
+  at.
+- Trading Grid already carries every document the argument needs.
+- The workflow ends in an action — file the dispute, accept the claim, correct the
+  data — and finding the problem and acting on it stop being two different
+  applications.
+- Catalogue data quality is upstream of a meaningful share of those claims, so the
+  first land and the second land reinforce each other rather than compete.
+
+## The condition this depends on
+
+Stated plainly, because it is what would make the expansion fail: **the reuse has
+to be real.** If each new document type ends up needing its own permission model,
+its own audit trail and its own confirmation flow, then this is not an expansion
+strategy — it is four integrations wearing one name, and the economics collapse.
+
+The discipline that keeps it honest is refusing to publish a capability until the
+control it requires exists. We have held that line once already: supplier-side
+access was gated on being able to prove that retailer and supplier organisations
+are properly isolated from each other, and it shipped the day that was true, not
+before.
+
+## The same architecture, described from outside
+
+This is not only our reading. Supply-chain analysts describe the identical
+pattern: separate agents for transportation exceptions, supplier risk, demand
+planning and procurement, sitting over shared services that publish approved
+capabilities — where **once standardised, the same capabilities serve procurement,
+planning, logistics and customer-service agents alike.** That is the land-and-
+expand thesis, stated by a third party with no interest in our roadmap.
+
+---
+---
+
+# Section 5 — Is this actually the future for enterprise products?
+
+Below, each claim carries a verdict, a confidence level, the basis for it, and —
+the part that makes this a ledger rather than a pitch — **what would prove it
+wrong.** Disagree with a row without discarding the document.
+
+## External access: customers' own assistants
+
+| Claim | Verdict | Confidence | Basis | What would falsify it |
+| --- | --- | --- | --- | --- |
+| Build it once and every major assistant can use it | **True** | **High** | OpenAI, Google, Microsoft and AWS all support the standard; OpenAI co-founded the foundation that governs it | A major assistant shipping a rival proprietary format *and* refusing this one. No current signal |
+| The standard is durable enough to build a product on | **True** | **High** | Linux Foundation stewardship since December 2025, an open standards process, and a twelve-month notice period on anything retired | Governance stalling, or a breaking change with no migration window |
+| Serious enterprise software vendors are shipping this to customers, not just experimenting | **True** | **Medium-high** | Asana, Atlassian, Canva, Figma, Linear and Supabase are named adopters of the corporate single-sign-on extension | These proving to be pilots that quietly lapse. Worth re-checking in two quarters |
+| Customers will permit a third-party assistant against their data | **Partly — and it is a procurement question, not a technical one** | **Medium** | Corporate single sign-on exists precisely because enterprises demanded central control. The customer's own IT department is the gatekeeper; we never hold their staff directory | Regulated customers standardising on "internal assistants only." Entirely plausible in some sectors |
+| A governed connector is safer than what customers already accept | **True, and under-used as an argument** | **Medium-high** | The realistic alternative is a file export or bulk feed, which copies data outside our control permanently — no revocation, no record of what was read | A customer demonstrating equivalent per-request policy enforcement on their existing feed. Rare in practice |
+
+## Internal access: the in-product Compliance Agent
+
+| Claim | Verdict | Confidence | Basis | What would falsify it |
+| --- | --- | --- | --- | --- |
+| Embedded AI assistants are becoming standard in enterprise software | **True** | **High** | Aviator ships one today over EDI data; every major enterprise suite has shipped or announced one | Customers actively switching them off. The opposite is happening |
+| The embedded agent is the right surface for actions that change things | **True** | **High** | Confirmation, impact preview, audit trail and separation of duties are all things we can *enforce* only where we own the screen | Confirmation moving into the protocol so completely that the distinction stops mattering. Partly happening — see the weaknesses below |
+| Embedded first, external selectively, is the right sequence | **True** | **Medium-high** | The hard work is shared; the embedded surface has the smaller blast radius and no third-party procurement conversation attached | A customer signing for external access before the embedded work lands. A good problem, and it would reorder the plan |
+| **External connectors will not make the embedded agent redundant** | **True** | **Medium** | The three "requested only" rows in Section 3. Citation, provenance and honest framing are guarantees only where we own the rendering | Assistants proving reliable enough at citation and provenance that the distinction is academic. **This is the row most likely to be argued with, and it should be** |
+
+## Retail and CPG specifically
+
+| Claim | Verdict | Confidence | Basis | What would falsify it |
+| --- | --- | --- | --- | --- |
+| Retail and CPG are adopting this, not waiting | **True** | **Medium-high** | Retailers name supply chain and pricing as their top intended uses; Walmart's supplier-facing agent is connected this way; Microsoft ships a commerce version | Adoption concentrating purely in consumer-facing shopping assistants, with nothing on the supply side |
+| Data quality is the constraint the agents are hitting | **True, and it is our strongest positioning** | **Medium** | Retail research reports that adoption is *exposing* data quality and availability concerns rather than solving them | Buyers treating data quality as solved. Section 2's deduction figures say otherwise |
+| **Retailer↔supplier catalogue compliance specifically has no direct precedent** | **True** | **Medium** | Extensive search finds commerce platforms, PIM vendors and individual retailers' own agents — not this | Somebody shipping it. Then we are late, and we would want to know quickly |
 
 ## Where the thesis is weakest
 
-Four things, stated plainly, because a document that only argues one way is worth
-less to the person reading it.
+Four things, stated plainly, because a document that only argues one direction is
+worth less to whoever reads it.
 
-**1. Agentic AI is heading into the trough, and MCP rides that curve.** Gartner's
-2026 Hype Cycle places agentic AI at the Peak of Inflated Expectations, reports
-only 17% of organisations having deployed agents, and predicts **over 40% of
-agentic AI projects will be cancelled by the end of 2027** on cost, unclear value,
-or inadequate risk controls. Publishing a server does not make anyone use it. The
-useful nuance in the same analysis: results are coming from *well-scoped agents in
-constrained workflows with human oversight* — which is a fair description of a
-32-tool server with per-call authorization and a two-phase confirm, and not a fair
-description of most things being funded.
+**1. The whole category is heading into a trough.** Gartner's 2026 assessment
+places agentic AI at the peak of inflated expectations, reports only 17% of
+organisations having deployed agents, and predicts **more than 40% of agentic AI
+projects will be cancelled by the end of 2027** on cost, unclear value, or
+inadequate risk controls. Publishing capabilities does not make anyone use them.
+The useful nuance in the same analysis: the results that *are* materialising come
+from well-scoped agents in constrained workflows with human oversight — which
+describes a narrow, permission-checked capability set with confirmation before
+every change, and does not describe most of what is currently being funded.
 
-**2. The security record is genuinely bad, and it is the strongest argument
-against naive adoption.** Tool poisoning — malicious instructions hidden in tool
-descriptions or responses, invisible to the user but read by the model — is now an
-OWASP-catalogued attack class. Microsoft has published warnings about poisoned
-tool descriptions causing agents to leak data. Invariant Labs demonstrated a
-cross-server attack using the official GitHub MCP server, exploiting the fact that
-users routinely grant broad repository scope. Scans of public servers report
-double-digit percentages with command-injection or SSRF findings, and hundreds
-exposed to the internet with no authentication at all. The NSA published a
-security-guidance document on MCP in June 2026.
+**2. The security record is genuinely bad, and it is the best argument against
+naive adoption.** Hiding instructions inside a capability's description, so that
+the assistant reads them and the user never sees them, is now a catalogued attack
+class. Microsoft has published warnings about it. Researchers demonstrated using
+one compromised system to make an assistant misuse a second, legitimate,
+high-privilege one. Scans of publicly available systems find double-digit
+percentages with serious flaws, and hundreds reachable on the internet with no
+sign-in at all. The US National Security Agency published guidance on this in
+June 2026.
 
-The correct conclusion is not "therefore don't." It is that **the governance is
-the product**, and every one of those failures is an implementation failure that
-TGC's design already answers: no unauthenticated access, tenant derived not
-chosen, authority split into five scopes, nothing mutates on a first call,
-everything logged including refusals. That is a defensible position — but it has
-to be stated as *"we did the work,"* never as *"MCP is secure."*
+The right conclusion is not "therefore don't." It is that **the governance is the
+product.** Every one of those failures is an implementation failure, and each has
+a specific answer in how we built ours: no anonymous access, the organisation
+derived from identity rather than chosen, permissions split so that reading,
+authoring, enforcing and deleting are four separate grants, nothing changing
+without a confirmation, and every action logged including the refusals. That is a
+defensible position — but it must always be stated as *"we did the work,"* never
+as *"this technology is secure."*
 
-**3. Protocol churn moves our own boundaries.** The 2026-07-28 spec is six days
-old and materially changes the deployment model. Multi Round-Trip Requests, which
-let a server return `input_required` mid-call, are a direct alternative to the
-custom pending-token mechanism in `lib/mcp/pending.ts`. Server-returned UI would
-move "dense comparison" out of the MCP-hostile column. The enforce-vs-request
-table in the deck is a snapshot of a moving boundary, not a property of the
-protocol.
+**3. The standard is still moving, and it moves our own boundaries.** The
+specification released six days before this document changes the deployment model
+and adds a native way for a system to pause mid-request and ask the user a
+question — which is an alternative to the confirmation mechanism we built
+ourselves. Similarly, if assistants gain the ability to render our screens rather
+than describe them in words, the "dense comparison belongs on a screen" argument
+weakens. Section 3's table is a snapshot of a moving line, not a permanent
+property.
 
-**4. Consolidation risk.** If gateways and registries become where the value sits,
-individual product servers become commodity plumbing — a checkbox, not a
-differentiator. TGC's answer has to be the thing a gateway can't supply: the
-domain model, the compliance engine, and the bilateral tenancy rules. **The moat
-is the requirement graph and the engine, not the connector.** Worth saying out
-loud before someone else says it in review.
+**4. Consolidation risk.** If corporate gateways become where the control and the
+value sit, an individual product's connector becomes commodity plumbing — a
+checkbox, not a differentiator. Our answer has to be the thing a gateway cannot
+supply. **The moat is the requirement model, the compliance engine, and the
+network of trading relationships — not the connector.** Better that we say this
+first than hear it in a review.
 
 ## What we should not claim
 
-Extends the existing list in `mcp-pm-presentation.md` §5.4:
-
-- **Not** "MCP is inherently secure." It standardises where authorization goes,
-  not whether you did it.
-- **Not** "Claude or Copilot can access our data safely by default." They must be
-  explicitly authorized and constrained.
-- **Not** "read-only means zero risk." Read tools disclose data; entitlement
-  checks and output minimisation are mandatory.
-- **Not** "the model decides access." Our platform and gateway do.
-- **Not** "everyone is doing MCP, therefore it works." Adoption of a protocol is
-  not evidence of value from the integrations built on it — and Gartner's
-  cancellation forecast is the counterweight.
-- **Not** "we are ahead." We have a prototype on mock data with no persistence.
+- **Not** "this technology is inherently secure." It standardises where the
+  permission checks go, not whether you did them.
+- **Not** "Claude or Copilot can safely reach our data by default." They must be
+  explicitly authorised and constrained.
+- **Not** "read-only means zero risk." Reading discloses data; entitlement checks
+  and minimal responses are mandatory.
+- **Not** "the assistant decides access." It does not. Our platform does.
+- **Not** "everyone is adopting it, therefore it works." Adoption of a standard is
+  not evidence of value from what is built on it, and the cancellation forecast is
+  the counterweight.
+- **Not** "we are ahead." We have a prototype on illustrative data.
 
 ## The verdict
 
 **Yes, with two qualifications.**
 
-MCP as the standard interface between AI systems and enterprise software is about
-as settled as an eighteen-month-old protocol can be: vendor-neutral governance,
-every major client, enterprise SSO shipped and stable, and a spec that has already
-made the jump from local tool to distributed infrastructure. Betting *against* it
-now requires believing something specific and unlikely.
+MCP as the standard way AI systems reach enterprise software is about as settled
+as an eighteen-month-old standard can be: neutral governance, every major
+assistant, corporate single sign-on shipped and stable, and a specification that
+has already made the jump from laptop tool to distributed infrastructure. Betting
+*against* it now requires believing something specific and unlikely.
 
-The two qualifications are what the ledger is for:
+The two qualifications are what the ledger is for.
 
-1. **The protocol is settled; the value is not.** Nothing above shows that MCP
-   integrations produce outcomes, and the most credible analyst view expects most
-   agentic projects to be cancelled. Treat "MCP is the future" as a claim about
-   *plumbing* and keep the *value* claim tied to something we can measure. The
-   cheapest available measurement is still the one in the deck's Appendix D:
-   instrument what fraction of report and dashboard sessions end in an **action**
-   rather than in nothing.
-2. **Internal-first is the better sequence for us**, and it is not what the
-   current documentation set implies. The identity, tenancy, audit and tool-layer
-   work is identical for both; internal has a smaller blast radius, a shorter
-   procurement path, and a named vehicle already waiting in the TG Aviator
-   Gateway. The external connector should follow the internal registry, not race
-   it.
+**One — the standard is settled; the value is not.** Nothing above demonstrates
+that these integrations produce outcomes, and the most credible analyst view
+expects most agentic projects to be cancelled. So treat "this is the future" as a
+claim about *plumbing*, and keep the *value* claim tied to something measurable.
+The cheapest available measurement, and the one worth taking before committing
+serious engineering: **what fraction of report and dashboard sessions end in an
+action — a fix, a waiver, an outreach — rather than ending in nothing?** If most
+end in nothing, a system that speaks up when something is wrong beats a screen
+somebody has to remember to check, and we should say so. If they end in
+multi-supplier forensics, the screens survive and the debate is over.
 
----
----
+**Two — embedded first, external selectively, expansion continuously.** The
+in-product agent is where the guarantees are real and where actions belong. The
+external connector is where the reach is, and it should follow the governed
+surface rather than race it. And the expansion across orders, shipments and
+invoices is the part that turns a well-received feature into a network position —
+because each step reuses the permission model, the audit trail and the customer
+relationship that the first one paid for.
 
-# Part Four — What follows
-
-## 4a. TODO backlog
-
-Consolidates what is currently scattered across the deck's L0–L4 ladder,
-Appendix E, and [`mcp-implementation-plan.md`](./mcp-implementation-plan.md), and
-adds the items that follow from Part Three. Ranked by leverage, not by effort.
-
-| # | Item | Why it matters | Depends on | Size |
-| --- | --- | --- | --- | --- |
-| 1 | **Fix the stale numbers in the existing docs** | Four documents state tool counts and a supplier gap that are no longer true. A reviewer who checks one and finds it wrong discounts everything else. Details below | Nothing | XS |
-| 2 | **Show `lib/mcp/manifest.ts` to the Aviator platform team** | Directly tests claim I3, the weakest claim in this document, and it costs a meeting | Nothing | XS |
-| 3 | **Register resources** | The missing primitive. Unblocks report-as-artifact, help content, and subscriptions at once. **Security note: every control today runs through the guard on tool invocation. Resources are a new surface that walks around that choke point — they need the same guard from the first one registered** | Nothing | M |
-| 4 | **Persist report runs** (`run_id`, parameters, requester, timestamp) and add `list_report_runs` / `get_report_run` | Makes "the Belk scan from Tuesday" a thing you can name, re-open, attach to an email, and hand to an auditor — which is most of what the report screen is for. `reportToCsv()` already exists and has nowhere to go | A real datastore; #3 | L |
-| 5 | **Return the audit correlation id to the caller** | `AuditEntry.id` already exists in `lib/mcp/audit.ts` and is never surfaced. The record exists; it just isn't quotable. Highest value-to-effort ratio in the list | Nothing | XS |
-| 6 | **Instrument the action rate** on report and dashboard sessions | The measurement that decides whether conversational access replaces the screens, and it can be taken before committing engineering either way | Analytics on the portal | S |
-| 7 | **Eval coverage for the connector** | Every "requested only" row in the enforce-vs-request table is an unmeasured assumption today. Connector calls are not traced and not in the golden set | Existing LangSmith harness | M |
-| 8 | **Supplier `prioritise_my_gaps`** | Ranks gaps by how many retail partners each one unblocks. This is the payoff the README claims as the supplier's whole reason to be on the network — *fill a gap once, satisfy every retailer* — and nothing computes it on either surface | Existing supplier functions | S |
-| 9 | **Requirement-set versioning** | The security memo assumes published, approved versions ("Fall 2026 / v3.2"). The code has `status` and `lastUpdated` only, so the memo's own sample output cannot currently be produced | Data model change | M |
-| 10 | **Scheduled compliance snapshots** | Turns reconstructed history into captured history. Today's trend is engine-scored over reconstructed past states, correctly labelled `provenance: "reconstructed"` — no amount of tooling makes that observed | A datastore | M |
-| 11 | **Bounded, cost-aware retrieval per call** | Explicit caps on retrieval depth and payload size, before the tool surface grows further. Currently unbounded | Nothing | S |
-| 12 | **Evaluate Multi Round-Trip Requests against `lib/mcp/pending.ts`** | The 2026-07-28 spec's `input_required` result type may replace our custom pending-token mechanism with a protocol-native one. Do not migrate reflexively — our version survives an abandoned conversation and carries an audit trail — but do not let it drift into unmaintained bespoke plumbing either | SDK support for the new spec | S to assess |
-| 13 | **Track the 2026-07-28 migration** | Stateless core, Client ID Metadata Documents replacing Dynamic Client Registration, RFC 9207 issuer validation. There is a twelve-month deprecation window, so this is planning, not panic — but our client-registration code is directly affected | Tier 1 SDK releases | M |
-
-### The stale claims behind item 1
-
-Verified against `lib/mcp/manifest.ts` on 2026-08-03:
-
-| Document | Says | Actually |
-| --- | --- | --- |
-| `mcp-faq.md` §4 | "Six read tools and three write tools" | 32 tools: 20 read, 12 write |
-| `mcp-faq.md` §4 | Supplier-side tools "not built in this prototype" | 5 supplier tools shipped |
-| `mcp-pm-presentation.md` §2.2, §6 | "About thirty capabilities" / "29 tools" | 32 |
-| `mcp-pm-presentation.md` Appendix A | Supplier "Read (4)" | 5 |
-| `mcp-pm-presentation.md` §4 | "Supplier-side has no report tool… The engine already exists. The tool doesn't" | `run_my_compliance_report` exists |
-| `README.md` | The connector "covers the retailer side" | Both sides shipped |
-
-## 4b. Files recommended for removal
-
-Verified while writing this document. **These are recommendations — nothing is
-deleted in the change that adds this file.** Each should be its own small commit
-so a reviewer can disagree with one without reverting the others.
-
-| File(s) | Finding | Risk |
-| --- | --- | --- |
-| `enterprise_safe_remote_mcp_retailer_catalog_compliance.md` (repo root, 231 lines) | A superseded duplicate of [`enterprise-safe-remote-mcp.md`](./enterprise-safe-remote-mcp.md) (274 lines) — same memo, same audience, same purpose line, but the `docs/` copy also carries the editor's-note table reconciling the memo against the code as built. A repo-wide grep finds **no reference to the root copy from anywhere** | **None.** Safe to delete |
-| `docs/*.csv` — 15 files (`Accessories.csv`, `Body Washing.csv`, `Cosmetics-Makeup Products.csv`, `Footwear.csv`, `Fragrances.csv`, `Hair Care.csv`, `Hair Removal.csv`, `Handbags.csv`, `Jewelry.csv`, `Nail Care.csv`, `Skin Care.csv`, `Sleepwear.csv`, `Sunscreen-Tanning.csv`, `Swimwear.csv`, `Underwear.csv`) | **Byte-identical** to the repo-root copies (`diff -q` on all 15). Every consumer reads from the repo root — `scripts/generate-golden-dataset.ts`, `scripts/upload-golden-dataset.mjs`, and the derivation comments in `lib/gs1-standard-library.ts`. Nothing reads the `docs/` path | **Low.** `CLAUDE.md` currently describes them as an intentional duplicate "for the MCP/docs context", so that line must be updated in the same commit |
-| `package-lock.json` (386 KB) | A second lockfile for a pnpm project. `CLAUDE.md` names `pnpm-lock.yaml` as the source of truth and says this one "is not the one to update" — i.e. it is already documented as drifting | **Medium.** Some CI and host package-manager detection keys off its presence. Verify a clean Vercel build before deleting |
-
-**Do not remove** the repo-root `*.csv` files or
-`gs1_extended_attribute_master_code_list.csv`. They look like build artifacts and
-are not: they are source data read at generation time, and `CLAUDE.md` flags them
-explicitly.
+**Land on catalogue compliance. Expand on the disputes it is upstream of.**
 
 ---
+---
 
-## Sources and verification status
+# Section 6 — Sources and verification status
 
-Following the convention set in
-[`mcp-pm-presentation.md`](./mcp-pm-presentation.md) Appendix F: several sites
-block automated fetching, so verification status is stated per source rather than
-implied.
+Several sources block automated retrieval, so status is stated per source rather
+than implied. This convention is used across our other documents and is worth
+keeping — it is the reason a reader can trust the numbers that *are* marked
+verified.
 
-### Verified — fetched and read directly
+## Verified — retrieved and read directly
 
-- [MCP joins the Agentic AI Foundation](https://blog.modelcontextprotocol.io/posts/2025-12-09-mcp-joins-agentic-ai-foundation/) — Linux Foundation stewardship, co-founders, maintainer independence
-- [The 2026-07-28 Specification](https://blog.modelcontextprotocol.io/posts/2026-07-28/) — stateless core, MRTR, header routing, cacheable lists, authorization hardening, extensions, deprecation window, SDK download figures
-- [Enterprise-Managed Authorization: Zero-touch OAuth for MCP](https://blog.modelcontextprotocol.io/posts/enterprise-managed-auth/) — stable 18 Jun 2026, IdP/client/server adopter list
-- [Model Context Protocol blog index](https://blog.modelcontextprotocol.io/) — release timeline
-- [Official MCP Registry](https://registry.modelcontextprotocol.io/) — exists and is live; **no server count is published on the page**, so any "N thousand servers" figure in circulation is not sourced from here
+All from the MCP project's own publications:
 
-### Not verified — search-result summaries only (the source blocked automated fetching)
+- [MCP joins the Agentic AI Foundation](https://blog.modelcontextprotocol.io/posts/2025-12-09-mcp-joins-agentic-ai-foundation/) — Linux Foundation stewardship, co-founders, governance independence
+- [The 2026-07-28 specification](https://blog.modelcontextprotocol.io/posts/2026-07-28/) — stateless operation, gateway routing headers, the mid-request question mechanism, authorization hardening, twelve-month deprecation window, download figures
+- [Enterprise-Managed Authorization: zero-touch OAuth](https://blog.modelcontextprotocol.io/posts/enterprise-managed-auth/) — stable 18 June 2026, and the identity-provider, assistant and business adopter lists
+- [The official registry](https://registry.modelcontextprotocol.io/) — live, but **publishes no server count**, so any "N thousand systems" figure in circulation is not sourced from there
 
-Treat every figure below as needing a primary-source check before it goes in front
-of a customer or on a slide.
+## Not verified — search summaries only, because the source blocked retrieval
 
-- [Gartner — Hype Cycle for Agentic AI, 2026](https://www.gartner.com/en/articles/hype-cycle-for-agentic-ai) — the 17% deployed figure, the >40% cancellation forecast, and the Peak-of-Inflated-Expectations placement. **Gartner is paywalled; these come from secondary coverage**
-- [OWASP — MCP Tool Poisoning](https://owasp.org/www-community/attacks/MCP_Tool_Poisoning) — the attack class
-- [Invariant Labs — Tool Poisoning Attacks](https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks) — the GitHub MCP cross-server demonstration
-- [Microsoft warning on poisoned MCP tool descriptions](https://thehackernews.com/2026/06/microsoft-warns-poisoned-mcp-tool.html)
-- [NSA — Security Design Considerations for AI-Driven Automation (CSI, Jun 2026)](https://media.defense.gov/2026/Jun/02/2003943289/-1/-1/0/CSI_MCP_SECURITY.PDF)
-- [MDPI — MCP threat modelling and tool-poisoning analysis](https://www.mdpi.com/2624-800X/6/3/84)
-- Block and Bloomberg internal-deployment details — including the "9,500+ engineers" and "identity-aware, multi-tenant MCP servers" characterisations — reached via [ZenML's LLMOps database entry](https://www.zenml.io/llmops-database/ai-powered-developer-productivity-platform-with-mcp-servers-and-agent-based-automation). **Find the original Bloomberg engineering talk before citing these publicly**
-- Vulnerability-prevalence percentages (command injection, SSRF, exposed unauthenticated servers) — multiple secondary scan reports, none independently verified. **The claim "the security record is bad" is well supported; the specific percentages are not**
-- Circulating enterprise-adoption percentages (e.g. "41% in production", "78% of enterprise AI teams") — **no primary source located; do not use**
+**Check against the primary source before any of these goes to a customer or on a
+slide.**
 
-### Already in the repo, unchanged by this document
+*Retail and CPG economics — every figure in Section 2:*
 
-The retail and CPG landscape sources — Walmart, Stacklok, Akeneo, Shopify,
-Microsoft Dynamics 365 Commerce, Logicbroker, and the EU ESPR / Digital Product
-Passport material — are in
-[`mcp-pm-presentation.md`](./mcp-pm-presentation.md) Appendix F with their own
-verification caveat, which still applies.
+- Chargeback and deduction ranges (5–15% of invoices, 2–10% of revenue, 3–8% of
+  retail sales), and the Walmart, Target and Amazon penalty structures — drawn
+  from several vendor and industry analyses, none independently confirmed
+- The Retail Value Chain Federation finding that **65–80% of retail shortage
+  claims are invalid** — this is the single most load-bearing number in the
+  document, and it should be traced to the RVCF's own publication before it is
+  quoted anywhere externally
+
+*OpenText product descriptions — all of Section 4's Trading Grid material:*
+
+- [Trading Grid](https://www.opentext.com/products/trading-grid), [Supply Chain Automation](https://www.opentext.com/products/supply-chain-automation), and the [Trading Grid with Aviator overview](https://www.opentext.com/media/product-overview/opentext-trading-grid-with-aviator-po-en.pdf) — the Active Orders scope, the 60+ country e-Invoicing coverage, and Aviator's natural-language-over-EDI capability all come from **public marketing pages, not internal roadmap**. Confirm the module boundaries and current capability with the product owners before presenting the expansion sequence as a plan
+
+*Analyst and security material:*
+
+- [Gartner — Hype Cycle for Agentic AI, 2026](https://www.gartner.com/en/articles/hype-cycle-for-agentic-ai) — the 17% figure, the >40% cancellation forecast, the trough placement. **Paywalled; these come from secondary coverage**
+- [OWASP — the tool-poisoning attack class](https://owasp.org/www-community/attacks/MCP_Tool_Poisoning), [Invariant Labs' cross-system demonstration](https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks), [Microsoft's warning](https://thehackernews.com/2026/06/microsoft-warns-poisoned-mcp-tool.html), and the [NSA guidance of June 2026](https://media.defense.gov/2026/Jun/02/2003943289/-1/-1/0/CSI_MCP_SECURITY.PDF)
+- Supply-chain analyst framing on shared capabilities across agents — [ARC Advisory Group](https://www.arcweb.com/blog/ai-supply-chain-part-3-mcp-model-context-protocol-shared-reasoning-across-agents) and [Logistics Viewpoints](http://logisticsviewpoints.com/2026/07/29/model-context-protocol-and-the-future-of-agentic-supply-chains/)
+- [Stacklok — State of MCP in Retail 2026](https://stacklok.com/resources/state-of-mcp-in-retail-2026/) — the >40%-of-retailers-in-production figure and the data-quality finding
+
+## Do not use
+
+- Circulating enterprise-adoption percentages such as "41% in production" or "78%
+  of enterprise AI teams" — **no primary source located for either.**
+- Any specific vulnerability-prevalence percentage. The claim *"the security
+  record is bad"* is well supported; the individual percentages are not.
+
+## Already documented elsewhere
+
+The retail landscape sources — Walmart's supplier-facing agent, the PIM vendors,
+Microsoft's and SAP's commerce systems, the network operators, and the EU Digital
+Product Passport material — are catalogued in our MCP presentation deck with their
+own verification caveats, which still apply.
