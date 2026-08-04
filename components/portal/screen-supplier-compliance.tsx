@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { BadgeCheck, ListChecks } from "lucide-react"
+import { ArrowRight, BadgeCheck, CheckCircle, ListChecks, Sparkles } from "lucide-react"
 import {
   countBaselineGaps,
   countUncategorised,
@@ -10,6 +10,7 @@ import {
   type TargetCompletion,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
+import { getCatalogueGaps } from "@/lib/supplier-gaps"
 import { PARTNERS } from "@/lib/partner-filters"
 import { RequirementsDrawer } from "@/components/portal/requirements-drawer"
 import { getRequirementMatrix, type RequirementTarget } from "@/lib/compliance-requirements"
@@ -24,6 +25,8 @@ interface SupplierComplianceProps {
   products: SupplierProduct[]
   onSelectGs1: () => void
   onSelectPartner: (partnerId: string, partnerName: string) => void
+  /** Cross-target worklist — every product needing enrichment, in one screen */
+  onViewAllGaps: () => void
 }
 
 // Reused from the former Trading Partners screen — the retailer-row status pill.
@@ -118,10 +121,77 @@ function RequirementsButton({ onClick }: { onClick: () => void }) {
   )
 }
 
+// ── Cross-target entry point ──────────────────────────────────────────────────
+// Every row in the table below is ONE compliance target. This card is the only
+// thing on the screen that isn't: it rolls the whole catalogue up across every
+// target at once, which is the shape of the question that actually precedes an
+// enrichment run ("what needs work?", not "am I ready for Belk?").
+function EnrichmentCallout({
+  needing,
+  uncategorised,
+  withGaps,
+  openGaps,
+  onViewAllGaps,
+}: {
+  needing: number
+  uncategorised: number
+  withGaps: number
+  openGaps: number
+  onViewAllGaps: () => void
+}) {
+  const clear = needing === 0
+  return (
+    <div
+      className="flex items-center gap-3 rounded-lg px-4 py-3.5 flex-wrap"
+      style={
+        clear
+          ? { backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0" }
+          : { backgroundColor: "#FFFBEB", border: "1px solid #FDE68A" }
+      }
+    >
+      {clear ? (
+        <CheckCircle className="w-4 h-4 shrink-0" style={{ color: "#16A34A" }} />
+      ) : (
+        <Sparkles className="w-4 h-4 shrink-0" style={{ color: "#B45309" }} />
+      )}
+      <div className="flex flex-col gap-0.5 flex-1 min-w-[16rem]">
+        <span
+          className="text-sm font-semibold"
+          style={{ color: clear ? "#15803D" : "#92400E" }}
+        >
+          {clear
+            ? "No products need enrichment"
+            : `${needing} product${needing !== 1 ? "s" : ""} need enrichment`}
+        </span>
+        <span
+          className="text-xs font-light tabular-nums"
+          style={{ color: clear ? "#15803D" : "#92400E" }}
+        >
+          {clear
+            ? "Every product is categorised and satisfies each requirement published against it."
+            : `${uncategorised} with no category · ${withGaps} with missing attributes or images · ${openGaps} open gaps across all targets`}
+        </span>
+        <span className="text-[11px] font-light" style={{ color: "#9CA3AF" }}>
+          Counted once per product across every target, not per selection code.
+        </span>
+      </div>
+      <button
+        onClick={onViewAllGaps}
+        className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 shrink-0"
+        style={{ backgroundColor: "#0168B3" }}
+      >
+        View all gaps
+        <ArrowRight className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
+}
+
 export function ScreenSupplierCompliance({
   products,
   onSelectGs1,
   onSelectPartner,
+  onViewAllGaps,
 }: SupplierComplianceProps) {
   // Requirements drawer — opened per row; null target keeps it closed.
   const [drawerTarget, setDrawerTarget] = useState<RequirementTarget | null>(null)
@@ -132,6 +202,9 @@ export function ScreenSupplierCompliance({
     baselineGaps: countBaselineGaps(products),
   }
   const gs1Completion = getTargetCompletion(products, "gs1")
+
+  // Cross-target roll-up for the enrichment callout above the table.
+  const catalogueGaps = getCatalogueGaps(products)
 
   return (
     <>
@@ -144,6 +217,14 @@ export function ScreenSupplierCompliance({
           retailer who has published requirements against your account.
         </p>
       </div>
+
+      <EnrichmentCallout
+        needing={catalogueGaps.rows.length}
+        uncategorised={catalogueGaps.uncategorisedCount}
+        withGaps={catalogueGaps.productsWithGaps}
+        openGaps={catalogueGaps.totalOpenGaps}
+        onViewAllGaps={onViewAllGaps}
+      />
 
       {/* Table */}
       <div

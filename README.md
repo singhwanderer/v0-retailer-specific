@@ -29,7 +29,8 @@ This is a demo, so some surfaces are deliberately not built:
 - **Wired:** retailer requirement authoring (create/activate/deactivate, edit
   attributes and image rules, map a requirement to one or more GS1 categories);
   supplier categorisation with live compliance recalculation; the compliance →
-  selection code → product → gap-detail drill-down; per-code CSV export;
+  selection code → product → gap-detail drill-down; the supplier's cross-target
+  **Products Needing Enrichment** worklist; per-code CSV export;
   **Compliance Reports** on both sides (supplier: proactive scans against any
   retailer's account filter or a global System filter; retailer: defensive
   scans of the vendor base against its own profiles or the same System
@@ -170,6 +171,39 @@ Catalogue screen's assign/enrich actions rather than left as a dead end. Progres
 is framed positively — a **% ready** readiness figure alongside raw gap counts —
 so filling a GS1-baseline gap visibly advances every retailer at once, the
 concrete payoff of "comply once, benefit everywhere."
+
+### Products Needing Enrichment — the one cross-target view
+
+Every screen above looks at gaps through **one compliance target at a time**,
+reached via that retailer's selection codes. That answers "am I ready for
+Dillard's" but never "what across my whole catalogue needs work", which is the
+question that actually precedes an enrichment run. **Products Needing
+Enrichment** (`components/portal/screen-supplier-gaps.tsx`) is that view:
+
+- **One row per product**, listing everything with an outstanding requirement —
+  no category, missing attributes, or missing images — irrespective of selection
+  code. Filterable by gap kind, category, and which target requires it.
+- **Gaps are unioned** across the GS1 baseline and every retailer that assesses
+  the product (`lib/supplier-gaps.ts`), so a requirement three retailers want is
+  counted once and cleared once. This is the "comply once, benefit everywhere"
+  claim computed rather than asserted: because a retailer's gap allocation is a
+  head-slice of the same brick attribute pool the baseline draws from, the union
+  is a strict superset of each per-target set. Every figure routes back through
+  `getGapRecords`/`getGapCount`, so it can never disagree with the drill-down.
+- **Gaps expand inline** with the targets that require each one, and can be
+  filled in place — the same confirm step and the same shared catalogue write as
+  the gap-detail screen, via the shared `AttributeFillControl`.
+- Reached from a callout on **Compliance Status**, not a sidebar item of its own:
+  it is a roll-up of that screen, and the supplier sidebar mirrors the live
+  product's IA rather than inventing entries for it (the Catalogue screen sits
+  the same way).
+- Bulk-select products and hand them to **AI Attributes Enrichment** — still a
+  signpost only, sharing one `EnrichHandoffModal` with the Catalogue screen.
+
+Deliberately **not** an AI feature: the gap engine is fully deterministic, so
+this worklist needs no agent to produce it. That is the point — a supplier-side
+compliance agent would be a convenience over this data, not the only way to
+reach it.
 
 ## In-product chat — the TGC Compliance Agent panel
 

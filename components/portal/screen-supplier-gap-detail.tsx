@@ -12,14 +12,7 @@ import {
   type MissingImage,
   type SupplierProduct,
 } from "@/lib/supplier-catalogue"
-import { getAllowedValues } from "@/lib/gs1-attribute-values"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { AttributeFillControl } from "@/components/portal/attribute-fill-control"
 import { ConfirmFillAttributeModal } from "@/components/portal/confirm-fill-attribute-modal"
 
 export type GapDetailCrumb = { label: string; onClick: () => void }
@@ -268,7 +261,6 @@ export function ScreenSupplierGapDetail({
             <table className="w-full text-sm">
               <tbody>
                 {missingAttrs.map((attr, idx) => {
-                  const allowedValues = getAllowedValues(attr.name)
                   return (
                     <tr
                       key={attr.name}
@@ -284,49 +276,10 @@ export function ScreenSupplierGapDetail({
                         <span className="font-medium text-[#111827]">{attr.name}</span>
                       </td>
                       <td className="px-4 py-3 text-right align-middle w-56">
-                        {allowedValues && allowedValues.length > 0 ? (
-                          <Select
-                            value=""
-                            onValueChange={(value) => setPendingFill({ attr, value })}
-                          >
-                            <SelectTrigger
-                              className="ml-auto h-8 w-52 text-xs"
-                              aria-label={`Select a value for ${attr.name}`}
-                            >
-                              <SelectValue placeholder="Select a value…" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allowedValues.map((v) => (
-                                <SelectItem key={v.value} value={v.value} className="text-xs">
-                                  {v.value}
-                                  {v.code && (
-                                    <span className="ml-1.5 font-mono text-[10px] text-[#9CA3AF]">
-                                      {v.code}
-                                    </span>
-                                  )}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <input
-                            type="text"
-                            placeholder="Enter a value…"
-                            aria-label={`Enter a value for ${attr.name}`}
-                            className="ml-auto h-8 w-52 text-xs rounded-md border px-2.5 outline-none focus:ring-2"
-                            style={{ borderColor: "#E0E4E8" }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                                const value = e.currentTarget.value.trim()
-                                if (value) setPendingFill({ attr, value })
-                              }
-                            }}
-                            onBlur={(e) => {
-                              const value = e.currentTarget.value.trim()
-                              if (value) setPendingFill({ attr, value })
-                            }}
-                          />
-                        )}
+                        <AttributeFillControl
+                          attributeName={attr.name}
+                          onPick={(value) => setPendingFill({ attr, value })}
+                        />
                       </td>
                     </tr>
                   )
