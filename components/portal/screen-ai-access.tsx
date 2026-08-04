@@ -35,7 +35,7 @@ type ToolRow = { name: string; kind: ToolKind; scope: string; description: strin
 // that may call it are part of what the connector publishes about itself, not
 // implementation details.
 const RETAILER_TOOLS: ToolRow[] = [
-  { name: "search_gs1_bricks", kind: "Read", scope: "tgc.read", description: "Search the GPC classification library by name, segment, or code." },
+  { name: "search_gs1_bricks", kind: "Read", scope: "tgc.read", description: "Search the GPC classification library by name, category, or code." },
   { name: "list_attribute_profiles", kind: "Read", scope: "tgc.read", description: "List your attribute profiles, status, and mapped GPC classification." },
   { name: "get_profile_detail", kind: "Read", scope: "tgc.read", description: "Get the full requirement set (attributes + image specs) for a category." },
   { name: "list_my_suppliers", kind: "Read", scope: "tgc.read", description: "List your suppliers ranked by open compliance gaps." },

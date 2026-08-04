@@ -29,16 +29,18 @@ the standard satisfy every retailer who requires it.
 Entry: the **Retailer** persona → *Attributes & Images Requirements*.
 
 ### 3.1 Requirements list — `components/portal/screen1-attribute-profiles.tsx`
-- A table of attribute profiles. Columns: Category (internal name), Product Type, **GS1
-  Category**, Requirements (attribute count), Status, Last Updated, Actions.
-- The **GS1 Category** column shows the primary brick's name + code, and a **"+N more"**
-  chip when the profile maps to multiple bricks.
-- **Create New Requirement** opens a 3-step wizard: (1) internal name, a required
-  free-text **Category / Product Type** field, and initial status (Draft/Active); (2)
-  **GS1 category picker**, multi-select — a requirement can map to several bricks at
-  creation, with the same cross-category confirmation as the detail screen; (3) a
-  per-brick preview of the standard extended attributes that will be pre-loaded (one card
-  per selected brick — nothing merged).
+- A table of attribute profiles. Columns: Requirement (internal name), **GPC
+  Classification**, Requirements (attribute count), Status, Last Updated, Actions.
+  There is no free-text category or product-type column — coverage is carried
+  entirely by the GPC Classification cell.
+- The **GPC Classification** column shows the primary classification's name + code,
+  and a **"+N more"** chip when the profile maps to multiple classifications.
+- **Create New Requirement** opens a 3-step wizard: (1) a requirement name and
+  initial status (Draft/Active) — nothing else; (2) **GPC classification picker**,
+  multi-select — a requirement can map to several classifications at creation, with
+  the same cross-category confirmation as the detail screen; (3) a per-classification
+  preview of the standard extended attributes that will be pre-loaded (one card per
+  selected classification — nothing merged).
 - **Activate / Deactivate** toggles a profile's visibility to suppliers (confirmation
   dialog; no data deleted on deactivate).
 - **Import from CSV** is a cosmetic placeholder (out of scope).
@@ -48,10 +50,10 @@ Entry: the **Retailer** persona → *Attributes & Images Requirements*.
   Requirements** — scoped to whichever brick is currently selected (see 3.3). Each
   attribute row is tagged `source: "standard"` (inherited from the GS1 brick) or
   `"custom"` (added by the retailer).
-- **GS1 Category Mapping** card (right column) lists **every** mapped brick with its
-  segment badge, highlights the one currently selected, and has an **"Add GS1 Category"**
-  action.
-- **Rename** the internal category name; **Activate/Deactivate** from here too.
+- **Category Summary** card (right column) lists **every** mapped GPC classification
+  with its category badge, highlights the one currently selected, and has an **"Add
+  GPC Classification"** action.
+- **Rename** the requirement's own name; **Activate/Deactivate** from here too.
 - Per-attribute **guidance notes** — including on standard/GS1-inherited rows — help
   suppliers get the value right (surfaced supplier-side in gap detail — see the supplier
   doc). Editing a standard row's label/guidance is recorded as an override keyed by GS1
@@ -70,14 +72,15 @@ bricks (distinct from the whole-library picker used to *add* a brick); switching
 selection changes which brick's attributes are shown and edited. A single-brick profile
 shows no dropdown chrome.
 
-**Validation:** a requirement ideally covers one category, where *category = the GS1
-`segment`* (Footwear, Clothing, Jewellery, Accessories, Sportswear, Homewear) — not the
-free-text "Category / Product Type" field, which is always whatever the retailer typed and
-never derived from a brick name, however many/whichever bricks end up mapped. If an added
-brick's segment differs from the requirement's established segment (its primary brick's),
-a **confirmation dialog** (`components/portal/confirm-mixed-category-modal.tsx`, shared
-between creation and the detail screen) warns and asks "Add anyway?" — a soft override, not
-a hard block. Same-segment adds go through silently.
+**Validation:** a requirement ideally covers one category (Footwear, Clothing,
+Jewellery, Accessories, Sportswear, Homewear — the `segment` field internally). There
+is no separate free-text category field to reconcile this against: the requirement's
+own name carries no category meaning, and coverage is determined entirely by which
+GPC classifications end up mapped. If an added classification's category differs from
+the requirement's established category (its primary classification's), a
+**confirmation dialog** (`components/portal/confirm-mixed-category-modal.tsx`, shared
+between creation and the detail screen) warns and asks "Add anyway?" — a soft override,
+not a hard block. Same-category adds go through silently.
 
 ### 3.4 Store unification
 Authoring here and the MCP connector's view are one code path: `lib/mcp/tools.ts`'s
@@ -96,8 +99,7 @@ caveat in the README about client/serverless memory not being literally shared.
 
 | field | type | notes |
 |---|---|---|
-| `name` | string | internal category name; the profile key |
-| `category` | string | free-text product-type grouping (e.g. "Women's Apparel") — **not** the GS1 segment |
+| `name` | string | the retailer's own unconstrained label for the requirement; the profile key. No free-text category or product-type field exists — coverage is carried entirely by `bricks`/`brickCode`. |
 | `attributes` | string | display summary (e.g. "51 attributes · 2 GS1 categories") |
 | `status` | `"Active" \| "Draft"` | Active = visible to suppliers |
 | `brickCode` / `brickName` | string | **primary** GS1 brick (kept for single-brick readers) |
@@ -144,8 +146,11 @@ exposed via `getProfileDetail(brickCode)`.
 
 - Multi-brick selection is now allowed at **creation** (Step 2 multi-select), not just the
   detail screen.
-- The list's Category / Product Type label is always the retailer's typed free text —
-  never derived from a brick name, regardless of which/how-many segments get mapped.
+- The free-text Category / Product Type field described in earlier rounds of this spec
+  no longer exists. `AttributeProfile.category` — the field it referred to — has been
+  removed from the model, the connector, and the copilot tool; the requirements list's
+  GPC Classification column is the only place coverage is shown, and it is driven
+  entirely by the mapped classifications.
 - The MCP structured store and the profile UI are unified: one shared assembly module
   (`lib/mcp/attribute-assembly.ts`) and the UI calls the same write functions
   (`lib/mcp/tools.ts`) the connector calls — see §3.4 and the README's client/serverless
