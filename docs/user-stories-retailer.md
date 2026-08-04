@@ -15,6 +15,12 @@
 - **Personas** are drawn from the fixed TGC persona list. The retailer side uses
   *retailer category manager* (authors requirements, monitors vendors) and
   *retailer hub administrator* (configuration, access, audit).
+- **Vocabulary.** TGC has two levels of product classification and no third:
+  **Category** is the Footwear / Clothing / Jewellery / Accessories / Sportswear /
+  Homewear grouping (the backend calls this `segment` — that word is never used in the
+  product), and **GPC classification** is the 8-digit brick beneath it (Dresses,
+  10001333). The **requirement** is the authored profile and its name; it is never
+  called a category. The free-text *product type* label no longer exists.
 - **Task-hints** are limited to **UI** — and **AI** on the criteria where LLM output
   is actually consumed by application code. Fetch / State / Persist lines are
   deliberately omitted from this set.
@@ -40,6 +46,7 @@ MCP connector.
 | Compliance Agent panel | `compliance-agent-panel.tsx`, `lib/copilot/*` | RET-16 – RET-18 |
 | AI Assistant Access + connector | `screen-ai-access.tsx`, `lib/mcp/*` | RET-19 – RET-23 |
 | Connector-only tools | `lib/mcp/tools.ts` | RET-24 – RET-27 |
+| Requirement model + connector + copilot | `lib/retailer-requirements.ts`, `lib/mcp/manifest.ts`, `lib/copilot/tools.ts` | RET-28 |
 
 ---
 
@@ -58,9 +65,11 @@ my vendor base without configuring and running a report.
 **Acceptance criteria**
 
 - Given I open the Compliance Dashboard, when it loads, then a KPI strip shows four
-  tiles: overall compliance %, open gaps, suppliers tracked, and categories covered.
+  tiles: overall compliance %, open gaps, suppliers tracked, and coverage.
   - UI: four tiles in one row; each renders a headline figure and a secondary line
-    ("across N suppliers", "N meet the 80% threshold", "N below 60%").
+    ("across N suppliers", "N meet the 80% threshold", "N below 60%"). The coverage
+    tile counts **GPC classifications**, not categories — label it accordingly (see
+    RET-15).
 
 - Given the dashboard is computed from all Active attribute profiles across all
   vendors, when I read the overall compliance %, then it equals the figure a
@@ -152,9 +161,11 @@ problem from N separate vendor problems.
   then a truncation line states how many of how many are displayed.
   - UI: footer reading "Top N of M distinct attributes with gaps".
 
-- Given the Compliance by Category panel renders, when I read it, then categories are
-  sorted worst-first with complete/total counts alongside each bar.
-  - UI: horizontal bars, worst readiness at the top.
+- Given the Compliance by Category panel renders, when I read it, then rows are sorted
+  worst-first with complete/total counts alongside each bar.
+  - UI: horizontal bars, worst readiness at the top. The panel groups by **GPC
+    classification** (brick names, `screen-compliance-dashboard.tsx:274`) despite its
+    "by Category" heading — relabel it, as in RET-15.
 
 - Given no gaps exist anywhere in the vendor base, when the panel renders, then an
   empty state is shown rather than an empty chart frame.
@@ -177,44 +188,58 @@ problem from N separate vendor problems.
 **Story ID:** RET-04
 
 **User story**
-As a retailer category manager, I want a list of my attribute profiles showing GPC
-classification, requirement counts and status, so that I always know what I am
-currently asking suppliers for.
+As a retailer category manager, I want a list of my requirements showing which GPC
+classifications each one covers, so that I know what I am asking suppliers for.
 
 **Acceptance criteria**
 
-- Given profiles exist, when the list renders, then each row shows Category (as a
-  link), GPC Classification, Requirements summary, Status, Last Updated and Actions.
-  - UI: Category cell is a link into Profile Detail; Status renders as an
-    Active/Draft pill.
+- Given profiles exist, when the list renders, then each row shows Requirement (the
+  name, as a link), GPC Classification, Requirements summary, Status, Last Updated
+  and Actions.
+  - UI: the column previously headed "Category" is headed **Requirement** and renders
+    the profile's name; Status renders as an Active/Draft pill.
 
-- Given a profile maps to more than one GS1 brick, when its row renders, then the
-  GPC Classification cell shows the primary brick's name and code plus a "+N more"
-  chip.
-  - UI: chip label counts the non-primary mapped bricks only.
+- Given a requirement's coverage is carried by its GPC classifications, when the list
+  renders, then no free-text category or product-type column is present.
+  - UI: no Product Type column; no second free-text label anywhere in the row.
+
+- Given a profile maps to more than one GPC classification, when its row renders, then
+  the GPC Classification cell shows the primary classification's name and code plus a
+  "+N more" chip.
+  - UI: chip label counts the non-primary mapped classifications only.
 
 - Given a profile's requirements span attributes and images, when its row renders,
   then the Requirements cell summarises both (e.g. "30 attributes · 1 image
   requirement").
-  - UI: single summary string; counts sum every mapped brick's own rows without
-    deduplicating across bricks.
+  - UI: single summary string; counts sum every mapped classification's own rows
+    without deduplicating across classifications.
 
 - Given Active and Draft mean different things to suppliers, when the list renders,
   then a callout states that Active profiles are visible to suppliers and Draft
   profiles are not.
   - UI: informational callout above the table.
 
-- Given the free-text Category / Product Type field is independent of brick mapping,
-  when a profile maps bricks from a segment unrelated to its typed name, then the
-  Category column still shows exactly what the retailer typed.
-  - UI: Category cell never derives its label from a brick name.
+- Given the requirement name is a label, when I read a row, then nothing in the row
+  suggests the name determines which products the requirement covers.
+  - UI: coverage is conveyed by the GPC Classification cell alone.
 
 **Anti-criteria**
 
+- Given coverage comes from GPC classifications, when the list renders, then the
+  requirement's name must NOT be presented as, or derived from, a category.
+- Given the product-type concept is removed, when a profile is created by any path,
+  then a free-text category label must NOT be stored alongside the name.
 - Given a profile is in Draft, when a supplier views their requirements, then that
   profile's attributes must NOT appear to them.
-- Given a profile maps several bricks, when the Requirements count is computed, then
-  attributes shared by two bricks must NOT be silently deduplicated into one count.
+- Given a profile maps several classifications, when the Requirements count is
+  computed, then attributes shared by two of them must NOT be silently deduplicated
+  into one count.
+
+> **Open question for refinement, not assumed here:** with category meaning the
+> Footwear/Clothing level, the list could carry a real **Category** column derived
+> from the mapped classifications, sitting between Requirement and GPC Classification.
+> Not added — it was not asked for, and a requirement spanning two categories would
+> need a display rule.
 
 ---
 
@@ -222,36 +247,44 @@ currently asking suppliers for.
 **Story ID:** RET-05
 
 **User story**
-As a retailer category manager, I want to name a requirement, select the GS1
-categories it covers, and preview the standard attributes it will inherit, so that I
-can author a category requirement without hand-listing the GS1 standard.
+As a retailer category manager, I want to name a requirement, select the GPC
+classifications it covers, and preview the standard attributes it will inherit, so
+that I can author a requirement without hand-listing the GS1 standard.
 
 **Acceptance criteria**
 
-- Given I open Create New Requirement, when Step 1 renders, then I can enter a
-  free-text internal category name and choose an initial status of Draft or Active.
-  - UI: text input plus a two-option radio; Next disabled until a name is entered.
+- Given I open Create New Requirement, when Step 1 renders, then it asks for a
+  requirement name and an initial status, and nothing else.
+  - UI: field label reads **Requirement Name** (previously "Internal Category Name");
+    helper text still states that suppliers see this name; two-option status radio;
+    Next disabled until a name is entered.
 
-- Given I am on Step 2, when I search the GS1 brick picker, then I can filter by
-  name or 8-digit code and by segment, and select more than one brick.
-  - UI: shared `gs1-brick-picker` in multi-select mode; each row shows brick name,
-    code and "N standard attributes".
+- Given the name is a label rather than a coverage statement, when I finish Step 1,
+  then no classification has been chosen yet and Step 2 is where coverage is set.
+  - UI: Step 1 contains no classification control of any kind.
 
-- Given I do not want to map a brick yet, when I am on Step 2, then I can skip brick
-  selection and add attributes manually instead.
+- Given I am on Step 2, when I search the GPC classification picker, then I can filter
+  by name or 8-digit code and by category, and select more than one classification.
+  - UI: shared `gs1-brick-picker` in multi-select mode; each row shows classification
+    name, code and "N standard attributes". The search placeholder currently reads
+    "Search category name or code…" while it searches classifications — reword it to
+    name the GPC classification.
+
+- Given I do not want to map a classification yet, when I am on Step 2, then I can
+  skip selection and add attributes manually instead.
   - UI: explicit "Skip — add attributes manually" action alongside the picker.
 
-- Given I have selected two or more bricks, when Step 3 renders, then one preview
-  card per brick lists every standard attribute that brick will pre-load, with
-  nothing merged across cards.
-  - UI: one card per selected brick; Standard/Custom pills explained inline.
+- Given I have selected two or more classifications, when Step 3 renders, then one
+  preview card per classification lists every standard attribute it will pre-load,
+  with nothing merged across cards.
+  - UI: one card per selected classification; Standard/Custom pills explained inline.
 
 - Given a previewed standard attribute is not something I require, when I delete it
   in Step 3, then a confirmation states that values already submitted are kept.
   - UI: confirm modal before the row is removed from the preview.
 
 - Given I want a requirement the GS1 standard does not carry, when I add an attribute
-  in Step 3, then I choose from the segment's TGC attribute pool and may attach
+  in Step 3, then I choose from the category's TGC attribute pool and may attach
   supplier guidance.
   - UI: searchable picker over real TGC attribute names; guidance is an optional
     free-text field.
@@ -267,54 +300,59 @@ can author a category requirement without hand-listing the GS1 standard.
 
 **Anti-criteria**
 
+- Given product type has been removed, when Step 1 renders, then it must NOT ask for a
+  free-text category or product-type value.
+- Given the name carries no category meaning, when the profile is created, then the
+  name must NOT be copied into a stored category field.
 - Given I abandon the wizard before the final step, when I return to the profile
   list, then a partially configured profile must NOT have been created.
-- Given a brick's standard attributes are derived from the GS1 library, when I delete
-  one in the preview, then the underlying GS1 library definition must NOT be altered.
+- Given a classification's standard attributes are derived from the GS1 library, when
+  I delete one in the preview, then the underlying GS1 library definition must NOT be
+  altered.
 
 ---
 
-**Screen / Flow:** GS1 brick picker — cross-category confirmation
+**Screen / Flow:** GPC classification picker — cross-category confirmation
 **Story ID:** RET-06
 
 **User story**
-As a retailer category manager, I want to be warned when I map a brick from a
-different GS1 segment than the requirement's established one, so that a requirement
-spans categories because I chose it to, not by accident.
+As a retailer category manager, I want to be warned when I map a GPC classification
+from a different category than the requirement's established one, so that a
+requirement spans categories because I chose it to, not by accident.
 
 **Acceptance criteria**
 
-- Given a requirement's established segment is set by its primary brick, when I add a
-  brick from a different segment, then a confirmation dialog asks me to confirm
-  before the brick is mapped.
+- Given a requirement's established category is set by its primary GPC classification,
+  when I add a classification from a different category, then a confirmation dialog
+  asks me to confirm before it is mapped.
   - UI: `confirm-mixed-category-modal` reading "Different category — requirements
-    usually cover a single category. Add it anyway?"
+    usually cover a single category. Add it anyway?" The existing copy names the
+    classification and both categories correctly and is not changing.
 
-- Given I confirm the dialog, when it closes, then the brick is mapped and the
-  requirement now spans two segments.
-  - UI: the new brick appears in the GS1 Category Mapping card with its own segment
+- Given I confirm the dialog, when it closes, then the classification is mapped and
+  the requirement now spans two categories.
+  - UI: the new classification appears in the mapping card with its own category
     badge.
 
-- Given I cancel the dialog, when it closes, then no brick is mapped and the
+- Given I cancel the dialog, when it closes, then nothing is mapped and the
   requirement is unchanged.
-  - UI: picker remains open with the candidate brick unselected.
+  - UI: picker remains open with the candidate classification unselected.
 
-- Given the brick I add is in the same segment as the requirement's established one,
-  when I add it, then no confirmation is shown.
-  - UI: brick is mapped silently.
+- Given the classification I add is in the same category as the requirement's
+  established one, when I add it, then no confirmation is shown.
+  - UI: classification is mapped silently.
 
-- Given the same guard applies in both authoring paths, when I add a cross-segment
-  brick from the creation wizard or from Profile Detail, then the identical dialog
-  and identical wording appear.
+- Given the same guard applies in both authoring paths, when I add a cross-category
+  classification from the creation wizard or from Profile Detail, then the identical
+  dialog and identical wording appear.
   - UI: one shared modal component used by both surfaces.
 
 **Anti-criteria**
 
 - Given the cross-category rule is advisory, when I confirm the dialog, then the
   system must NOT block the mapping.
-- Given the requirement's established segment comes from its primary brick, when the
-  guard evaluates, then it must NOT compare against the free-text Category / Product
-  Type field.
+- Given the guard compares categories, when it evaluates, then it must NOT compare
+  against the requirement's name.
 
 ---
 
@@ -339,12 +377,12 @@ exactly what value to send for each GS1 field.
     a Standard/Custom source pill.
 
 - Given I add an extended attribute, when I open the picker, then I may only choose
-  from the segment's real TGC attribute names, excluding ones already on the profile.
+  from the category's real TGC attribute names, excluding ones already on the profile.
   - UI: searchable dropdown; the attribute name cannot be free-typed, only the
     guidance note can.
 
 - Given I add a core attribute, when I complete the form, then it is added as a
-  custom core row on the currently selected brick.
+  custom core row on the currently selected GPC classification.
   - UI: free-text name field for core rows; row renders with a Custom pill.
 
 - Given a row is inherited from the GS1 standard, when I edit its label or guidance,
@@ -352,8 +390,9 @@ exactly what value to send for each GS1 field.
   - UI: row keeps its Standard pill after editing; the GS1 name stays locked.
 
 - Given I delete an attribute row, when I confirm, then it is removed from that
-  brick's requirement set only.
-  - UI: confirm modal before removal; other mapped bricks' tables are unchanged.
+  classification's requirement set only.
+  - UI: confirm modal before removal; other mapped classifications' tables are
+    unchanged.
 
 - Given the GS1 code is what ties a requirement to submitted data, when the tables
   render, then a footnote states that the GS1 code carries the mapping regardless of
@@ -362,10 +401,10 @@ exactly what value to send for each GS1 field.
 
 **Anti-criteria**
 
-- Given standard rows are derived from the GS1 brick rather than stored, when I edit
-  one, then a duplicate copy of that row must NOT be written into the profile.
-- Given attributes are brick-scoped, when I add or delete an attribute, then the
-  other bricks mapped to the same profile must NOT be affected.
+- Given standard rows are derived from the GPC classification rather than stored, when
+  I edit one, then a duplicate copy of that row must NOT be written into the profile.
+- Given attributes are classification-scoped, when I add or delete an attribute, then
+  the other classifications mapped to the same requirement must NOT be affected.
 - Given the GS1 attribute name is the join key, when I edit a row, then the GS1 name
   must NOT become editable.
 
@@ -375,9 +414,9 @@ exactly what value to send for each GS1 field.
 **Story ID:** RET-08
 
 **User story**
-As a retailer category manager, I want to define image specifications on a category,
-so that suppliers know the shot specs before they submit rather than after a
-rejection.
+As a retailer category manager, I want to define image specifications on a GPC
+classification, so that suppliers know the shot specs before they submit rather than
+after a rejection.
 
 **Acceptance criteria**
 
@@ -387,29 +426,30 @@ rejection.
   - UI: seven-column table; rows inherited from the shared set carry a "Shared" badge.
 
 - Given I add or edit an image requirement, when the form opens, then all seven
-  fields are editable and the requirement is scoped to the currently selected brick.
+  fields are editable and the requirement is scoped to the currently selected GPC
+  classification.
   - UI: single form used by both add and edit so the two cannot drift.
 
 - Given I edit a row that carries the Shared badge, when I save, then the change
-  applies to this category only and the shared definition is untouched.
-  - UI: row keeps its Shared badge and now reflects the category's own values.
+  applies to this classification only and the shared definition is untouched.
+  - UI: row keeps its Shared badge and now reflects the classification's own values.
 
 - Given TGC checks presence rather than content, when the group renders, then a
   footnote states that TGC confirms an image was provided but does not verify image
   content, dimensions or format.
   - UI: footnote beneath the image table.
 
-- Given a profile maps several bricks, when I switch the selected brick, then the
-  Image Requirements group shows that brick's own rows.
-  - UI: table re-renders scoped to the selected brick.
+- Given a profile maps several classifications, when I switch the selected one, then
+  the Image Requirements group shows that classification's own rows.
+  - UI: table re-renders scoped to the selected classification.
 
 **Anti-criteria**
 
 - Given the footnote states TGC does not verify image content, when a supplier
   provides an image, then the system must NOT report it as validated against the
   stated dimensions or format.
-- Given I override a shared image requirement for one category, when the override is
-  saved, then the shared definition used by other categories must NOT change.
+- Given I override a shared image requirement for one classification, when the
+  override is saved, then the shared definition used by others must NOT change.
 
 ---
 
@@ -417,41 +457,44 @@ rejection.
 **Story ID:** RET-09
 
 **User story**
-As a retailer category manager, I want to map additional GS1 categories to an
+As a retailer category manager, I want to map additional GPC classifications to an
 existing requirement and switch which one I am editing, so that one requirement can
-cover several bricks without their attribute sets being merged.
+cover several classifications without their attribute sets being merged.
 
 **Acceptance criteria**
 
-- Given a profile maps more than one brick, when Profile Detail renders, then a
-  searchable brick selector scoped to that profile's own bricks is shown.
-  - UI: `profile-brick-selector`; no dropdown chrome at all on a single-brick profile.
+- Given a profile maps more than one classification, when Profile Detail renders, then
+  a searchable selector scoped to that profile's own classifications is shown.
+  - UI: `profile-brick-selector`; no dropdown chrome at all on a single-classification
+    profile.
 
-- Given I switch the selected brick, when the screen re-renders, then the Core,
-  Extended and Image groups show that brick's rows only.
+- Given I switch the selected classification, when the screen re-renders, then the
+  Core, Extended and Image groups show that classification's rows only.
   - UI: all three groups re-scope together; no merged or deduplicated view exists.
 
-- Given I click Add GPC Classification, when the picker opens, then bricks already
-  mapped to this profile render as disabled and labelled "Added".
-  - UI: shared brick picker in single-select mode.
+- Given I click Add GPC Classification, when the picker opens, then classifications
+  already mapped to this profile render as disabled and labelled "Added".
+  - UI: shared picker in single-select mode.
 
-- Given a GS1 category may belong to at most one profile, when I try to map a brick
-  another profile already claims, then the mapping is refused and the still-free
-  categories are named.
+- Given a GPC classification may belong to at most one requirement, when I try to map
+  one another requirement already claims, then the mapping is refused and the
+  still-free classifications are named.
   - UI: refusal message lists available categories rather than failing silently.
 
-- Given the right rail summarises the profile, when it renders, then it lists every
-  mapped classification with its code, the Core/Extended/Image counts, and a supplier
-  visibility statement.
-  - UI: counts suffixed "(this category)" when the profile maps more than one brick.
+- Given the right rail summarises the requirement, when it renders, then it lists
+  every mapped GPC classification with its code, the Core/Extended/Image counts, and
+  a supplier visibility statement.
+  - UI: card heading reads **Classification Summary** (previously "Category
+    Summary"); counts suffixed "(this classification)" when more than one is mapped.
 
 **Anti-criteria**
 
-- Given attributes are defined at brick level, when a profile maps several bricks,
-  then their attribute sets must NOT be merged, deduplicated or presented as one
-  combined list.
-- Given every GS1 category belongs to at most one profile, when I map a claimed
-  brick, then it must NOT be silently reassigned away from the profile that holds it.
+- Given attributes are defined at GPC classification level, when a requirement maps
+  several classifications, then their attribute sets must NOT be merged, deduplicated
+  or presented as one combined list.
+- Given every GPC classification belongs to at most one requirement, when I map a
+  claimed one, then it must NOT be silently reassigned away from the requirement that
+  holds it.
 
 ---
 
@@ -465,18 +508,23 @@ exactly when suppliers start being measured against it.
 
 **Acceptance criteria**
 
-- Given a profile is open, when I click the inline rename control, then I can edit
-  the internal category name and save it.
-  - UI: pencil affordance beside the title, turning it into an editable field.
+- Given a requirement is open, when I click the inline rename control, then I can edit
+  its name and save it.
+  - UI: dialog title reads **Rename Requirement** (previously "Rename Category
+    Requirements"); pencil affordance beside the title, turning it into an editable
+    field.
 
-- Given a Draft profile, when I activate it, then a confirmation states that
+- Given a Draft requirement, when I activate it, then a confirmation states that
   suppliers will now see it, and on confirm the status pill changes to Active.
-  - UI: confirm modal; success toast; pill updates in both the detail screen and the
-    list.
+  - UI: control reads **Activate Requirement** (previously "Activate Category" /
+    "Activate Category Requirements"); confirm modal; success toast; pill updates in
+    both the detail screen and the list.
 
-- Given an Active profile, when I deactivate it, then the confirmation states that
+- Given an Active requirement, when I deactivate it, then the confirmation states that
   suppliers will no longer see it and that no data will be deleted.
-  - UI: confirm modal with that exact consequence wording.
+  - UI: control reads **Deactivate Requirement**; confirm modal with that exact
+    consequence wording. The confirmation bodies already name the requirement and are
+    unchanged.
 
 - Given I deactivate from Profile Detail, when the change is applied, then I am
   returned to the profile list.
@@ -488,10 +536,13 @@ exactly when suppliers start being measured against it.
 
 **Anti-criteria**
 
-- Given deactivation only changes visibility, when I deactivate a profile, then its
-  attributes, image requirements, overrides or exclusions must NOT be deleted.
-- Given renaming is a label change, when I rename a profile, then its GS1 brick
-  mapping must NOT change.
+- Given deactivation only changes visibility, when I deactivate a requirement, then
+  its attributes, image requirements, overrides or exclusions must NOT be deleted.
+- Given renaming is a label change, when I rename a requirement, then its GPC
+  classification mapping must NOT change.
+- Given "category" means the Footwear/Clothing level only, when any lifecycle control
+  or confirmation renders, then it must NOT use the word "category" to refer to the
+  requirement itself.
 
 ---
 
@@ -556,12 +607,12 @@ change which attribute gets named.
 **Acceptance criteria**
 
 - Given exceptions are on file, when the table renders, then each row shows vendor,
-  category (profile name plus brick name and code), type, affected attribute chips,
+  scope (requirement name plus GPC classification name and code), type, attribute chips,
   valid-until date, status and effect.
   - UI: type pill reads Attribute Waiver, Extended Deadline or Reduced Scope; status
     pill reads Active or Expired.
 
-- Given an Active Attribute Waiver is scoped to a category the vendor really
+- Given an Active Attribute Waiver is scoped to a GPC classification the vendor really
   supplies, when its effect is computed, then it reads that reported gaps are reduced
   by a stated number.
   - UI: effect cell renders "Reduces reported gaps by N".
@@ -571,8 +622,8 @@ change which attribute gets named.
   - UI: effect cell renders "Re-ranks blame only — does not reduce gap counts".
 
 - Given an exception has no effect, when its effect is computed, then the reason is
-  stated: expired, not scoped to a category this vendor supplies, no matching
-  attributes in that category, or the vendor has no open gaps there.
+  stated: expired, not scoped to a GPC classification this vendor supplies, no
+  matching attributes in that classification, or the vendor has no open gaps there.
   - UI: effect cell renders the specific reason, never a bare "none".
 
 - Given the effect column and the report engine must agree, when an effect is
@@ -721,9 +772,12 @@ remediation list.
   is truncated, then a note names the maximum-attributes setting that truncated it.
   - UI: ranked bar list plus a truncation footer.
 
-- Given the per-category table renders, when I read a row, then it shows category,
-  items, complete, % complete with a bar, and gaps.
-  - UI: sortable-looking table matching the dashboard's category presentation.
+- Given the breakdown table renders, when I read a row, then it is labelled by what it
+  actually groups on, and shows items, complete, % complete with a bar, and gaps.
+  - UI: the retailer scorecard groups by **GPC classification** (brick names,
+    `lib/compliance-report.ts:469`) while the supplier scorecard groups by **category**
+    (`:264`). Both currently render under a "By category" heading; the retailer's must
+    be relabelled.
 
 - Given the per-vendor table renders, when I read a row, then it shows supplier,
   category, products, complete, open gaps and % complete.
@@ -1265,14 +1319,15 @@ actual open gaps, so that what I ask for is accurate rather than generic.
 
 **User story**
 As a retailer category manager, I want to grant and revoke vendor exceptions scoped to
-one category, so that relief is deliberate, bounded and still auditable afterwards.
+one GPC classification, so that relief is deliberate, bounded and still auditable
+afterwards.
 
 **Acceptance criteria**
 
-- Given I grant an exception, when I set it, then it names one vendor, one GS1
-  category, a type of waiver, extended deadline or reduced scope, the attributes
+- Given I grant an exception, when I set it, then it names one vendor, one GPC
+  classification, a type of waiver, extended deadline or reduced scope, the attributes
   affected, and a valid-until date.
-  - UI: category scope is required, not optional.
+  - UI: classification scope is required, not optional.
 
 - Given granting an exception changes compliance numbers, when I call the tool, then
   it previews the change and requires confirmation before applying.
@@ -1302,6 +1357,73 @@ one category, so that relief is deliberate, bounded and still auditable afterwar
   reduce that supplier's gaps against any other retailer.
 - Given expiry preserves the audit trail, when I expire an exception, then its record
   must NOT be deleted.
+
+---
+
+**Screen / Flow:** Requirement model + MCP connector + copilot
+**Story ID:** RET-28
+
+**User story**
+As a retailer hub administrator, I want the free-text product-type label removed from
+the requirement model and from every tool that writes it, so that a concept the
+product no longer has cannot be reintroduced through an API.
+
+**Acceptance criteria**
+
+- Given the model no longer carries a free-text label, when a requirement is created
+  by any path, then only its name and its GPC classifications are stored.
+  - UI: `AttributeProfile.category` removed from `lib/retailer-requirements.ts` and
+    from the seed rows; no screen changes, because nothing rendered it.
+
+- Given the connector previously accepted a category argument, when its tool schema is
+  published, then that argument is absent.
+  - AI: the tool description no longer instructs an assistant to confirm a
+    product-type label with the user — application code must NOT accept the argument
+    if a client still sends one.
+
+- Given an existing client still sends the argument, when the call is made, then it is
+  ignored rather than failing, and the tool description records that it was removed.
+  - UI: removal noted in the description an assistant reads, so a stale client gets an
+    explanation rather than silence.
+
+- Given agent-facing text claimed the label was displayed, when the descriptions are
+  rewritten, then no tool description, prompt or server instruction says a category
+  label is shown in the requirements list.
+  - UI: corrects `lib/mcp/manifest.ts:375`, `:388`, `lib/mcp/tools.ts:707`,
+    `lib/copilot/tools.ts:314`.
+
+- Given "segment" is a backend word, when agent-facing copy is rewritten, then it says
+  **category** for the Footwear/Clothing level and **GPC classification** for the
+  8-digit brick.
+  - AI: corrects `lib/mcp/manifest.ts:192` ("Search the GS1 standard category library
+    by name, segment, or category code" — the thing searched is a classification),
+    `lib/copilot/tools.ts:98`, and `lib/copilot/system-prompt.ts:18` ("offer the
+    categories that are still free, grouped by segment").
+
+- Given the copilot publishes the same creation tool, when its schema is rebuilt, then
+  it matches the connector's.
+  - UI: one shape across both surfaces, as with every other shared tool.
+
+- Given user-facing copy still says "segment", when the change lands, then
+  `gpc-info-tooltip.tsx:24` ("categorizing products by segment and brick") and
+  `screen-ai-access.tsx:38` ("…by name, segment, or code") are corrected.
+
+- Given three documents describe the removed field, when the change lands, then
+  `README.md:65`, `CLAUDE.md:95` and `docs/feature-retailer-requirements.md` are
+  corrected.
+  - UI: documentation only.
+
+**Anti-criteria**
+
+- Given the argument is removed, when a client sends a category value, then a
+  free-text label must NOT be stored on the requirement.
+- Given this is a published tool contract, when the argument is removed, then the
+  change must NOT ship without the tool description saying so.
+- Given "segment" is backend-only, when any user-facing or agent-facing string is
+  written, then it must NOT use the word.
+- Given `lib/mcp/attribute-assembly.ts:158-161` justifies its wording on the premise
+  that several profiles legitimately share a category label, when that premise is
+  removed, then the wording must NOT be left asserting it.
 
 ---
 
