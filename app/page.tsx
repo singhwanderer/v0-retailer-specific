@@ -13,6 +13,7 @@ import { ScreenSupplierCatalogue } from "@/components/portal/screen-supplier-cat
 import { ScreenSupplierSelectionCodes } from "@/components/portal/screen-supplier-selection-codes"
 import { ScreenSupplierAllSelectionCodes } from "@/components/portal/screen-supplier-all-selection-codes"
 import { ScreenSupplierProducts } from "@/components/portal/screen-supplier-products"
+import { ScreenSupplierGaps } from "@/components/portal/screen-supplier-gaps"
 import { ScreenSupplierGapDetail, type GapDetailCrumb } from "@/components/portal/screen-supplier-gap-detail"
 import { ScreenSupplierProductAttributes } from "@/components/portal/screen-supplier-product-attributes"
 import { ScreenSupplierImageUpload } from "@/components/portal/screen-supplier-image-upload"
@@ -70,6 +71,7 @@ type SupplierScreen =
   | "account-code-products"
   | "selection-codes"
   | "supplier-products"
+  | "supplier-gaps"
   | "supplier-gap-detail"
   | "supplier-product-attributes"
   | "image-upload"
@@ -77,7 +79,7 @@ type SupplierScreen =
 
 // Which flow the gap detail was entered from — drives its breadcrumb trail and
 // which sidebar section stays highlighted.
-type GapOrigin = "partner-flow" | "gs1-view" | "code-list"
+type GapOrigin = "partner-flow" | "gs1-view" | "code-list" | "gaps-hub"
 
 type GapContext = {
   productId: string
@@ -367,6 +369,17 @@ export default function RetailerPortal() {
     setSupplierScreen("gs1-products")
   }
 
+  // ── Compliance list → the cross-target enrichment worklist ─────────────────
+  // Deliberately has no sidebar entry: it is a roll-up of Compliance Status, and
+  // the supplier sidebar mirrors the live product's IA rather than inventing
+  // items for it (the Catalogue screen sits the same way).
+  function handleViewAllGaps() {
+    setSupplierScreen("supplier-gaps")
+    setActivePartner(null)
+    setActiveCode(null)
+    setGapContext(null)
+  }
+
   // ── Sidebar "Selection Code List" → the account-wide L1 nav root ───────────
   function handleSelectSelectionCodeList() {
     setSupplierScreen("all-selection-codes")
@@ -438,7 +451,9 @@ export default function RetailerPortal() {
         ? "gs1-view"
         : supplierScreen === "account-code-products"
           ? "code-list"
-          : "partner-flow"
+          : supplierScreen === "supplier-gaps"
+            ? "gaps-hub"
+            : "partner-flow"
     setGapContext({ productId, target, origin })
     setSupplierScreen("supplier-gap-detail")
   }
@@ -451,7 +466,9 @@ export default function RetailerPortal() {
         ? "gs1-products"
         : origin === "code-list"
           ? "account-code-products"
-          : "supplier-products"
+          : origin === "gaps-hub"
+            ? "supplier-gaps"
+            : "supplier-products"
     )
     setGapContext(null)
   }
@@ -487,6 +504,11 @@ export default function RetailerPortal() {
             onClick: handleBackToProducts,
           },
         ]
+      case "gaps-hub":
+        return [
+          { label: "Compliance", onClick: handleBackToPartnerList },
+          { label: "Products Needing Enrichment", onClick: handleBackToProducts },
+        ]
       default:
         return [
           { label: "Compliance", onClick: handleBackToPartnerList },
@@ -503,9 +525,11 @@ export default function RetailerPortal() {
         ? "gs1-view"
         : supplierScreen === "account-code-products"
           ? "code-list"
-          : supplierScreen === "supplier-gap-detail"
-            ? gapContext?.origin ?? "partner-flow"
-            : "partner-flow"
+          : supplierScreen === "supplier-gaps"
+            ? "gaps-hub"
+            : supplierScreen === "supplier-gap-detail"
+              ? gapContext?.origin ?? "partner-flow"
+              : "partner-flow"
     setAttrContext({ productId, target, origin })
     setSupplierScreen("supplier-product-attributes")
   }
@@ -524,7 +548,9 @@ export default function RetailerPortal() {
             ? "gs1-products"
             : origin === "code-list"
               ? "account-code-products"
-              : "supplier-products"
+              : origin === "gaps-hub"
+                ? "supplier-gaps"
+                : "supplier-products"
         )
       }
     }
@@ -541,7 +567,12 @@ export default function RetailerPortal() {
   // Establishes the gap context the upload screen (and its "Back") relies on,
   // then hands off the same way the gap-detail table does.
   function handleUploadImageFor(productId: string, target: GapTarget, image: MissingImage) {
-    setGapContext({ productId, target, origin: gapContext?.origin ?? "partner-flow" })
+    // Screens reached without a gap context of their own (the enrichment
+    // worklist) still need one, so "Back" out of the upload screen lands on the
+    // flow the supplier actually came from rather than the partner drill-down.
+    const origin: GapOrigin =
+      gapContext?.origin ?? (supplierScreen === "supplier-gaps" ? "gaps-hub" : "partner-flow")
+    setGapContext({ productId, target, origin })
     handleOpenImageUpload(image)
   }
 
@@ -584,7 +615,9 @@ export default function RetailerPortal() {
   // Code List (its breadcrumb says so too), regardless of which banner sent it
   // there, so it highlights the same section as the account-wide screens. Gap
   // detail (and the image-upload screen behind it) highlights whichever flow
-  // it was entered from.
+  // it was entered from. Products Needing Enrichment has no nav entry either and
+  // is reached from Compliance Status, so it falls through to that highlight —
+  // no case of its own needed.
   const gapFlowIsCodeList =
     (supplierScreen === "supplier-gap-detail" || supplierScreen === "image-upload") &&
     gapContext?.origin === "code-list"
@@ -737,6 +770,21 @@ export default function RetailerPortal() {
                   products={supplierProducts}
                   onSelectGs1={handleSelectGs1}
                   onSelectPartner={handleSelectPartner}
+                  onViewAllGaps={handleViewAllGaps}
+                />
+              )}
+
+              {/* Cross-target enrichment worklist — every product with a gap,
+                  in one list, irrespective of selection code */}
+              {supplierScreen === "supplier-gaps" && (
+                <ScreenSupplierGaps
+                  products={supplierProducts}
+                  onBack={handleBackToCompliance}
+                  onAssignCategory={handleAssignCategory}
+                  onFillAttribute={handleFillAttribute}
+                  onUploadImage={handleUploadImageFor}
+                  onViewGtins={handleViewGtins}
+                  onOpenGapDetail={handleNavigateToGapDetail}
                 />
               )}
 
