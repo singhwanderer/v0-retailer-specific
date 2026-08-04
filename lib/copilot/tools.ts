@@ -95,7 +95,7 @@ function makeReadTools(ctx: CopilotContext) {
   return {
     search_gs1_bricks: tool({
       description:
-        "Search GS1 product categories (bricks) by name, segment, or category code. Matching is literal against those fields, not fuzzy — a product type the GS1 names do not use will find nothing, which is a signal to ask the user, not to pick the nearest category. Each hit says whether it is still free to map to a new profile. Call with an empty query to list the whole library.",
+        "Search GS1 product categories (bricks) by name, category, or category code. Matching is literal against those fields, not fuzzy — a product type the GS1 names do not use will find nothing, which is a signal to ask the user, not to pick the nearest category. Each hit says whether it is still free to map to a new profile. Call with an empty query to list the whole library.",
       inputSchema: z.object({ query: z.string().describe("Free-text search, e.g. 'dresses' or 'footwear'; empty lists all categories") }),
       // Each hit says whether the category is still free to map, and an empty
       // or fully-taken result carries a note naming the categories that are —
@@ -286,7 +286,7 @@ function makeReadTools(ctx: CopilotContext) {
           "Sales, logistics, or pricing.",
         ],
         liveSnapshot: {
-          attributeProfiles: ctx.profiles.map((p) => ({ name: p.name, category: p.category, status: p.status, brickCode: p.brickCode })),
+          attributeProfiles: ctx.profiles.map((p) => ({ name: p.name, status: p.status, brickCode: p.brickCode })),
           mySuppliers: knownSuppliers(),
           gs1Segments: getSegments(),
           systemFilters: SYSTEM_FILTERS.map((f) => f.id),
@@ -311,9 +311,8 @@ function makeCreateTools(ctx: CopilotContext) {
           .describe(
             "GS1 brick codes the profile covers, from search_gs1_bricks. Omit if the user has not said which category — you will get the available ones back to ask them."
           ),
-        category: z.string().optional().describe("Free-text category label; defaults to name"),
       }),
-      execute: async ({ name, brickCodes, category }) => {
+      execute: async ({ name, brickCodes }) => {
         // No category yet. This is the normal state after "create a requirement
         // called Troy" — a name on its own says nothing about which GS1
         // category it covers — so it returns the next step, not an error.
@@ -325,7 +324,7 @@ function makeCreateTools(ctx: CopilotContext) {
             note:
               `"${name}" is the retailer's own label for the profile and does not have to match a GS1 category name — ` +
               `nothing needs to be looked up for it. What is still missing is which GS1 category the profile covers, ` +
-              `and that is the user's decision: ask them, offering the available categories below by segment. ` +
+              `and that is the user's decision: ask them, offering the available categories below. ` +
               `They can answer with a category name or its code. Do not choose one for them, and do not call this tool ` +
               `again until they have.`,
           }
@@ -350,7 +349,7 @@ function makeCreateTools(ctx: CopilotContext) {
         const proposal: ProposedAction = {
           tool: "create_attribute_profile",
           summary: `Create a new profile "${name}" mapped to: ${brickNames}.`,
-          args: { name, brickCodes, category: category ?? name },
+          args: { name, brickCodes },
         }
         return { proposal }
       },
@@ -541,8 +540,8 @@ function makeEditTools(ctx: CopilotContext) {
           args: { profileName: profile.name, status },
           consequence:
             status === "Active"
-              ? `Vendor items in ${profile.category} start being assessed against this profile. Expect reported gap counts to rise the first time a report runs — those gaps already existed, they were simply not being measured.`
-              : `Vendor items in ${profile.category} stop being assessed against this profile. The requirements are kept and can be re-activated.`,
+              ? `Vendor items under "${profile.name}" start being assessed against this profile. Expect reported gap counts to rise the first time a report runs — those gaps already existed, they were simply not being measured.`
+              : `Vendor items under "${profile.name}" stop being assessed against this profile. The requirements are kept and can be re-activated.`,
         }
         return { proposal }
       },
@@ -562,7 +561,7 @@ function makeEditTools(ctx: CopilotContext) {
         )
         const proposal: ProposedAction = {
           tool: "delete_attribute_profile",
-          summary: `Delete the "${profile.name}" profile (${profile.category}) and everything under it.`,
+          summary: `Delete the "${profile.name}" profile (${bricks.map((b) => b.name).join(", ")}) and everything under it.`,
           args: { profileName: profile.name },
           destructive: true,
           confirmText: profile.name,

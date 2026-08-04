@@ -686,7 +686,6 @@ export function getCapabilities(ctx: CallerContext) {
     liveSnapshot: {
       attributeProfiles: store.profiles.map((p) => ({
         name: p.name,
-        category: p.category,
         status: p.status,
         brickCode: p.brickCode,
       })),
@@ -703,16 +702,14 @@ export function getCapabilities(ctx: CallerContext) {
 // ── Writes (in-memory demo store) ────────────────────────────────────────────
 
 /**
- * Create a requirement profile mapped to one or more GS1 bricks. `category`
- * is the free-text product-type label shown in the requirements list —
- * independent of which/how-many bricks are mapped; it defaults to
- * `categoryName` so existing single-argument callers keep working.
+ * Create a requirement profile mapped to one or more GPC classifications.
+ * `categoryName` is the retailer's own label for the requirement — it is not
+ * a GS1 category and does not have to match one.
  */
 export function createAttributeProfile(
   ctx: CallerContext,
   categoryName: string,
-  brickCodes: string[],
-  category?: string
+  brickCodes: string[]
 ) {
   const bricks = brickCodes.map((code) => getBrickByCode(code))
   const store = getStore(ctx.tenantId)
@@ -743,7 +740,6 @@ export function createAttributeProfile(
   const mappedBricks: ProfileBrick[] = resolvedBricks.map((b) => ({ code: b.brickCode, name: b.brickName }))
   const profile: AttributeProfile = {
     name: categoryName,
-    category: category ?? categoryName,
     attributes: describeProfileAttributes(mappedBricks),
     status: "Draft",
     lastUpdated: today(),
@@ -993,7 +989,7 @@ export function deleteAttributeProfile(ctx: CallerContext, profileName: string) 
   }
   const [removed] = store.profiles.splice(idx, 1)
   for (const brick of profileBrickCodes(removed)) delete store.profileExtras[brick]
-  return { removed: { name: removed.name, category: removed.category, status: removed.status }, demo_note: DEMO_NOTE }
+  return { removed: { name: removed.name, status: removed.status }, demo_note: DEMO_NOTE }
 }
 
 /**

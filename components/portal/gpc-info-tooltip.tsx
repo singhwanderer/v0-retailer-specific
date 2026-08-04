@@ -21,7 +21,7 @@ export function GpcInfoTooltip({ className }: { className?: string }) {
       <TooltipContent className="max-w-[240px]">
         <p>
           GPC (Global Product Classification) is GS1&apos;s global standard for
-          categorizing products by segment and brick.{" "}
+          categorizing products by category and GPC classification.{" "}
           <a
             href={GPC_BROWSER_URL}
             target="_blank"

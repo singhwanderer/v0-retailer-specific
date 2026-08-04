@@ -189,7 +189,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "search_gs1_bricks",
     description:
-      "Search the GS1 standard category library by name, segment, or category code. Returns each GS1 category's code, name, segment, its standard extended attributes, and whether it is still free to map to a new profile (`available`, plus `mappedTo` when it is not). Use this to resolve a product category like 'dresses' or 'footwear' to a GS1 category code before creating or inspecting an attribute profile. Matching is literal against those fields, not fuzzy: a product type the GS1 names do not use will find nothing, and a profile name will usually find nothing — neither is a failure, both mean ask the user which category they mean. If nothing matches, or every match is already mapped, the result carries a `note` naming the categories that are still free — relay those rather than picking a similar-sounding category yourself. Call with an empty query to list the whole library.",
+      "Search the GS1 standard category library by name, category (Footwear, Clothing, etc.), or category code. Returns each GS1 category's code, name, category grouping, its standard extended attributes, and whether it is still free to map to a new profile (`available`, plus `mappedTo` when it is not). Use this to resolve a product type like 'dresses' or 'footwear' to a GS1 category code before creating or inspecting an attribute profile. Matching is literal against those fields, not fuzzy: a product type the GS1 names do not use will find nothing, and a profile name will usually find nothing — neither is a failure, both mean ask the user which category they mean. If nothing matches, or every match is already mapped, the result carries a `note` naming the categories that are still free — relay those rather than picking a similar-sounding category yourself. Call with an empty query to list the whole library.",
     schema: {
       query: z
         .string()
@@ -372,7 +372,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
   {
     name: "create_attribute_profile",
     description:
-      "Create a new attribute profile (requirement set) for a product category, mapped to one or more GS1 categories. The profile starts as Draft and is seeded with each mapped GS1 category's standard extended attributes — each brick keeps its own attribute set, with no merging across bricks. A profile has two independent parts: `categoryName`, the retailer's own label, which can be anything, and `brickCodes`, the GS1 categories it covers. The name never implies the category — do not derive one from the other. Call without brickCodes when the user has named a profile but not said what it covers: the call is refused with the list of categories still free, to put to the user. Every GS1 category belongs to at most one profile. Before calling with a category, confirm the name, the GS1 category choice(s), and the free-text product-type label with the user, and afterwards show them the created profile.",
+      "Create a new attribute profile (requirement set) for a product category, mapped to one or more GS1 categories. The profile starts as Draft and is seeded with each mapped GS1 category's standard extended attributes — each brick keeps its own attribute set, with no merging across bricks. `categoryName` is the retailer's own label for the requirement, which can be anything — the name never implies the category, do not derive one from the other. `brickCodes` is the GS1 categories it covers. Call without brickCodes when the user has named a profile but not said what it covers: the call is refused with the list of categories still free, to put to the user. Every GS1 category belongs to at most one profile. Before calling, confirm the name and the GS1 category choice(s) with the user, and afterwards show them the created profile. There is no separate free-text category or product-type field to set — the requirement's coverage is carried entirely by its mapped GS1 categories.",
     schema: {
       categoryName: z.string().describe("The retailer's internal category name, e.g. 'Swimwear' — the retailer's own label, unconstrained"),
       brickCodes: z
@@ -381,19 +381,13 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
         .describe(
           "GS1 category codes to map (find via search_gs1_bricks). Omit if the user has not said which category — the refusal names the available ones to ask them about."
         ),
-      category: z
-        .string()
-        .optional()
-        .describe(
-          "Free-text product-type label shown in the requirements list, e.g. 'Women's Apparel' — independent of which GS1 categories are mapped; defaults to categoryName if omitted"
-        ),
     },
     kind: "write",
     requiredScope: SCOPES.requirementsWrite,
     allowedTenantClasses: RETAILER_ONLY,
     allowWorkload: false,
     requiresConfirmation: true,
-    preview: (ctx, a: { categoryName: string; brickCodes?: string[]; category?: string }) => {
+    preview: (ctx, a: { categoryName: string; brickCodes?: string[] }) => {
       // A name on its own is not half a request — it is the normal state after
       // "create a requirement called Troy". Refusing here means no confirmation
       // token is minted (see the `preview` contract above), so the agent has to
@@ -411,17 +405,14 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
       return {
         summary: `Create a new "${a.categoryName}" requirement profile mapped to ${codes.length} GS1 categor${codes.length === 1 ? "y" : "ies"}.`,
         effect: [
-          `Free-text category label: "${a.category ?? a.categoryName}".`,
           `GS1 categories mapped: ${codes.join(", ")}. Each keeps its own attribute set — nothing is merged across them.`,
           "The profile is seeded with each category's standard GS1 extended attributes.",
           "It starts as a DRAFT, so nothing is assessed against it until it is activated.",
         ],
       }
     },
-    handler: (
-      ctx,
-      { categoryName, brickCodes, category }: { categoryName: string; brickCodes?: string[]; category?: string }
-    ) => createAttributeProfile(ctx, categoryName, brickCodes ?? [], category),
+    handler: (ctx, { categoryName, brickCodes }: { categoryName: string; brickCodes?: string[] }) =>
+      createAttributeProfile(ctx, categoryName, brickCodes ?? []),
   },
   {
     name: "add_attribute_requirement",
@@ -649,11 +640,11 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
         effect:
           a.status === "Active"
             ? [
-                `Vendor items in ${profile.category} start being assessed against this profile's requirements.`,
+                `Vendor items under "${profile.name}" start being assessed against this profile's requirements.`,
                 "Expect reported gap counts to rise the first time a report runs — those gaps already existed, they were simply not being measured.",
               ]
             : [
-                `Vendor items in ${profile.category} stop being assessed against this profile.`,
+                `Vendor items under "${profile.name}" stop being assessed against this profile.`,
                 "Gaps against these requirements will no longer be reported. The requirements themselves are kept and can be re-activated.",
               ],
       }
@@ -766,7 +757,7 @@ export const TOOL_MANIFEST: ToolDefinition[] = [
         0
       )
       return {
-        summary: `Delete the "${profile.name}" profile (${profile.category}) and everything under it.`,
+        summary: `Delete the "${profile.name}" profile (${bricks.map((b) => b.name).join(", ")}) and everything under it.`,
         effect: [
           bricks.length === 1
             ? `1 GS1 category loses its requirements: ${bricks[0].name}.`

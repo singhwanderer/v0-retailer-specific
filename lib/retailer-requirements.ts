@@ -16,7 +16,6 @@ export interface ProfileBrick {
 
 export interface AttributeProfile {
   name: string
-  category: string
   attributes: string
   status: ProfileStatus
   lastUpdated: string
@@ -26,10 +25,11 @@ export interface AttributeProfile {
   brickCode: string
   brickName: string
   /**
-   * All GS1 bricks mapped to this requirement. A requirement can span several
-   * bricks within one category (segment). Optional: when absent, the profile
-   * maps to just the primary `brickCode`/`brickName` — use `getProfileBricks`
-   * to read the effective list.
+   * All GS1 bricks (GPC classifications) mapped to this requirement. A
+   * requirement can span several classifications within one category.
+   * Optional: when absent, the profile maps to just the primary
+   * `brickCode`/`brickName` — use `getProfileBricks` to read the effective
+   * list.
    */
   bricks?: ProfileBrick[]
 }
@@ -48,7 +48,6 @@ export function getProfileBricks(
 export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   {
     name: "Footwear",
-    category: "Footwear",
     attributes: "30 attributes · 1 image requirement",
     status: "Active",
     lastUpdated: "Mar 8, 2026",
@@ -59,7 +58,6 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   },
   {
     name: "Apparel",
-    category: "Women's Apparel",
     attributes: "59 attributes · 2 GPC classifications",
     status: "Active",
     lastUpdated: "Feb 14, 2026",
@@ -74,7 +72,6 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   },
   {
     name: "Outerwear",
-    category: "Women's Apparel",
     attributes: "36 attributes",
     status: "Active",
     lastUpdated: "Feb 26, 2026",
@@ -85,7 +82,6 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   },
   {
     name: "Dresses",
-    category: "Women's Apparel",
     attributes: "34 attributes",
     status: "Active",
     lastUpdated: "Mar 15, 2026",
@@ -96,7 +92,6 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   },
   {
     name: "Skirts",
-    category: "Women's Apparel",
     attributes: "32 attributes",
     status: "Active",
     lastUpdated: "Mar 12, 2026",
@@ -107,7 +102,6 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   },
   {
     name: "Trousers & Shorts",
-    category: "Women's Apparel",
     attributes: "34 attributes",
     status: "Draft",
     lastUpdated: "Mar 14, 2026",
@@ -118,7 +112,6 @@ export const ATTRIBUTE_PROFILES: AttributeProfile[] = [
   },
   {
     name: "Belts",
-    category: "Accessories",
     attributes: "29 attributes",
     status: "Active",
     lastUpdated: "Mar 7, 2026",

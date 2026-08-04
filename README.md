@@ -49,23 +49,26 @@ This is a demo, so some surfaces are deliberately not built:
 
 ## Requirement authoring model — GS1 bricks, multi-brick profiles, one shared store
 
-Attributes are always defined at **GS1 brick level**, not the free-text category
-level. A retailer requirement (`AttributeProfile`) can map to **one or more GS1
-bricks**, chosen either at creation (Screen 1's multi-select wizard step) or
-later from the detail screen's "Add GS1 Category" action — both reuse the same
-searchable brick picker (`components/portal/gs1-brick-picker.tsx`) and the same
-cross-category confirmation (`components/portal/confirm-mixed-category-modal.tsx`):
-if an added brick's segment (Footwear, Clothing, Jewellery, Accessories,
+Attributes are always defined at **GPC classification level** (the GS1 brick), not
+at the free-text requirement name. A retailer requirement (`AttributeProfile`)
+has a name — its own unconstrained label — and maps to **one or more GPC
+classifications**, chosen either at creation (Screen 1's multi-select wizard
+step) or later from the detail screen's "Add GS1 Category" action — both reuse
+the same searchable picker (`components/portal/gs1-brick-picker.tsx`) and the
+same cross-category confirmation
+(`components/portal/confirm-mixed-category-modal.tsx`): if an added
+classification's category (Footwear, Clothing, Jewellery, Accessories,
 Sportswear, Homewear) differs from the requirement's established one, a
 confirmation dialog asks "Add anyway?" — a soft override, not a hard block.
 
-**Each mapped brick keeps its own attribute set — nothing is merged across
-bricks.** A multi-brick profile's detail screen (Screen 2) shows a searchable
-dropdown scoped to that profile's own bricks; switching bricks changes which
-brick's Core/Extended/Image rows are shown and edited. The free-text
-**Category / Product Type** field (typed once, in Step 1 of creation) always
-drives the requirements list's Category column — independent of which or how
-many GS1 categories end up mapped underneath it.
+**Each mapped classification keeps its own attribute set — nothing is merged
+across classifications.** A multi-classification profile's detail screen
+(Screen 2) shows a searchable dropdown scoped to that profile's own
+classifications; switching between them changes which classification's
+Core/Extended/Image rows are shown and edited. The requirement's name carries
+no category meaning of its own — coverage is conveyed entirely by its mapped
+GPC classifications, which is what the requirements list's GPC Classification
+column shows. There is no separate free-text category or product-type field.
 
 **One shared tool layer, two consumers.** `lib/mcp/tools.ts` — the same
 functions the external MCP connector calls — is called directly by the portal

@@ -122,8 +122,8 @@ export function ComplianceAgentPanel({
 
     try {
       if (proposal.tool === "create_attribute_profile") {
-        const { name, brickCodes, category } = proposal.args as { name: string; brickCodes: string[]; category?: string }
-        const result = createAttributeProfile(PORTAL_CTX, name, brickCodes, category)
+        const { name, brickCodes } = proposal.args as { name: string; brickCodes: string[] }
+        const result = createAttributeProfile(PORTAL_CTX, name, brickCodes)
         if ("error" in result) {
           setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: "error", resultNote: result.error } : p)))
           return

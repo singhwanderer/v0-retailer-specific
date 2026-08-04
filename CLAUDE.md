@@ -90,12 +90,14 @@ external MCP clients have no UI of ours to render a confirm card in — see
 
 ### Requirement authoring model
 
-Attributes are defined at **GS1 brick** level, never free-text category level. A
-retailer requirement (`AttributeProfile`) can map to multiple GS1 bricks (via
-`components/portal/gs1-brick-picker.tsx`); each mapped brick keeps its own
-attribute set (nothing merges across bricks). The free-text Category/Product Type
-field is independent of, and drives only the list-view label for, however many
-GS1 bricks are actually mapped underneath.
+Attributes are defined at **GPC classification** level (the GS1 brick), never at
+the requirement's own name. A retailer requirement (`AttributeProfile`) can map
+to multiple GPC classifications (via `components/portal/gs1-brick-picker.tsx`);
+each mapped classification keeps its own attribute set (nothing merges across
+classifications). There is no free-text category or product-type field — the
+requirement's name is an unconstrained label with no bearing on coverage, and
+the requirements list's GPC Classification column is driven entirely by however
+many classifications are actually mapped.
 
 ### Evaluation
 

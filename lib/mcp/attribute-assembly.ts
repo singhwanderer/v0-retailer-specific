@@ -155,10 +155,11 @@ function unmappedBricks(profiles: AttributeProfile[]): Gs1Brick[] {
  * refusal back, because those really were the only options the agent had been
  * handed, while an unmapped category sat there the whole time.
  *
- * It also says "GS1 category" throughout: AttributeProfile.category is a
- * separate free-text label that several profiles legitimately share, so an
- * unqualified "a category belongs to one profile" reads as false to anyone
- * looking at their own requirements list.
+ * It also says "GS1 category" throughout to mean the GPC classification a
+ * profile is mapped to — a profile's own name is a separate, unconstrained
+ * label with no bearing on this rule, several profiles may share a similar
+ * one, and "a category belongs to one profile" is a statement about the GS1
+ * mapping only.
  */
 export function mappingConflict(
   profiles: AttributeProfile[],
@@ -178,7 +179,7 @@ export function mappingConflict(
   return (
     `The GS1 category "${brick.brickName}" is already mapped to the "${ownerName}" profile, ` +
     `and a GS1 category can belong to only one profile at a time. ` +
-    `(A profile's own category label is a different, free-text field — profiles may share that.) ` +
+    `(A profile's own name is a separate, unconstrained label with no bearing on this rule.) ` +
     `Ways forward: ${options.join("; ")}. ` +
     `Put these to the user and let them choose; do not pick a category on their behalf.`
   )

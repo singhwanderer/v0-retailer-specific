@@ -21,9 +21,15 @@
 - **Anti-criteria** state what must *not* happen. They are as binding as the
   acceptance criteria.
 
-The organising idea behind every story here: **the GS1 brick code is the pivot that
-lets many retailers assess one product.** Fill a gap once, satisfy every retailer who
-requires it.
+The organising idea behind every story here: **the GPC classification code is the
+pivot that lets many retailers assess one product.** Fill a gap once, satisfy every
+retailer who requires it.
+
+**Vocabulary.** TGC has two levels of product classification and no third:
+**Category** is the Footwear / Clothing / Jewellery / Accessories / Sportswear /
+Homewear grouping (the backend calls this `segment` — that word is never used in the
+product), and **GPC classification** is the 8-digit brick beneath it. Where a screen
+groups by one and labels it the other, the story says so.
 
 ---
 
@@ -226,8 +232,8 @@ whole catalogue, so that I fix a requirement once instead of once per customer.
 **Story ID:** SUP-04
 
 **User story**
-As a supplier data manager, I want to assign a GS1 category to products in bulk, so
-that they can be assessed at all — against the baseline and every retailer at once.
+As a supplier data manager, I want to assign a GPC classification to products in bulk,
+so that they can be assessed at all — against the baseline and every retailer at once.
 
 **Acceptance criteria**
 
@@ -240,10 +246,12 @@ that they can be assessed at all — against the baseline and every retailer at 
   can select all uncategorised in one action.
   - UI: red "No category" pill per row; a "Select all uncategorised (N)" control.
 
-- Given I have selected products, when I open Assign Category, then I choose a GS1
-  brick from a searchable picker filterable by segment.
-  - UI: modal titled with the selection count; explains that the brick's standard
-    attributes become the GS1 baseline requirements.
+- Given I have selected products, when I open Assign Category, then I choose a GPC
+  classification from a searchable picker filterable by category.
+  - UI: modal titled with the selection count; explains that the classification's
+    standard attributes become the GS1 baseline requirements. Its search placeholder
+    currently reads "Search category name or code…" while it searches
+    classifications — reword it, as in RET-05.
 
 - Given I assign a category, when it is applied, then compliance recalculates against
   the GS1 baseline and every retailer, and the change is confirmed.
@@ -259,10 +267,11 @@ that they can be assessed at all — against the baseline and every retailer at 
 
 **Anti-criteria**
 
-- Given a categorised product already carries a brick, when a bulk assignment runs
-  over a mixed selection, then it must NOT silently reclassify the categorised ones.
-- Given categorisation is the gateway task, when a product has no brick, then it must
-  NOT be reported as compliant or complete for any target.
+- Given a categorised product already carries a GPC classification, when a bulk
+  assignment runs over a mixed selection, then it must NOT silently reclassify the
+  categorised ones.
+- Given categorisation is the gateway task, when a product has no GPC classification,
+  then it must NOT be reported as compliant or complete for any target.
 
 ---
 
@@ -359,8 +368,8 @@ and work offline where I need to.
   - UI: blue "N waived" badge alongside the compliance badge.
 
 - Given I download a code's template, when the file is produced, then it carries
-  Product ID, Description, Category and GS1 brick code columns plus the attribute
-  columns, with one row per product under that code.
+  Product ID, Description, Category and GPC classification code columns plus the
+  attribute columns, with one row per product under that code.
   - UI: per-code "Download attribute template CSV" action.
 
 - Given the template is meant to be filled and returned, when I download it, then a
@@ -391,13 +400,16 @@ end in the same place.
 **Acceptance criteria**
 
 - Given I arrive from a retailer's selection code, when the list renders, then it is
-  filtered to that code's brick and shows that partner's gap count only.
+  filtered to that code's GPC classification and shows that partner's gap count only.
   - UI: filters are free-text search plus All / Has gaps / Complete toggles.
 
-- Given I arrive from the GS1 row, when the list renders, then I can filter by category
-  and each product shows its baseline state.
+- Given I arrive from the GS1 row, when the list renders, then I can filter by GPC
+  classification and each product shows its baseline state.
   - UI: states read "GS1 complete", "N GS1 gaps" or "Cannot be assessed"; a chip panel
-    shows the selected category's GS1 standard attributes.
+    shows the selected classification's GS1 standard attributes. This filter is
+    labelled "category" today but builds its options from classification codes
+    (`screen-supplier-products.tsx:333-349`) — relabel it, since SUP-03's filter one
+    screen away is a genuine category filter.
 
 - Given products in the GS1 view have no category, when the list renders, then a banner
   states how many and routes me to the Catalogue screen.
@@ -669,8 +681,8 @@ exception, so that my compliance numbers never move for reasons I cannot trace.
 
 - Given I click a notification, when it resolves, then I land on the selection code the
   exception applies to.
-  - UI: resolves the exception's GS1 brick to a live selection code; falls back to the
-    code list when no match exists.
+  - UI: resolves the exception's GPC classification to a live selection code; falls
+    back to the code list when no match exists.
 
 **Anti-criteria**
 
@@ -823,8 +835,8 @@ anyone else's data.
   - UI: default and maximum result sizes applied; waived items in their own field.
 
 - Given I ask what has been waived for me, when exceptions are returned, then each names
-  the granting retailer, its category scope, the attributes, the validity date and a
-  plain-English effect.
+  the granting retailer, its GPC classification scope, the attributes, the validity
+  date and a plain-English effect.
   - UI: exceptions that reduce no gap count are flagged as such.
 
 - Given a retailer's custom requirement names are its own, when partner information is

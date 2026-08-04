@@ -825,7 +825,6 @@ export function Screen1AttributeProfiles({
     // Skip path — no GS1 brick mapped; a plain baseline-only profile.
     const newProfile: AttributeProfile = {
       name: result.name,
-      category: result.name,
       attributes: `${BASELINE_CORE_COUNT} attributes`,
       status: result.initialStatus,
       lastUpdated: today(),
