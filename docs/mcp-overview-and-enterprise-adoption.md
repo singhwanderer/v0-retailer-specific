@@ -1018,6 +1018,12 @@ would live outside the catalogue prototype — the point is precisely that they 
 not one product's screens — and they are described here at product level so a
 later session can build them without re-deriving the reasoning.
 
+> **Worked up in full in [`cross-product-screens-brief.md`](cross-product-screens-brief.md)** —
+> the problem statement, the opportunity, which products are involved, the
+> information flow between them as diagrams, the user flow through each screen, and
+> the open questions addressed to each peer product manager by name. That brief is
+> written to be read without this document; this annex remains the short version.
+
 ## The screens
 
 **1. Mapping Console.** The declared surface from Section 4's second condition.
