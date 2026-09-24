@@ -239,7 +239,7 @@ export function TopNav({
           </div>
           <div className="flex flex-col leading-tight">
             <span className="text-sm font-medium">
-              {perspective === "retailer" ? "Dillard\u2019s" : "J.Ren\u00e9e"}
+              {perspective === "retailer" ? "Nordstrom" : "J.Ren\u00e9e"}
             </span>
             <span className="text-[10px] text-white/60">
               {role === "admin" ? "Administrator" : "Standard user"}
